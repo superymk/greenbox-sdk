@@ -1,0 +1,32 @@
+lvgl (13dd9021332b028f6630d21b2d8052cf312a537d): https://codeload.github.com/lvgl/lvgl/zip/13dd9021332b028f6630d21b2d8052cf312a537d
+
+lvgl modifications
+=============
+1. In lvgl/src/others/file_explorer/lv_file_explorer.c, line 554, the function <static void browser_file_event_handler(lv_event_t * e)>:
+/* Navigate to the file path if this is a directory */
+        if(file_entry_user_data->file_kind == LV_FILE_EXPLORER_FILE_KIND_DIR) {
+            lv_fs_dir_t dir;
+            lv_fs_res_t res = lv_fs_dir_open(&dir, file_name);
+            if(res == LV_FS_RES_OK) {
+                lv_fs_dir_close(&dir);
+                show_dir(obj, (char *)file_name);
+            }
+            else {
+                LV_LOG_USER("Could not navigate to %s (error: %d)", file_name, res);
+            }
+
++           explorer->sel_fn = ""; //[Superymk] Lvgl BUG: going into a dir should clear the cached "selected file name".
+        }
+        else {
+            if(navigate_to_child) {
+                explorer->sel_fn = selected_text;
+                lv_obj_send_event(obj, LV_EVENT_VALUE_CHANGED, NULL);
+            }
+        }
+
+
+
+mouse_cursor_icon (https://www.flaticon.com/free-icon/cursor_17294068?term=cursor&page=3&position=32&origin=tag&related_id=17294068)
+=============
+1. [Important] Flaticon License: Free for personal and commercial purpose with attribution. Attribution link is: 
+<a href="https://www.flaticon.com/free-icons/mouse-clicker" title="mouse clicker icons">Mouse clicker icons created by Fathema Khanom - Flaticon</a>

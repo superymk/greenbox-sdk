@@ -1,0 +1,93 @@
+SPDX-License-Identifier: Proprietary
+Copyright (c) [YEAR] [Your Legal Entity]. All rights reserved.
+
+PROPRIETARY LICENSE AGREEMENT
+
+IMPORTANT: This license applies ONLY to parties who have obtained a valid
+commercial license from [Your Legal Entity] ("Licensor"). If you do not have
+a separate, written commercial license agreement from Licensor, you are not
+granted any rights under this Proprietary License and must use the Software
+under GPL-2.0-only instead (see LICENSE-GPL-2.0).
+
+1. Definitions
+   1.1 "Software" means the source code and associated materials in this
+       repository that contain the SPDX identifier "GPL-2.0-only OR Proprietary".
+   1.2 "Licensee" means the entity that has executed a commercial license
+       agreement with Licensor for the Software.
+
+2. Grant
+   Subject to Licensee's continuous compliance with this License and payment of
+   all applicable fees under the commercial agreement, Licensor grants Licensee
+   a worldwide, non-exclusive, non-transferable, royalty-bearing license to:
+     (a) use, reproduce, modify, and compile the Software;
+     (b) create derivative works of the Software;
+     (c) distribute object code (including as part of Licensee products)
+         under terms selected by Licensee; and
+     (d) sublicense object code to Licensee's customers and distributors,
+         solely as necessary to enable the distribution and operation of
+         Licensee products.
+
+3. Source Code Distribution
+   Distribution of source code or any materials that would enable recipients to
+   reconstruct the source code (e.g., decompilation stubs or patch sets) is NOT
+   permitted under this Proprietary License without Licensor's prior written
+   consent.
+
+4. Reservation of Rights
+   Except for the rights expressly granted, Licensor reserves all rights, title,
+   and interest in and to the Software, including all intellectual property
+   rights.
+
+5. Restrictions
+   Licensee shall not: (i) remove or obscure notices in the Software; (ii) use
+   Licensor's names, marks, or logos except as permitted by written agreement;
+   (iii) misrepresent the origin of the Software; (iv) reverse engineer or
+   attempt to derive the source of any Licensor-provided binary-only components,
+   except where required by law.
+
+6. No Copyleft Trigger
+   Distribution of object code by Licensee under this License does not impose
+   any copyleft or source-disclosure obligation upon Licensee's proprietary
+   works.
+
+7. Support & Updates
+   Any support, updates, or maintenance are provided (if at all) only as stated
+   in the commercial agreement between Licensor and Licensee.
+
+8. Warranty Disclaimer
+   THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY, FITNESS
+   FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, OR THAT OPERATION WILL BE
+   UNINTERRUPTED OR ERROR-FREE.
+
+9. Limitation of Liability
+   TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR SHALL NOT BE LIABLE FOR ANY
+   INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY
+   LOSS OF PROFITS, REVENUE, DATA, OR BUSINESS, EVEN IF ADVISED OF THE
+   POSSIBILITY OF SUCH DAMAGES. LICENSOR'S TOTAL LIABILITY FOR ALL CLAIMS
+   ARISING UNDER THIS LICENSE SHALL NOT EXCEED THE AMOUNTS PAID BY LICENSEE FOR
+   THE SOFTWARE DURING THE 12 MONTHS PRECEDING THE CLAIM.
+
+10. Term & Termination
+   This License is effective as of the effective date of Licensee's commercial
+   agreement and continues for its term. Either party may terminate this License
+   as stated in that agreement. Upon termination, Licensee must cease use of and
+   destroy or return all copies of the Software in its possession or control,
+   except for object code already distributed to Licensee's customers, which may
+   continue to be used under the terms in Section 2.
+
+11. Compliance Audit
+   Licensor may, upon reasonable notice and no more than once per year, audit
+   Licensee's records solely as necessary to verify compliance with this
+   License.
+
+12. Governing Law; Venue
+   This License is governed by the laws of [Choose: e.g., Delaware, USA], and
+   the courts located in [County/State] shall have exclusive jurisdiction.
+
+13. Entire Agreement; Order of Precedence
+   This License and the commercial agreement constitute the entire agreement for
+   the Proprietary licensing of the Software. In case of conflict, the
+   commercial agreement controls.
+
+For commercial licensing, contact: [legal@yourdomain.com]

@@ -1,0 +1,204 @@
+# /*
+#  * -------------------------------------------------------------------------------------
+#  * Carnegie Mellon University
+#  * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
+#  * 
+#  * This software is the proprietary information of Carnegie Mellon University.
+#  * Use is subject to license terms.
+#  * 
+#  * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
+#  * written consent of Carnegie Mellon University. is strictly prohibited.
+#  * -------------------------------------------------------------------------------------
+#  * 
+#  * Authors: Miao Yu
+#  *          Virgil Gligor
+#  */
+
+# ----------------------------------------------------------------------------
+# Common commands
+# ----------------------------------------------------------------------------
+export MAKE                     = make
+export RM                       = rm -f
+export RMDIR                    = rm -rf
+export MKDIR                    = mkdir -p
+export CP                       = cp
+export CD                       = cd
+export ECHO                     = echo
+
+# ----------------------------------------------------------------------------
+# Kernel Configurations
+# ----------------------------------------------------------------------------
+export CURRENT_PLATFORM                 = amd64
+# Note: Platform could be i386, amd64
+export TARGET_PLATFORM                  = amd64
+# The target running OS: linux, windows_msys2
+# Note: MSYS2 UCRT is needed to build under "windows"
+export OS                               = linux
+export DEVELOP                          = y
+
+export CONFIG_SOSLOADER_GUI             = y
+export CONFIG_SOSLOADER_GUI_DEBUG       = n
+
+export CONFIG_SECAGENT_WIN_DEBUG        = n
+
+# Debug configurations
+export DEBUG                            = n
+export CONFIG_DEBUG_LOADERS_MEMLEAK     = n
+
+# Verbose Level: V_DEBUG V_PERF V_INFO V_NOTICE V_WARNING V_ERR V_CRIT V_EMERG
+export VERBOSE_LVL              = V_DEBUG
+
+# PAL_DEMO could be either SP_EXAMPLE_SAP or SP_TEST_PAL or RDESKTOP_PAL or RICH_GUI_SAP or RFILES_SAP
+export PAL_DEMO                 = RICH_GUI_SAP
+
+# [Copied from the old SecBase]
+# This environment variable controls how logs are printed.
+# If this macro is NOT set:
+#   SecOS will directly access serial to print logs.
+#   SecAgent will print logs to red OS (e.g. Linux serial output).
+# If this macro is set:
+#   SecOS and SecAgent will ask hypapp to print the log with a hypercall.
+#   The value of this macro indicates vsnprintf() buffer size.
+export XMHF_LOG_BUF_SIZE = 256
+
+# ----------------------------------------------------------------------------
+# Build tools
+# ----------------------------------------------------------------------------
+ifeq ($(CURRENT_PLATFORM)$(TARGET_PLATFORM), amd64i386)
+    ifeq ($(OS), linux)
+        # WXW_CC and WXW_CPP is for compiling and linking wxWidgets GUI applications 
+        export WXW_CC = i686-linux-gnu-gcc
+        export WXW_CPP = i686-linux-gnu-g++
+        export CC = i686-linux-gnu-gcc
+        export CXX = i686-linux-gnu-g++
+        export CPP = $(CC) -E
+        export LD = i686-linux-gnu-ld
+        export OBJCOPY = i686-linux-gnu-objcopy
+        export STRIP = i686-linux-gnu-strip --strip-all
+    endif
+else
+    ifeq ($(OS), windows_msys2)
+        export WXW_CC = /mingw64/bin/x86_64-w64-mingw32-gcc
+        export WXW_CPP = /mingw64/bin/x86_64-w64-mingw32-g++
+        export CC = cc
+        export CXX = g++
+        export CPP = $(CC) -E
+        export LD = ld
+        export OBJCOPY = objcopy
+        export STRIP = strip --strip-all
+    else
+        # For Linux implicit variables, see https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html
+        export WXW_CC = gcc
+        export WXW_CPP = g++
+        export CC = cc
+        export CXX = g++
+        export CPP = $(CC) -E
+        export LD = ld
+        export OBJCOPY = objcopy
+        export STRIP = strip --strip-all
+    endif
+endif
+
+# ----------------------------------------------------------------------------
+# Define directory structure paths.
+# ----------------------------------------------------------------------------
+#export GREENBOX_ROOT_DIR=$(CURDIR)/..
+
+# Build paths
+export BUILD_PATH=$(CURDIR)/output/build
+export DIST_PATH=$(CURDIR)/output/dist
+export DIST_DATA_PATH=$(DIST_PATH)/userdata
+export DIST_TOOLS_PATH=$(DIST_PATH)/tools
+export DIST_SAP_PATH=$(DIST_PATH)/sap
+export DIST_SOS_PATH=$(DIST_PATH)/sos
+export DIST_SOSLOADER_GUI_PATH=$(DIST_PATH)
+export DIST_INSTALLER_PATH=$(DIST_TOOLS_PATH)/installer
+export DIST_LIBS_QT_PATH=$(DIST_PATH)/libs/qt
+export DIST_PRIV_PATH=$(CURDIR)/output/dist_priv
+export DIST_PRIV_DATA_PATH=$(DIST_PRIV_PATH)/userdata
+export DIST_PRIV_TOOLS_PATH=$(DIST_PRIV_PATH)/tools
+export DIST_PRIV_SAP_PATH=$(DIST_PRIV_PATH)/sap
+export DIST_PRIV_SOS_PATH=$(DIST_PRIV_PATH)/sos
+export DIST_PRIV_SOSLOADER_GUI_PATH=$(DIST_PRIV_PATH)
+export DIST_PRIV_INSTALLER_PATH=$(DIST_PRIV_TOOLS_PATH)/installer
+export DIST_PRIV_LIBS_QT_PATH=$(DIST_PRIV_PATH)/libs/qt
+
+# Project paths
+export SAP_LIBS_BASEDIR=$(CURDIR)/secapp_libs
+export SAP_DEMOS=$(CURDIR)/secapp_demos
+export GB_PRIVATE_SP_DEMOS=$(SAP_DEMOS)/gb-private-sp
+export SECAGENT_PATH=$(CURDIR)/os_module
+
+export LOADERS_BASEDIR=$(CURDIR)/loaders
+export SAP_LOADER_BASEDIR=$(LOADERS_BASEDIR)/sp_loader
+export SECOS_LOADER_BASEDIR=$(LOADERS_BASEDIR)/sos_loader
+export SECOS_SERVICES_LOADER_BASEDIR=$(LOADERS_BASEDIR)/sos_services_loader
+
+export APPLIB_BASEDIR=$(SAP_LOADER_BASEDIR)/libs
+
+export LOADERS_EXTERNAL_BASEDIR=$(LOADERS_BASEDIR)/external
+
+export INSTALLER_TEMPDIST_BASEDIR=$(CURDIR)/tools_dist/installer/dist
+
+# Public headers
+export SECBASE_PUBLIC_HEADERS=$(CURDIR)/base/include/secbase
+export SECOS_PUBLIC_HEADERS=$(CURDIR)/base/include/secos
+export APP_HEADERS=$(SAP_LOADER_BASEDIR)/include
+export SECAGENT_PUBLIC_HEADERS=$(SECAGENT_PATH)/include/public
+export SECOS_LOADER_PUBLIC_HEADERS=$(SECOS_LOADER_BASEDIR)/include/public
+
+# SecServices' public headers
+export SECSRV_INIT_PUBLIC_HEADERS=$(CURDIR)/base/include/iosms/init
+export IOSM_PCIE_PUBLIC_HEADERS=$(CURDIR)/base/include/iosms/iosm_pcie
+export IOSM_PS2_PUBLIC_HEADERS=$(CURDIR)/base/include/iosms/iosm_ps2
+export IOSM_USB3_PUBLIC_HEADERS=$(CURDIR)/base/include/iosms/iosm_usb3
+export IOSM_FB_PUBLIC_HEADERS=$(CURDIR)/base/include/iosms/iosm_fb
+export SECSRV_DTM_PUBLIC_HEADERS=$(CURDIR)/base/include/secsrvs/secsrv_dtm
+
+# SecApp's public headers
+export SAP_NEWLIB_DIST=$(SAP_LIBS_BASEDIR)/newlib/dist
+export SAP_PORT_LIBS_BASEDIR=$(SAP_LIBS_BASEDIR)/ports
+export SAP_PORT_LIBS_DIST_DIR = $(SAP_PORT_LIBS_BASEDIR)/dist
+export PAL_LIBC_HEADERS=$(SAP_LIBS_BASEDIR)/sap-libc/include
+export PAL_HEADERS=$(SAP_LIBS_BASEDIR)/include
+export LIBDRV_INIT_BASEDIR=$(SAP_LIBS_BASEDIR)/iosm/init
+export LIBDRV_INIT_PUBLIC_HEADERS=$(LIBDRV_INIT_BASEDIR)/include
+export LIBDRV_USB2_BASEDIR=$(SAP_LIBS_BASEDIR)/iosm/usb2
+export LIBDRV_USB2_PUBLIC_HEADERS=$(LIBDRV_USB2_BASEDIR)/include
+export LIBDRV_USB3_BASEDIR=$(SAP_LIBS_BASEDIR)/iosm/usb3
+export LIBDRV_USB3_PUBLIC_HEADERS=$(LIBDRV_USB3_BASEDIR)/include
+export LIBDRV_FB_BASEDIR=$(SAP_LIBS_BASEDIR)/iosm/fb
+export LIBDRV_FB_PUBLIC_HEADERS=$(LIBDRV_FB_BASEDIR)/include
+
+export LIBDRV_HID_BASEDIR=$(SAP_LIBS_BASEDIR)/drv/hid
+export LIBDRV_HID_PUBLIC_HEADERS=$(LIBDRV_HID_BASEDIR)/include
+export LIBBRIDGE_HID_BASEDIR=$(SAP_LIBS_BASEDIR)/drv/hid-bridge
+export LIBBRIDGE_HID_PUBLIC_HEADERS=$(LIBBRIDGE_HID_BASEDIR)/include
+export LIBBRIDGE_TPM_BASEDIR=$(SAP_LIBS_BASEDIR)/drv/tpm-bridge
+export LIBBRIDGE_TPM_PUBLIC_HEADERS=$(LIBBRIDGE_TPM_BASEDIR)/include
+
+export LIBGUI_BASEDIR=$(SAP_LIBS_BASEDIR)/gui/lib-gui
+export LIBDTM_BASEDIR=$(SAP_LIBS_BASEDIR)/gui/libdtm
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

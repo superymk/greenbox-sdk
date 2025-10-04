@@ -1,0 +1,3 @@
+#!/bin/sh
+STRIP="/usr/bin/strip"
+exec $STRIP "$@"

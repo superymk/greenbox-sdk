@@ -1,0 +1,3 @@
+#!/bin/sh
+OBJDUMP="/usr/bin/objdump"
+exec $OBJDUMP "$@"

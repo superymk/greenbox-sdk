@@ -1,0 +1,174 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\gui">
+      <UniqueIdentifier>{2ab47a8b-b069-44ca-a9d2-d42e3365045e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\gui\gui_res">
+      <UniqueIdentifier>{9b2b05d5-4507-42bd-8e4a-7f12255a1a65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\cJSON">
+      <UniqueIdentifier>{3aed85a1-e67b-4280-9f91-bd56834455f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader">
+      <UniqueIdentifier>{4c714574-fcc4-4a8d-b1cb-133b559c68d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader\win">
+      <UniqueIdentifier>{ef1f7dcc-315e-40b4-ab7e-1c8abf4ae5ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader\dev_config">
+      <UniqueIdentifier>{d9670e4b-f727-4558-a2fd-bb8d41717ee0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader\dev_config\usb">
+      <UniqueIdentifier>{5d808b1a-d6b5-4cb7-b5b7-33d6a89a903f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader\include">
+      <UniqueIdentifier>{b7395136-20a0-43eb-aaa9-c5aef0b2399b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\loader\include\dev_config">
+      <UniqueIdentifier>{62036df0-57bb-4a28-a66a-82229dbdc8c4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="targetver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\SOSLoader_GUIFrm_SPMgr.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\sl_err.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\sl_gui.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\sl_gui_ctrl.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\sl_gui_header.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\sl_gui_rpc.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\SOSLoader_GUIFrm_Log.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\SOSLoader_GUIFrm_Main.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\cJSON\cJSON_Utils.h">
+      <Filter>Source Files\cJSON</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\cJSON\cJSON.h">
+      <Filter>Source Files\cJSON</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\sl_gui_utils.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\SOSLoader_GUIFrm_DevConfig.h">
+      <Filter>Source Files\gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\loader\include\loader_os_intfs.h">
+      <Filter>Source Files\loader\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\loader\include\loader_sa_intfs.h">
+      <Filter>Source Files\loader\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\loader\include\dev_config\usbhid_iosm_common_intfs.h">
+      <Filter>Source Files\loader\include\dev_config</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\loader\include\dev_config\usbhid_iosm_common_utils.h">
+      <Filter>Source Files\loader\include\dev_config</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\loader\include\dev_config\usbhid_probe.h">
+      <Filter>Source Files\loader\include\dev_config</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\gui\util_file.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\gui\main.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\sl_gui.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\sl_gui_ctrl.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\sl_gui_rpc.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\SOSLoader_GUIFrm_Log.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\SOSLoader_GUIFrm_Main.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\SOSLoader_GUIFrm_SPMgr.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\cJSON\cJSON.c">
+      <Filter>Source Files\cJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\cJSON\cJSON_Utils.c">
+      <Filter>Source Files\cJSON</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\loader\win\app_os_if.c">
+      <Filter>Source Files\loader\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\loader\loader_sa_intfs.c">
+      <Filter>Source Files\loader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\sl_gui_utils.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\SOSLoader_GUIFrm_DevConfig.cpp">
+      <Filter>Source Files\gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\loader\win\win_file.c">
+      <Filter>Source Files\loader\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\loader\dev_config\usb\usbhid_common_utils.c">
+      <Filter>Source Files\loader\dev_config\usb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\loader\dev_config\usb\usbhid_probe.c">
+      <Filter>Source Files\loader\dev_config\usb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\gui\util_file.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\gui\LICENSE.txt">
+      <Filter>Source Files\gui</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\gui\main.fbp">
+      <Filter>Source Files\gui</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\..\gui\gui_res\Greenbox.png">
+      <Filter>Source Files\gui\gui_res</Filter>
+    </Image>
+    <Image Include="..\..\gui\gui_res\Greenbox.jpg">
+      <Filter>Source Files\gui\gui_res</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

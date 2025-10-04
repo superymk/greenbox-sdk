@@ -1,0 +1,59 @@
+# /*
+#  * -------------------------------------------------------------------------------------
+#  * Carnegie Mellon University
+#  * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
+#  * 
+#  * This software is the proprietary information of Carnegie Mellon University.
+#  * Use is subject to license terms.
+#  * 
+#  * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
+#  * written consent of Carnegie Mellon University. is strictly prohibited.
+#  * -------------------------------------------------------------------------------------
+#  * 
+#  * Authors: Miao Yu
+#  *          Virgil Gligor
+#  */
+
+C_SOURCES = $(wildcard *.c)
+AS_SOURCES = $(wildcard *.S)
+OBJECTS = $(patsubst %.S, %.o, $(AS_SOURCES))
+OBJECTS += $(patsubst %.c, %.o, $(C_SOURCES))
+
+APP_LFLAGS = -pthread
+
+ifeq ($(CONFIG_OS_WINDOWS_MSYS2), y)
+	APP_LFLAGS += -lDbgHelp
+
+	# Control OS sound mute/unmute
+	APP_LFLAGS += -lole32 -loleaut32 -luuid
+endif
+
+current_dir = $(shell pwd)
+APP_INCLUDE += -I$(current_dir)/../include -I$(LIBDRV_USB2_PUBLIC_HEADERS) -I$(SECBASE_PUBLIC_HEADERS)
+ 
+.PHONY: all
+all: $(OBJECTS) static
+	
+%.o: %.S Makefile FORCE
+	$(CC) -c $(APP_INCLUDE) $(CFLAGS) -D__ASSEMBLY__ -o $@ $<
+%.o: %.c Makefile FORCE
+	$(CC) -c $(APP_INCLUDE) $(CFLAGS) -o $@ $<
+	
+.PHONY: static
+static:
+	$(CC) -o $(DIST_SAP_PATH)/sl_demo_sp $(OBJECTS) $(BUILD_PATH)/app-libs.o $(APP_LFLAGS)
+	$(STRIP) $(DIST_SAP_PATH)/sl_demo_sp
+	$(CC) -o $(DIST_PRIV_SAP_PATH)/sl_demo_sp $(OBJECTS) $(BUILD_PATH)/app-libs.o $(APP_LFLAGS)
+
+.PHONY: shared
+shared:
+	$(CC) -o $(DIST_SAP_PATH)/sl_demo_sp $(OBJECTS) $(APP_LFLAGS) -L$(DIST_SAP_PATH) -l:app-libs.so
+	$(STRIP) $(DIST_SAP_PATH)/sl_demo_sp
+	$(CC) -o $(DIST_PRIV_SAP_PATH)/sl_demo_sp $(OBJECTS) $(APP_LFLAGS) -L$(DIST_PRIV_SAP_PATH) -l:app-libs.so
+	
+clean:
+	$(RM) *.o
+
+# Define a phony target that always runs
+.PHONY: FORCE
+FORCE:

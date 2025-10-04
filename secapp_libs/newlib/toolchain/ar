@@ -1,0 +1,4 @@
+#!/bin/sh
+AR="/usr/bin/ar"
+
+exec $AR "$@"

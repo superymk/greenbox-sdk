@@ -1,0 +1,19 @@
+*.[oa]
+# *~
+*.bin
+*.mod.c
+*.cmd
+*.ko
+*.bin.gz
+.tmp_versions
+*.symvers
+*.order
+*.cache
+.tags*
+doc/html/
+doc/latex/
+output/
+/config.mk
+
+secos/sos.lds
+secapp_libs/secapp.lds

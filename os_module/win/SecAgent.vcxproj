@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{C712A078-627B-410D-8B1B-E44A3ACF4BD0}</ProjectGuid>
+    <TemplateGuid>{1bc93793-694f-48fe-9372-81e2b05556fd}</TemplateGuid>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
+    <Configuration>Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <RootNamespace>SecAgent</RootNamespace>
+    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
+    <OutDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <IntDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <OutDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+    <ClCompile>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+    <ClCompile>
+      <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+    <ClCompile>
+      <TreatWarningAsError>false</TreatWarningAsError>
+      <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+    <ClCompile>
+      <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Inf Include="SecAgent.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\apic.c" />
+    <ClCompile Include="..\common\app_notif_mgr.c" />
+    <ClCompile Include="..\common\arch\x86\amd64\amd64_apic.c" />
+    <ClCompile Include="..\common\arch\x86\i386\i386_apic.c" />
+    <ClCompile Include="..\common\arch\x86\sa_arch.c" />
+    <ClCompile Include="..\common\comm_sos.c" />
+    <ClCompile Include="..\common\comm_sos_handler.c" />
+    <ClCompile Include="..\common\debug.c" />
+    <ClCompile Include="..\common\intr.c" />
+    <ClCompile Include="..\common\ioctl_handler.c" />
+    <ClCompile Include="..\common\mm.c" />
+    <ClCompile Include="..\common\perf.c" />
+    <ClCompile Include="..\common\sa_process.c" />
+    <ClCompile Include="..\common\secagent.c" />
+    <ClCompile Include="..\common\secbase.c" />
+    <ClCompile Include="..\common\sos.c" />
+    <ClCompile Include="..\common\sos_mm_mgr.c" />
+    <ClCompile Include="..\common\sos_sp_params.c" />
+    <ClCompile Include="..\common\stl_dlist.c" />
+    <ClCompile Include="..\common\untrusted_loader_info.c" />
+    <ClCompile Include="..\common\untrusted_loader_utils.c" />
+    <ClCompile Include="..\devs\ehci.c" />
+    <ClCompile Include="..\devs\gpu\gpu.c" />
+    <ClCompile Include="..\devs\gpu\gpu_debug.c" />
+    <ClCompile Include="..\devs\gpu\intel\gen9.c" />
+    <ClCompile Include="..\devs\gpu\intel\ilk.c" />
+    <ClCompile Include="..\devs\gpu\intel\i965_ops.c" />
+    <ClCompile Include="..\devs\pci.c" />
+    <ClCompile Include="..\devs\ps2.c" />
+    <ClCompile Include="..\devs\xhci_shared.c" />
+    <ClCompile Include="..\utils\utils.c" />
+    <ClCompile Include="driver_entry.c" />
+    <ClCompile Include="main.c" />
+    <ClCompile Include="win_cpu.c" />
+    <ClCompile Include="win_event_notify.c" />
+    <ClCompile Include="win_funcs.c" />
+    <ClCompile Include="win_intr.c" />
+    <ClCompile Include="win_mm.c" />
+    <ClCompile Include="win_mm_sdom.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\devs\gpu\intel\gen9.h" />
+    <ClInclude Include="..\devs\gpu\intel\ilk.h" />
+    <ClInclude Include="..\devs\gpu\intel\i965.h" />
+    <ClInclude Include="..\include\apic.h" />
+    <ClInclude Include="..\include\app_notif_mgr.h" />
+    <ClInclude Include="..\include\comm_sos.h" />
+    <ClInclude Include="..\include\comm_sos_handler.h" />
+    <ClInclude Include="..\include\debug.h" />
+    <ClInclude Include="..\include\device\usb\ehci.h" />
+    <ClInclude Include="..\include\device\gpu\gpu.h" />
+    <ClInclude Include="..\include\device\gpu\gpu_debug.h" />
+    <ClInclude Include="..\include\device\gpu\gpu_utils.h" />
+    <ClInclude Include="..\include\device\gpu\intel\i965_regs.h" />
+    <ClInclude Include="..\include\device\pci.h" />
+    <ClInclude Include="..\include\device\ps2.h" />
+    <ClInclude Include="..\include\ioctl_handler.h" />
+    <ClInclude Include="..\include\mm.h" />
+    <ClInclude Include="..\include\os_funcs.h" />
+    <ClInclude Include="..\include\os_funcs\os\win_headers.h" />
+    <ClInclude Include="..\include\os_logs.h" />
+    <ClInclude Include="..\include\os_types.h" />
+    <ClInclude Include="..\include\os_var.h" />
+    <ClInclude Include="..\include\perf.h" />
+    <ClInclude Include="..\include\sa_headers.h" />
+    <ClInclude Include="..\include\sa_process.h" />
+    <ClInclude Include="..\include\secagent_ops.h" />
+    <ClInclude Include="..\include\sos.h" />
+    <ClInclude Include="..\include\sos_mm_mgr.h" />
+    <ClInclude Include="..\include\sos_sp_params.h" />
+    <ClInclude Include="..\include\stl_dlist.h" />
+    <ClInclude Include="..\include\untrusted_loader_info.h" />
+    <ClInclude Include="..\include\untrusted_loader_utils.h" />
+    <ClInclude Include="..\include\utils.h" />
+    <ClInclude Include="..\include\x86_mm.h" />
+    <ClInclude Include="driver_entry.h" />
+    <ClInclude Include="win_cpu.h" />
+    <ClInclude Include="win_event_notify.h" />
+    <ClInclude Include="win_intr.h" />
+    <ClInclude Include="win_mm.h" />
+    <ClInclude Include="win_mm_sdom.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="x86\cpu.asm" />
+    <MASM Include="x86\int.asm" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

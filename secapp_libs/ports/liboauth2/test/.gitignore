@@ -1,0 +1,8 @@
+/*.o
+/*.log
+/*.trs
+/*.gcda
+/*.gcno
+/.deps/
+/.dirstamp
+/Dockerfile*

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# /*
+#  * -------------------------------------------------------------------------------------
+#  * Carnegie Mellon University
+#  * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
+#  * 
+#  * This software is the proprietary information of Carnegie Mellon University.
+#  * Use is subject to license terms.
+#  * 
+#  * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
+#  * written consent of Carnegie Mellon University. is strictly prohibited.
+#  * -------------------------------------------------------------------------------------
+#  * 
+#  * Authors: Miao Yu
+#  *          Virgil Gligor
+#  */
+
+# sudo ./gb_secbase_tpm_pcrs.sh <PCR1> <PCR2>
+
+# Get TPM PCRs from the physical TPM device
+cd ../tools/tpmtools
+sudo ./gb_tpm -pf $1 $2

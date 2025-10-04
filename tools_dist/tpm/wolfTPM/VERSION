@@ -1,0 +1,7 @@
+wolfssl v5.7.4
+https://codeload.github.com/wolfSSL/wolfssl/zip/refs/tags/v5.7.4-stable
+
+wolfTPM v3.6.0
+https://codeload.github.com/wolfSSL/wolfTPM/zip/refs/tags/v3.6.0
+
+How to build (see https://superymk.wordpress.com/2024/11/21/compile-wolftpm-and-export-binaries/)

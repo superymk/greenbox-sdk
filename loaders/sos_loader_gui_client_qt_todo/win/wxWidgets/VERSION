@@ -1,0 +1,8 @@
+wxWidgets-3.2.2.1
+
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.2.1/wxMSW-3.2.2_vc14x_Dev.7z
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.2.1/wxMSW-3.2.2_vc14x_x64_Dev.7z
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.2.1/wxWidgets-3.2.2.1-headers.7z
+
+
+Step 1. If using VS2022, then rename dev_i386/lib/vc14x_dll to be dev_i386/lib/vc143_dll, and rename dev_amd64/lib/vc14x_x64_dll to be dev_amd64/lib/vc143_x64_dll. This is because the <setup.h> in wxWidgets requires these modifications for Visual Studio. 

@@ -1,0 +1,19 @@
+{
+    "display":{
+        "type":"IOSM-FB",
+        "_type_comment":"type must be 'IOSM-FB' or 'NONE'"
+    },
+    "usb":{
+        "usb2_enable": 1,
+        "usb2_enable_comment": "Set 1 to enable, set 0 to disable",
+        "kbd_dev_addr": 4,
+        "kbd_hub_port": 2,
+        "kbd_hub_port_comment":"Up left USB port",
+        "mouse_dev_addr": 5,
+        "mouse_hub_port": 4,
+        "mouse_hub_port_comment":"Down left USB port",
+        "restore_dev_addr": 6,
+        "restore_hub_port": 1,
+        "restore_hub_port_comment":"Left back top USB port"
+    }
+}

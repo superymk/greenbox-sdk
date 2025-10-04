@@ -1,0 +1,13 @@
+wxWidgets-3.2.6
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxWidgets-3.2.6-headers.7z
+
+amd64:
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxMSW-3.2.6_vc14x_x64_ReleaseDLL.7z
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxMSW-3.2.6_vc14x_x64_Dev.7z
+
+i386:
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxMSW-3.2.6_vc14x_ReleaseDLL.7z
+https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.6/wxMSW-3.2.6_vc14x_Dev.7z
+
+Step 1. For each micro-architecture, unpack the header and the libraries in the same folder; i.e., "include" and "lib" directories are at the same level after unpacking.
+Step 2. If using VS2022, then rename dev_i386/lib/vc14x_dll to be dev_i386/lib/vc143_dll, and rename dev_amd64/lib/vc14x_x64_dll to be dev_amd64/lib/vc143_x64_dll. This is because the <setup.h> in wxWidgets requires these modifications for Visual Studio. 

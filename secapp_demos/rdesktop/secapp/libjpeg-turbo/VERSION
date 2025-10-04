@@ -1,0 +1,112 @@
+libjpeg-turbo-3.0.0
+
+https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.0.0.zip
+
+
+Modifications of ./CMakeLists.txt
+========================
+(1) Comment out Line 724 - Line 732
+```
+    # add_executable(tjunittest-static tjunittest.c tjutil.c md5/md5.c
+    #   md5/md5hl.c)
+    # target_link_libraries(tjunittest-static turbojpeg-static)
+
+    # add_executable(tjbench-static tjbench.c tjutil.c)
+    # target_link_libraries(tjbench-static turbojpeg-static)
+    # if(UNIX)
+    #   target_link_libraries(tjbench-static m)
+    # endif()
+```
+
+(2) Comment out Line 742 - Line 783
+```
+    # if(ENABLE_STATIC)
+#   # Compile a separate version of these source files with 12-bit and 16-bit
+#   # data precision.
+#   add_library(cjpeg12-static OBJECT rdgif.c rdppm.c)
+#   set_property(TARGET cjpeg12-static PROPERTY COMPILE_FLAGS
+#     "-DBITS_IN_JSAMPLE=12 -DGIF_SUPPORTED -DPPM_SUPPORTED")
+#   add_library(cjpeg16-static OBJECT rdgif.c rdppm.c)
+#   set_property(TARGET cjpeg16-static PROPERTY COMPILE_FLAGS
+#     "-DBITS_IN_JSAMPLE=16 -DGIF_SUPPORTED -DPPM_SUPPORTED")
+#   add_executable(cjpeg-static cjpeg.c cdjpeg.c rdbmp.c rdgif.c rdppm.c
+#     rdswitch.c rdtarga.c $<TARGET_OBJECTS:cjpeg12-static>
+#     $<TARGET_OBJECTS:cjpeg16-static>)
+#   set_property(TARGET cjpeg-static PROPERTY COMPILE_FLAGS
+#     ${CDJPEG_COMPILE_FLAGS})
+#   target_link_libraries(cjpeg-static jpeg-static)
+
+#   # Compile a separate version of these source files with 12-bit and 16-bit
+#   # data precision.
+#   add_library(djpeg12-static OBJECT rdcolmap.c wrgif.c wrppm.c)
+#   set_property(TARGET djpeg12-static PROPERTY COMPILE_FLAGS
+#     "-DBITS_IN_JSAMPLE=12 -DGIF_SUPPORTED -DPPM_SUPPORTED")
+#   add_library(djpeg16-static OBJECT wrppm.c)
+#   set_property(TARGET djpeg16-static PROPERTY COMPILE_FLAGS
+#     "-DBITS_IN_JSAMPLE=16 -DPPM_SUPPORTED")
+#   add_executable(djpeg-static djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrbmp.c
+#     wrgif.c wrppm.c wrtarga.c $<TARGET_OBJECTS:djpeg12-static>
+#     $<TARGET_OBJECTS:djpeg16-static>)
+#   set_property(TARGET djpeg-static PROPERTY COMPILE_FLAGS
+#     ${CDJPEG_COMPILE_FLAGS})
+#   target_link_libraries(djpeg-static jpeg-static)
+
+#   add_executable(jpegtran-static jpegtran.c cdjpeg.c rdswitch.c transupp.c)
+#   target_link_libraries(jpegtran-static jpeg-static)
+#   set_property(TARGET jpegtran-static PROPERTY COMPILE_FLAGS "${USE_SETMODE}")
+
+#   add_executable(example-static example.c)
+#   target_link_libraries(example-static jpeg-static)
+# endif()
+
+# add_executable(rdjpgcom rdjpgcom.c)
+
+# add_executable(wrjpgcom wrjpgcom.c)
+```
+
+(3) Comment out Line 794
+```
+# add_executable(strtest strtest.c)
+```
+
+(4) Modify Line 1735 from ```install(TARGETS rdjpgcom wrjpgcom RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})``` to ```install(TARGETS RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})```
+
+(5)
+
+(6) Commented out Line 1708 and 1709 as
+```
+# install(PROGRAMS ${DIR}/tjbench-static${EXE}
+#   DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME tjbench${EXE})
+```
+
+diff --git a/code/secapp_demos/rdesktop/secapp/libjpeg-turbo/CMakeLists.txt b/code/secapp_demos/rdesktop/secapp/libjpeg-turbo/CMakeLists.txt
+index 68fcf0c18..692a3cf68 100644
+--- a/code/secapp_demos/rdesktop/secapp/libjpeg-turbo/CMakeLists.txt
++++ b/code/secapp_demos/rdesktop/secapp/libjpeg-turbo/CMakeLists.txt
+@@ -1723,12 +1723,12 @@ if(ENABLE_STATIC)
+     else()
+       set(DIR ${CMAKE_CURRENT_BINARY_DIR})
+     endif()
+-    install(PROGRAMS ${DIR}/cjpeg-static${EXE}
+-      DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME cjpeg${EXE})
+-    install(PROGRAMS ${DIR}/djpeg-static${EXE}
+-      DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME djpeg${EXE})
+-    install(PROGRAMS ${DIR}/jpegtran-static${EXE}
+-      DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME jpegtran${EXE})
++    # install(PROGRAMS ${DIR}/cjpeg-static${EXE}
++    #   DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME cjpeg${EXE})
++    # install(PROGRAMS ${DIR}/djpeg-static${EXE}
++    #   DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME djpeg${EXE})
++    # install(PROGRAMS ${DIR}/jpegtran-static${EXE}
++    #   DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME jpegtran${EXE})
+   endif()
+ endif()
+
+
+
+Modifications of ./md5/CMakeLists.txt
+========================
+(1) Comment out Line 1
+```
+# add_executable(md5cmp md5cmp.c md5.c md5hl.c)
+```

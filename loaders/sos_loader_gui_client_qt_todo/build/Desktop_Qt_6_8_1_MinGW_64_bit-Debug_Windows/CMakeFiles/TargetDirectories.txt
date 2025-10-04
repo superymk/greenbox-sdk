@@ -1,0 +1,9 @@
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/sos_loader_gui_client.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/edit_cache.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/rebuild_cache.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/list_install_components.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/install.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/install/local.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/install/strip.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/sos_loader_gui_client_autogen_timestamp_deps.dir
+Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/sos_loader_gui_client_autogen.dir

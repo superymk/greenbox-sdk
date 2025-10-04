@@ -1,0 +1,12 @@
+{
+	"logon":	{
+		"url":"192.168.137.1:8000",
+		"url_comment":	"hostname:port of the VNC server; e.g., superymkdev.cylab.cmu.edu:8000, or 192.168.137.1:5900"
+	},
+	"display":	{
+		"compress":	8,
+		"compress_comment":	"Compression level. Ranges from 0 (lowest) to 9 (highest)",
+		"quality":	5,
+		"quality_comment":	"Quality level. Ranges from 0 (lowest) to 9 (highest)"
+	}
+}

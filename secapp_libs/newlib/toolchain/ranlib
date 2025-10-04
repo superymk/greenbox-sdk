@@ -1,0 +1,3 @@
+#!/bin/sh
+RANLIB="/usr/bin/ranlib"
+exec $RANLIB "$@"

@@ -1,0 +1,51 @@
+{
+    "display":{
+        "type":"Insecure",
+        "_type_comment":"type must be 'IOSM-FB', 'Insecure', or 'NONE'",
+        "disp_width": 800,
+        "disp_height": 600
+    },
+    "ps2":{
+        "ps2_enable": 0,
+        "ps2_enable_comment": "Set 1 to enable, set 0 to disable"
+    }, 
+    "usb2":{
+        "usb2_enable": 0,
+        "usb2_enable_comment": "Set 1 to enable, set 0 to disable",
+        "kbd_dev_addr": 4,
+        "kbd_hub_port": 2,
+        "kbd_hub_port_comment":"Up left USB port. Port number starts from 0, not 1.",
+        "mouse_dev_addr": 5,
+        "mouse_hub_port": 4,
+        "mouse_hub_port_comment":"Down left USB port. Port number starts from 0, not 1.",
+        "restore_dev_addr": 6,
+        "restore_hub_port": 1,
+        "restore_hub_port_comment":"Left back top USB port. Port number starts from 0, not 1."
+    },
+    "usb3":{
+        "usb3_enable": 0,
+        "usb3_enable_comment": "Set 1 to enable, set 0 to disable",
+        "hid_dev1_enable": 1,
+        "hid_dev1_enable_comment": "Set 1 to enable HID device 1, set 0 to disable",
+        "hid_dev1_addr": 3,
+        "hid_dev1_hub_addr": 1,
+        "hid_dev1_hub_port": 7,
+        "hid_dev1_hub_port_comment":"Up left USB port. Port number starts from 0, not 1.",
+        "hid_dev1_bus_id": 1,
+        "hid_dev1_vendor_id": "413c",
+        "hid_dev1_vendor_id_comment": "Heximal string (case non-sensitive) of the USB device's vendor ID (idVendor); e.g., 413c",
+        "hid_dev1_product_id": "2003",
+        "hid_dev1_product_id_comment": "Heximal string (case non-sensitive) of the USB device's vendor ID (idVendor); e.g., 2003",
+        "hid_dev2_enable": 1,
+        "hid_dev2_enable_comment": "Set 1 to enable HID device 1, set 0 to disable",
+        "hid_dev2_addr": 2,
+        "hid_dev2_hub_addr": 1,
+        "hid_dev2_hub_port": 9,
+        "hid_dev2_hub_port_comment":"Down left USB port. Port number starts from 0, not 1.",
+        "hid_dev2_bus_id": 1,
+        "hid_dev2_vendor_id": "413c",
+        "hid_dev2_vendor_id_comment": "Heximal string (case non-sensitive) of the USB device's vendor ID (idVendor); e.g., 413c",
+        "hid_dev2_product_id": "3200",
+        "hid_dev2_product_id_comment": "Heximal string (case non-sensitive) of the USB device's vendor ID (idVendor); e.g., 3200"
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "display": {
+        "type": "Insecure",
+        "type_comment": "type must be 'IOSM-FB', 'Insecure', or 'NONE'",
+        "disp_width": 800,
+        "disp_height": 600
+    },
+    "usb3": {
+        "usb3_enable": 0,
+        "usb3_enable_comment": "Set 1 to enable, set 0 to disable",
+        "hid_dev1_addr": 5,
+        "hid_dev1_hub_addr": 1,
+        "hid_dev1_hub_port": 11,
+        "hid_dev1_hub_port_comment": "USB port. Port number starts from 0, not 1.",
+        "hid_dev1_bus_id": 1,
+        "hid_dev2_addr": 0,
+        "hid_dev2_hub_addr": 0,
+        "hid_dev2_hub_port": 0,
+        "hid_dev2_hub_port_comment": "USB port. Port number starts from 0, not 1.",
+        "hid_dev2_bus_id": 0
+    }
+}
