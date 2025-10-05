@@ -1,0 +1,64 @@
+{
+	"folders": [
+		{
+			"name": "secapp_demos",
+			"path": "code/secapp_demos"
+		},
+		{
+			"name": "secapp_libs",
+			"path": "code/secapp_libs"
+		},
+		{
+			"name": "loaders",
+			"path": "code/loaders"
+		},
+		{
+			"name": "os_module",
+			"path": "code/os_module"
+		}
+	],
+    "settings": {
+        "files.associations": {
+            "ops.h": "c",
+            "blank_screen.h": "c",
+            "frm_main.h": "c",
+            "chrono": "c",
+            "format": "c",
+            "fcntl.h": "c",
+            "errno.h": "c",
+            "stdio.h": "c",
+            "iosfwd": "cpp",
+            "xlocbuf": "cpp",
+            "*.inc": "c",
+            "palddk.h": "c",
+            "sap_headers.h": "c",
+            "sap_headers_libc.h": "c",
+            "lock.h": "c",
+            "algorithm": "c",
+            "xiosbase": "c",
+            "xlocale": "c",
+            "xutility": "c",
+            "lib-usb3.h": "c",
+            "iosm_common_intfs.h": "c",
+            "util.h": "c",
+            "sap_test.h": "c",
+            "headers.h": "c",
+            "time.h": "c",
+            "times.h": "c",
+            "stdlib.h": "c",
+            "*.s": "c",
+            "cdefs.h": "c",
+            "memory": "c",
+            "system_error": "c",
+            "cmath": "c",
+            "complex": "c",
+            "queue": "c",
+            "stack": "c",
+            "signal.h": "c",
+            "*.c_temp": "c",
+            "xlocmon": "c",
+            "rfiles_header.h": "c",
+            "app_sp_intfs.h": "c"
+        }
+    }
+}
