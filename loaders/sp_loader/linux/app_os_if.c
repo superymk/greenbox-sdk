@@ -62,13 +62,13 @@ static int read_file(const char *filepath, uint8_t **data, size_t *len)
 {
     int fd = open(filepath, O_RDONLY);
     if (fd < 0) {
-        perror("open");
+        APP_ERR("open");
         return -1;
     }
 
     struct stat st;
     if (fstat(fd, &st) != 0) {
-        perror("fstat");
+        APP_ERR("fstat");
         close(fd);
         return -1;
     }
@@ -81,7 +81,7 @@ static int read_file(const char *filepath, uint8_t **data, size_t *len)
     }
 
     if (read(fd, *data, st.st_size) != st.st_size) {
-        perror("read");
+        APP_ERR("read");
         free(*data);
         close(fd);
         return -1;
@@ -270,21 +270,21 @@ int app_lock_mem(void* ptr, size_t len)
 	    struct rlimit memlock_limit;
 
 	    if(getrlimit(RLIMIT_MEMLOCK, &memlock_limit)) {
-	      perror("getrlimit");
+	      APP_ERR("getrlimit");
 	      return -1;
 	    }
 	    memlock_limit.rlim_cur += len;
 	    if(setrlimit(RLIMIT_MEMLOCK, &memlock_limit)) {
 	      if (!(memlock_limit.rlim_cur > memlock_limit.rlim_max
 	            && errno == EINVAL)) {
-	        perror("setrlimit");
+	        APP_ERR("setrlimit");
 	      }
 	      return -2;
 	    }
 
 	    /* successfully increased limit. try locking again. */
 	    if(mlock(ptr, len)) {
-	      perror("mlock");
+	      APP_ERR("mlock");
 	      return -3;
 	    }
 
@@ -292,7 +292,7 @@ int app_lock_mem(void* ptr, size_t len)
 	    return 0;
 	  }
 
-	  perror("mlock");
+	  APP_ERR("mlock");
 	  return -4;
 }
 
@@ -462,14 +462,14 @@ int os_execute_program_wait_exit(bool ignore_child_status, const char* exe_filep
         uint8_t file_hash[SHA256_DIGEST_LENGTH];
         if (sha2_256_mem(file_data, file_size, file_hash) != 0) {
             free(file_data);
-            perror("Hash computation failed\n");
+            APP_ERR("Hash computation failed\n");
             return -1;
         }
 
         free(file_data);
 
         if (memcmp(file_hash, exe_file_hash->sha2_256_digest, SHA256_DIGEST_LENGTH) != 0) {
-            perror("Executable file hash does not match\n");
+            APP_ERR("Executable file hash does not match (%s)\n", exe_filepath);
             return -1;
         }
     }
@@ -477,7 +477,7 @@ int os_execute_program_wait_exit(bool ignore_child_status, const char* exe_filep
     pid = fork();
     if (pid == -1) {
         // Fork failed
-        perror("fork");
+        APP_ERR("fork");
         return -1; // Return an error status
     } else if (pid == 0) {
         // Child process
@@ -505,7 +505,7 @@ int os_execute_program_wait_exit(bool ignore_child_status, const char* exe_filep
         execv(exe_filepath, argv);
 
         // If execv returns, it means there was an error
-        perror("execv");
+        APP_ERR("execv");
         exit(EXIT_FAILURE); // Terminate the child process
     } else {
         // Parent process

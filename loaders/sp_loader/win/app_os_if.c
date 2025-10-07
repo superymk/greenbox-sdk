@@ -67,7 +67,7 @@ static int munlock(const void *addr, size_t len)
 // 	// void *array[30];
 //   	// size_t size;
 
-//     printf("Caught segfault at address %p\n", si->si_addr);
+//     APP_ERR("Caught segfault at address %p\n", si->si_addr);
 // 	// get void*'s for all entries on the stack
 // 	// size = backtrace(array, 30);
 
@@ -81,7 +81,7 @@ static int munlock(const void *addr, size_t len)
 
 static LONG WINAPI windows_exception_handler(EXCEPTION_POINTERS *ExceptionInfo)
 {
-    printf("Caught Exception %lu\n", (uint64_t)ExceptionInfo->ExceptionRecord->ExceptionCode);
+    APP_ERR("Caught Exception %lu\n", (uint64_t)ExceptionInfo->ExceptionRecord->ExceptionCode);
 
     // Call SecProcess Loader's exception handler
     sp_loader_on_exception();
@@ -148,14 +148,14 @@ static int read_file(const char *filepath, uint8_t **data, size_t *len)
     HANDLE hFile = CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        printf("Error opening file %s: %d\n", filepath, GetLastError());
+        APP_ERR("Error opening file %s: %d\n", filepath, GetLastError());
         return -1;
     }
 
     LARGE_INTEGER fileSize;
     if (!GetFileSizeEx(hFile, &fileSize))
     {
-        printf("Error getting file size: %d\n", GetLastError());
+        APP_ERR("Error getting file size: %d\n", GetLastError());
         CloseHandle(hFile);
         return -1;
     }
@@ -163,7 +163,7 @@ static int read_file(const char *filepath, uint8_t **data, size_t *len)
     *data = (uint8_t *)malloc(fileSize.QuadPart);
     if (*data == NULL)
     {
-        printf("Memory allocation failed\n");
+        APP_ERR("Memory allocation failed\n");
         CloseHandle(hFile);
         return -1;
     }
@@ -171,7 +171,7 @@ static int read_file(const char *filepath, uint8_t **data, size_t *len)
     DWORD bytesRead;
     if (!ReadFile(hFile, *data, (DWORD)fileSize.QuadPart, &bytesRead, NULL) || bytesRead != fileSize.QuadPart)
     {
-        printf("Error reading file: %d\n", GetLastError());
+        APP_ERR("Error reading file: %d\n", GetLastError());
         free(*data);
         CloseHandle(hFile);
         return -1;
@@ -258,7 +258,7 @@ uint32_t app_cpus_get_procs_num(void)
 
 void press_continue(const char *prompt)
 {
-    printf("%s", prompt);
+    APP_ERR("%s", prompt);
     while (true)
     {
         char c = getchar();
@@ -761,7 +761,7 @@ int os_execute_program_wait_exit(bool ignore_child_status, const char *exe_filep
         if (sha2_256_mem(file_data, file_size, file_hash) != 0)
         {
             free(file_data);
-            printf("Hash computation failed\n");
+            APP_ERR("Hash computation failed\n");
             return -1;
         }
 
@@ -769,7 +769,7 @@ int os_execute_program_wait_exit(bool ignore_child_status, const char *exe_filep
 
         if (memcmp(file_hash, exe_file_hash->sha2_256_digest, SHA256_DIGEST_LENGTH) != 0)
         {
-            printf("Executable file hash does not match\n");
+            APP_ERR("Executable file hash does not match (%s)\n", exe_filepath);
             return -1;
         }
     }
@@ -808,7 +808,7 @@ int os_execute_program_wait_exit(bool ignore_child_status, const char *exe_filep
     // Check process result
     if (result == -1)
     {
-        perror("_spawnv");
+        APP_ERR("_spawnv");
         returnCode = -1;
     }
     else
@@ -904,7 +904,7 @@ ulong_t os_execute_program_nowait(
     char *cmd_line = malloc(cmd_len + 1);
     if (!cmd_line)
     {
-        perror("malloc(cmd_line)");
+        APP_ERR("malloc(cmd_line)");
         for (int i = 0; i < argc; ++i)
             free(argv[i]);
         return (ulong_t)-1;
