@@ -158,6 +158,6 @@ module_init(tz_client_init);
 module_exit(tz_client_exit);
 
 MODULE_DESCRIPTION("SecAgent Kernel Module");
-MODULE_AUTHOR("Miao Yu <superymk@cmu.edu>");
+MODULE_AUTHOR("Miao Yu");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("secagent");

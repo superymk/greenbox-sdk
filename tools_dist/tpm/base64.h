@@ -2,6 +2,9 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
+/* This is a public domain base64 implementation written by WEI Zhicheng. */
+
+#ifndef BASE64_H
 #define BASE64_H
 
 #define BASE64_ENCODE_OUT_SIZE(s) ((unsigned int)((((s) + 2) / 3) * 4 + 1))

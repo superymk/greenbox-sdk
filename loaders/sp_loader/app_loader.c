@@ -6,7 +6,6 @@
 #include <stdio.h> //fprintf, printf
 #include <string.h>
 #include <pthread.h>
-#include <drivers/gpu/gpu_config.h>
 
 #include "elf.h"
 

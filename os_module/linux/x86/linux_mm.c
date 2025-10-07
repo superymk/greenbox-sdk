@@ -3,6 +3,7 @@
 // Author: Virgil Gligor (Carnegie Mellon University)
 
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/uaccess.h>
 #include <linux/string.h> 
 
