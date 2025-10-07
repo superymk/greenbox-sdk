@@ -1,3 +1,7 @@
+# // SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+# // Author: Miao Yu (Carnegie Mellon University)
+# // Author: Virgil Gligor (Carnegie Mellon University)
+
 CPP_SOURCES = $(wildcard ../gui/*.cpp)
 AS_SOURCES = $(wildcard ../gui/*.S)
 OBJECTS = $(patsubst %.S, %.o, $(AS_SOURCES))

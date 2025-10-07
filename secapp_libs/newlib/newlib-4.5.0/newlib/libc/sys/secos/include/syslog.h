@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /* Based on IEEE Std 1003.1-2008
    http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/syslog.h.html
 */

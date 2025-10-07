@@ -1,18 +1,6 @@
-/*
- * -------------------------------------------------------------------------------------
- * Carnegie Mellon University
- * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
- * 
- * This software is the proprietary information of Carnegie Mellon University.
- * Use is subject to license terms.
- * 
- * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
- * written consent of Carnegie Mellon University. is strictly prohibited.
- * -------------------------------------------------------------------------------------
- * 
- * Authors: Miao Yu
- *          Virgil Gligor
- */
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
 
 /*	$OpenBSD: systm.h,v 1.170 2023/10/30 07:04:36 claudio Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/

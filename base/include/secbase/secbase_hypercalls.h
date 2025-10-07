@@ -385,7 +385,7 @@ struct utpm_pcr_comp
 {
     struct uTPM_PCR_SELECTION select;
 
-    /// @brief This SHALL be the size of the pcrValue field (not the number of PCR's). <valueSize> is big endian.
+    /// @brief This SHALL be the size of the pcrValue field (not the number of PCR’s). <valueSize> is big endian.
     uint32_t valueSize;
     struct utpm_pcr pcrValue[uTPM_PCR_NUM];
 } PACKED_STRUCT;

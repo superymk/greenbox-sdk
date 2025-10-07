@@ -5,5 +5,16 @@
 			"path": "."
 		}
 	],
-    "settings": {}
+	"settings": {
+		"files.associations": {
+			"palddk.h": "c",
+			"algorithm": "c",
+			"iterator": "c",
+			"xhash": "c",
+			"xmemory": "c",
+			"xtree": "c",
+			"xutility": "c",
+			"types.h": "c"
+		}
+	}
 }

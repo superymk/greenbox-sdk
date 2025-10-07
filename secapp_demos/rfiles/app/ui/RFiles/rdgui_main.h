@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 #ifndef RDGUI_MAIN_H
 #define RDGUI_MAIN_H
 

@@ -44,7 +44,7 @@
  * @XMHF_LICENSE_HEADER_END@
  */
 
-// Author: Miao Yu (superymk@cmu.edu)
+// Author: Miao Yu (Carnegie Mellon University)
 
 /* $OpenBSD: sk-usbhid.c,v 1.46 2023/03/28 06:12:38 dtucker Exp $ */
 /*

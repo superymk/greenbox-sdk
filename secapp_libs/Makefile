@@ -1,3 +1,7 @@
+# // SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+# // Author: Miao Yu (Carnegie Mellon University)
+# // Author: Virgil Gligor (Carnegie Mellon University)
+
 ifeq ($(TARGET_PLATFORM), i386)
 	PAL_LIBC_HEADER = $(SAP_LIBS_BASEDIR)/newlib/dist/i686-secos/include
 else ifeq ($(TARGET_PLATFORM), amd64)

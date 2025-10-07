@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /*	$OpenBSD: inet.h,v 1.21 2017/02/04 19:16:25 guenther Exp $	*/
 
 /*

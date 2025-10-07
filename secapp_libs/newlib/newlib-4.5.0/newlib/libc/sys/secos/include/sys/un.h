@@ -1,18 +1,6 @@
-/*
- * -------------------------------------------------------------------------------------
- * Carnegie Mellon University
- * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
- * 
- * This software is the proprietary information of Carnegie Mellon University.
- * Use is subject to license terms.
- * 
- * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
- * written consent of Carnegie Mellon University. is strictly prohibited.
- * -------------------------------------------------------------------------------------
- * 
- * Authors: Miao Yu
- *          Virgil Gligor
- */
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
 
 /* based on IEEE Std 1003.1-2008
  * http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/sys_un.h.html

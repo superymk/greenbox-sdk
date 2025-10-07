@@ -1,18 +1,6 @@
-/*
- * -------------------------------------------------------------------------------------
- * Carnegie Mellon University
- * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
- *
- * This software is the proprietary information of Carnegie Mellon University.
- * Use is subject to license terms.
- *
- * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
- * written consent of Carnegie Mellon University. is strictly prohibited.
- * -------------------------------------------------------------------------------------
- *
- * Authors: Miao Yu
- *          Virgil Gligor
- */
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
 
 /// @file This file MUST be Newlib (currently 4.5.0)'s stdio.h appended with the missing functions in 3rd party libraries.
 /// The implementation of the missing functions are in gloss/gloss_stdio.c. The new functions are in the "GreenBox added 

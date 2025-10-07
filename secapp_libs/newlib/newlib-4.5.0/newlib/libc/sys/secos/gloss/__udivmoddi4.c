@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 #include <sys/types.h>
 
 uint64_t __udivmoddi4(uint64_t num, uint64_t den, uint64_t *rem_p)

@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 // Linux specific implementation
 #include <linux/version.h>
 #include <linux/slab.h>

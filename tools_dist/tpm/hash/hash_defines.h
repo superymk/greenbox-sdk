@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /*
  * Copyright (c) 1999-2003 Damien Miller.  All rights reserved.
  *

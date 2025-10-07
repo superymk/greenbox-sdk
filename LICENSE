@@ -1,16 +1,18 @@
 This project is dual-licensed:
 
-  1) GNU General Public License v2.0 only (¡°GPL-2.0-only¡±)
+  1) GNU General Public License v2.0 only (GPL-2.0-only)
   2) A separate commercial Proprietary License (see LICENSE-PROPRIETARY)
 
-You may choose either license for any copy of the source files except files 
-of 3rd party libraries:
+You may choose either license for any copy of the source files that carry the
+SPDX identifier:
+
+  SPDX-License-Identifier: GPL-2.0-only OR Proprietary
 
 - If you do not have a separate, written commercial license agreement from
   [Your Legal Entity], the GPL-2.0-only license applies to your use.
 - Commercial licensing (including terms for closed-source use and redistribution)
-  is available from [Your Legal Entity]. Contact: Miao Yu (superymk@gmail.com).
+  is available from [Your Legal Entity]. Contact: Miao Yu (superymk-cmu-edu).
 
 See:
-- LICENSE-GPL-2.0   ¡ª full text of GPL-2.0-only
-- LICENSE-PROPRIETARY ¡ª terms for commercial licensees
+- LICENSE-GPL-2.0: full text of GPL-2.0-only
+- LICENSE-PROPRIETARY: terms for commercial licensees

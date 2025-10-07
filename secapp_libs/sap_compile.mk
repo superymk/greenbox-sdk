@@ -1,3 +1,7 @@
+# // SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+# // Author: Miao Yu (Carnegie Mellon University)
+# // Author: Virgil Gligor (Carnegie Mellon University)
+
 ifeq ($(TARGET_PLATFORM), i386)
     export SAP_AR = $(SAP_NEWLIB_DIST)/bin/i686-secos-ar
     export SAP_AS = $(SAP_NEWLIB_DIST)/bin/i686-secos-as

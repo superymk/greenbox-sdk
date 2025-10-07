@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /*
  * @XMHF_LICENSE_HEADER_START@
  *
@@ -44,7 +48,7 @@
  * @XMHF_LICENSE_HEADER_END@
  */
 
-// Author: Miao Yu (superymk@cmu.edu)
+// Author: Miao Yu (Carnegie Mellon University)
 
 #ifndef _HASH_FUNCS_H
 #define _HASH_FUNCS_H

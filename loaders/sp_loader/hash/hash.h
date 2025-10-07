@@ -44,7 +44,7 @@
  * @XMHF_LICENSE_HEADER_END@
  */
 
-// Author: Miao Yu (superymk@cmu.edu)
+// Author: Miao Yu (Carnegie Mellon University)
 
 #ifndef _HASH_FUNCS_H
 #define _HASH_FUNCS_H

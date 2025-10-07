@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /* Portable reimplementation of LLVM's __popcountdi2 using standard C types.
  * No dependency on compiler-rt's int_lib.h typedefs.
  *

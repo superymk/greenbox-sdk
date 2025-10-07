@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /*	$OpenBSD: sha2.c,v 1.28 2019/07/23 12:35:22 dtucker Exp $	*/
 
 /*

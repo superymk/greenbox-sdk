@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /* FIXME: From sys/tsvc/sys */
 #ifndef _SYS_DIRENT_H
 # define _SYS_DIRENT_H
