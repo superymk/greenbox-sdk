@@ -53,3 +53,16 @@ Pre-requisites:
 1. Boot GreenBox SecOS.
 2. After GreenBox DesktopMgr shows, run SecApps in "./output/dist/sap/"; e.g., ```sudo ./sl_demo_sp```.
     - Or run run_demo_*.sh in the project root folder as a quick way; e.g., ```sudo ./run_demo_sp_demo.sh```.
+ 
+ 
+# Supported Machines
+
+| Machines                                                      | Windows 11 (x64)  | Windows 10 (x64)  | Ubuntu 24.04.3 (x64) |
+| --------                                                      | ------            | -------           | ------- |
+| Dell Optiplex 7050 <br> (i7-7700, 8GB RAM)                    |  -                |  Y                |   Y   |
+| Puget Systems <br> (i9-9900K, Gigabyte Z390, 128GB RAM)       |  -                |  -                |   Y   |
+| HP EliteBook 840 Aero G8 <br> (i7-1185G7, 64GB RAM)           |  -                |  Y (with mHV v2)  |   -   |
+
+"-" means not tested.
+
+We test supported machines by running RICH_GUI_SAP only.
