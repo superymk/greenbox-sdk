@@ -1,0 +1,16 @@
+#
+# liboauth2_nginx - NGINX C bindings for liboauth2
+#
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: liboauth2_nginx
+URL: https://github.com/OpenIDC/liboauth2
+Description: NGINX C bindings for liboauth2
+Version: @VERSION@
+Requires: liboauth2 >= 2.0.0
+Cflags: -I${includedir}
+Libs: -L${libdir} -loauth2_nginx

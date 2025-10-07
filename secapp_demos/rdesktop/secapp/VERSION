@@ -1,0 +1,246 @@
+libvncserver-0.9.15
+https://github.com/LibVNC/libvncserver/archive/refs/tags/LibVNCServer-0.9.15.zip
+
+
+libvncserver diff
+================================================
+diff --git a/code/secapp_demos/rdesktop/secapp/libvncserver/include/rfb/rfbconfig.h.cmakein b/code/secapp_demos/rdesktop/secapp/libvncserver
+/include/rfb/rfbconfig.h.cmakein
+index d50c3c965..76795a7be 100644
+--- a/code/secapp_demos/rdesktop/secapp/libvncserver/include/rfb/rfbconfig.h.cmakein
++++ b/code/secapp_demos/rdesktop/secapp/libvncserver/include/rfb/rfbconfig.h.cmakein
+@@ -188,13 +188,13 @@ typedef int pid_t;
+ /* The type for size_t */
+ #cmakedefine HAVE_LIBVNCSERVER_SIZE_T 1
+ #ifndef HAVE_LIBVNCSERVER_SIZE_T
+-typedef int size_t;
++typedef __SIZE_TYPE__ size_t;
+ #endif
+
+ /* The type for socklen */
+ #cmakedefine HAVE_LIBVNCSERVER_SOCKLEN_T 1
+ #ifndef HAVE_LIBVNCSERVER_SOCKLEN_T
+-typedef int socklen_t;
++typedef unsigned int socklen_t;
+ #endif
+
+
+
+diff --git a/code/secapp_demos/rdesktop/secapp/libvncserver/CMakeLists.txt b/code/secapp_demos/rdesktop/secapp/libvncserver/CMakeLists.txt
+index d9e560dc4..51a5650d6 100644
+--- a/code/secapp_demos/rdesktop/secapp/libvncserver/CMakeLists.txt
++++ b/code/secapp_demos/rdesktop/secapp/libvncserver/CMakeLists.txt
+@@ -38,7 +38,7 @@ endif(CMAKE_GENERATOR MATCHES "Unix Makefiles|Ninja")
+ include_directories(
+   ${CMAKE_CURRENT_SOURCE_DIR}/include
+   ${CMAKE_CURRENT_BINARY_DIR}/include
+-  ${LIBVNCSERVER_DIR}
++  # ${LIBVNCSERVER_DIR}
+   ${LIBVNCCLIENT_DIR}
+   ${COMMON_DIR})
+
+@@ -372,30 +372,30 @@ endif(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
+
+ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/rfb/rfbconfig.h.cmakein ${CMAKE_CURRENT_BINARY_DIR}/include/rfb/rfbconfig.h)
+
+-set(LIBVNCSERVER_SOURCES
+-    ${LIBVNCSERVER_DIR}/main.c
+-    ${LIBVNCSERVER_DIR}/rfbserver.c
+-    ${LIBVNCSERVER_DIR}/rfbregion.c
+-    ${LIBVNCSERVER_DIR}/auth.c
+-    ${LIBVNCSERVER_DIR}/sockets.c
+-    ${LIBVNCSERVER_DIR}/stats.c
+-    ${LIBVNCSERVER_DIR}/corre.c
+-    ${LIBVNCSERVER_DIR}/hextile.c
+-    ${LIBVNCSERVER_DIR}/rre.c
+-    ${LIBVNCSERVER_DIR}/translate.c
+-    ${LIBVNCSERVER_DIR}/cutpaste.c
+-    ${LIBVNCSERVER_DIR}/httpd.c
+-    ${LIBVNCSERVER_DIR}/cursor.c
+-    ${LIBVNCSERVER_DIR}/font.c
+-    ${LIBVNCSERVER_DIR}/draw.c
+-    ${LIBVNCSERVER_DIR}/selbox.c
+-    ${COMMON_DIR}/vncauth.c
+-    ${COMMON_DIR}/sockets.c
+-    ${LIBVNCSERVER_DIR}/cargs.c
+-    ${LIBVNCSERVER_DIR}/ultra.c
+-    ${LIBVNCSERVER_DIR}/scale.c
+-    ${CRYPTO_SOURCES}
+-)
++# set(LIBVNCSERVER_SOURCES
++#     ${LIBVNCSERVER_DIR}/main.c
++#     ${LIBVNCSERVER_DIR}/rfbserver.c
++#     ${LIBVNCSERVER_DIR}/rfbregion.c
++#     ${LIBVNCSERVER_DIR}/auth.c
++#     ${LIBVNCSERVER_DIR}/sockets.c
++#     ${LIBVNCSERVER_DIR}/stats.c
++#     ${LIBVNCSERVER_DIR}/corre.c
++#     ${LIBVNCSERVER_DIR}/hextile.c
++#     ${LIBVNCSERVER_DIR}/rre.c
++#     ${LIBVNCSERVER_DIR}/translate.c
++#     ${LIBVNCSERVER_DIR}/cutpaste.c
++#     ${LIBVNCSERVER_DIR}/httpd.c
++#     ${LIBVNCSERVER_DIR}/cursor.c
++#     ${LIBVNCSERVER_DIR}/font.c
++#     ${LIBVNCSERVER_DIR}/draw.c
++#     ${LIBVNCSERVER_DIR}/selbox.c
++#     ${COMMON_DIR}/vncauth.c
++#     ${COMMON_DIR}/sockets.c
++#     ${LIBVNCSERVER_DIR}/cargs.c
++#     ${LIBVNCSERVER_DIR}/ultra.c
++#     ${LIBVNCSERVER_DIR}/scale.c
++#     ${CRYPTO_SOURCES}
++# )
+
+ set(LIBVNCCLIENT_SOURCES
+     ${LIBVNCCLIENT_DIR}/cursor.c
+
+
+
+
+diff --git a/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/tls_openssl.c b/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/tls_openssl.c
+index a858f751b..3553d1743 100644
+--- a/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/tls_openssl.c
++++ b/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/tls_openssl.c
+@@ -247,6 +247,14 @@ load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
+      return FALSE;
+}
+
++// Callback function for handling and printing errors
++static int print_errors_cb(const char *str, size_t len, void *u) {
++    // Cast the user argument to the expected type if needed (not used in this example)
++    // Print the error string to stderr
++    rfbClientLog("%.*s", (int)len, str);
++    return 1; // Return 1 to continue the iteration through the error queue
++}
++
+static SSL *
+open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredential *cred)
+{
+@@ -258,6 +266,8 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
+
+   if (!(ssl_ctx = SSL_CTX_new(SSLv23_client_method())))
+   {
++    ERR_print_errors_cb(print_errors_cb, NULL);
++    rfbClientLog("\n");
+      rfbClientLog("Could not create new SSL context.\n");
+      return NULL;
+   }
+     
+
+
+(2) In src/libvncclient/listen.c, line 43 and 44:
+
+#if LIBVNCSERVER_HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <rfb/rfbclient.h>
+
++ // No support of <listenForIncomingConnections> in RDesktop on GreenBox
++ #ifndef OS_SECOS
+/*
+ * listenForIncomingConnections() - listen for incoming connections from
+ * servers, and fork a new process to deal with each connection.
+ */
+
+void
+listenForIncomingConnections(rfbClient* client)
+
+
+In src/libvncclient/listen.c, line 141:
+
+         }
+      }
+   }
+#endif
+}
+
++ #endif // OS_SECOS
+
+/*
+ * listenForIncomingConnectionsNoFork() - listen for incoming connections
+ * from servers, but DON'T fork, instead just wait timeout microseconds.
+ * If timeout is negative, block indefinitely.
+ * Returns 1 on success (there was an incoming connection on the listen socket
+ * and we accepted it successfully), -1 on error, 0 on timeout.
+ */
+
+int
+listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
+
+
+
+
+
+
+ 
+diff --git a/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/vncviewer.c b/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/vncviewe
+r.c
+index 342a9bc7..96dff068 100644
+--- a/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/vncviewer.c
++++ b/code/secapp_demos/rdesktop/secapp/libvncserver/src/libvncclient/vncviewer.c
+@@ -55,39 +55,39 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
+ #include <termios.h>
+ #endif
+ 
+static char* ReadPassword(rfbClient* client) {
+       int i;
+       char* p=calloc(1,9);
+
+static char* ReadPassword(rfbClient* client) {
++ #ifndef OS_SECOS
+     int i;
+     char* p=calloc(1,9);
+     if (!p) return p;
+ #ifndef WIN32
+     struct termios save,noecho;
+     if(tcgetattr(fileno(stdin),&save)!=0) return p;
+     noecho=save; noecho.c_lflag &= ~ECHO;
+     if(tcsetattr(fileno(stdin),TCSAFLUSH,&noecho)!=0) return p;
+ #endif
+     fprintf(stderr,"Password: ");
+     fflush(stderr);
+     i=0;
+     while(1) {
+             int c=fgetc(stdin);
+             if(c=='\n')
+                     break;
+             if(i<8) {
+                     p[i]=c;
+                     i++;
+                     p[i]=0;
+             }
+     }
+ #ifndef WIN32
+     tcsetattr(fileno(stdin),TCSAFLUSH,&save);
+ #endif
+     return p;
++
++ #else
++     return NULL;
++ #endif // OS_SECOS
+ }
+ static rfbBool MallocFrameBuffer(rfbClient* client) {
+   uint64_t allocSize;
+ 
+
+In Line 438 of src/libvncclient/vncviewer.c:
+rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
+   int i,j;
+   
+   if(argv && argc && *argc) {
+      if(client->programName==0)
+         client->programName=argv[0];
+   
+      for (i = 1; i < *argc; i++) {
+         j = i;
+   
++         // No support of <listenForIncomingConnections> in RDesktop on GreenBox
++   #ifndef OS_SECOS
+         if (strcmp(argv[i], "-listen") == 0) {
+      listenForIncomingConnections(client);
+      break;
+         } else if (strcmp(argv[i], "-listennofork") == 0) {
++   #else
++         if (strcmp(argv[i], "-listennofork") == 0) {
++   #endif // OS_SECOS

@@ -1,0 +1,4 @@
+efi_tpm2_event_logs/.vs
+efi_tpm2_event_logs/x64
+efi_tpm2_event_logs/efi_tpm2.????????/
+*.exe

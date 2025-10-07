@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "greenbox-sdk",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"license": "c"
+		}
+	}
+}

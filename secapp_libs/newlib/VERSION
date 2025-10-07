@@ -1,0 +1,3 @@
+Newlib
+===============
+1. Remove "config.h" from newlib-4.5.0/.gitignore

@@ -1,0 +1,346 @@
+OpenSSL v3.5.2
+https://github.com/openssl/openssl/releases/download/openssl-3.5.2/openssl-3.5.2.tar.gz
+
+
+OpenSSL diff
+================================================
+find . -name '*.[ch]' -exec diff -wibu {} ../openssl_old/{} \;
+--- ./include/internal/sockets.h	2024-01-30 08:14:56.000000000 -0500
++++ ../openssl_old/./include/internal/sockets.h	2024-09-01 22:10:55.650419124 -0400
+@@ -201,7 +201,11 @@
+ #  define ioctlsocket(a,b,c)      ioctl(a,b,c)
+ #  define closesocket(s)          close(s)
+ # else
++#    if defined (OPENSSL_SYS_GREENBOX)
++#         define ioctlsocket(a,b,c)      ioctl_ret_1arg(a,b,c, sizeof(unsigned long))
++#    else
+ #  define ioctlsocket(a,b,c)      ioctl(a,b,c)
++#    endif // OPENSSL_SYS_GREENBOX
+ #  define closesocket(s)          close(s)
+ #  define readsocket(s,b,n)       read((s),(b),(n))
+ #  define writesocket(s,b,n)      write((s),(b),(n))
+--- ./crypto/asn1/a_time.c	2024-01-30 08:14:56.000000000 -0500
++++ ../openssl_old/./crypto/asn1/a_time.c	2024-09-01 22:10:55.343414629 -0400
+@@ -599,6 +599,8 @@
+  */
+ #ifdef WIN32
+ # define timezone _timezone
++#elif defined(OPENSSL_SYS_GREENBOX) 
++#define timezone time(NULL)
+ #endif
+ 
+ #if defined(__FreeBSD__) || defined(__wasi__)
+--- ./crypto/o_dir.c	2024-01-30 08:14:56.000000000 -0500
++++ ../openssl_old/./crypto/o_dir.c	2024-09-01 22:10:55.461416357 -0400
+@@ -23,7 +23,9 @@
+ #include "internal/o_dir.h"
+ 
+ #define LPDIR_H
+-#if defined OPENSSL_SYS_UNIX || defined DJGPP \
++#if defined OPENSSL_SYS_GREENBOX
++# include "LPdir_nyi.c"
++#elif defined OPENSSL_SYS_UNIX || defined DJGPP \
+     || (defined __VMS_VER && __VMS_VER >= 70000000)
+ # include "LPdir_unix.c"
+ #elif defined OPENSSL_SYS_VMS
+--- ./providers/implementations/rands/seeding/rand_unix.c	2024-01-30 08:14:56.000000000 -0500
++++ ../openssl_old/./providers/implementations/rands/seeding/rand_unix.c	2024-09-01 22:10:55.701419871 -0400
+@@ -6,6 +6,11 @@
+  * in the file LICENSE in the source distribution or at
+  * https://www.openssl.org/source/license.html
+  */
++#ifdef OPENSSL_SYS_GREENBOX
++    #include "rand_greenbox.c"
++#else // OPENSSL_SYS_GREENBOX
++
++
+ 
+ #ifndef _GNU_SOURCE
+ # define _GNU_SOURCE
+@@ -27,6 +32,7 @@
+ #  include <sys/shm.h>
+ #  include <sys/utsname.h>
+ # endif
++
+ #endif
+ #if (defined(__FreeBSD__) || defined(__NetBSD__)) && !defined(OPENSSL_SYS_UEFI)
+ # include <sys/types.h>
+@@ -806,3 +812,7 @@
+ 
+ #endif /* (defined(OPENSSL_SYS_UNIX) && !defined(OPENSSL_SYS_VXWORKS))
+           || defined(__DJGPP__) */
++
++
++
++#endif // OPENSSL_SYS_GREENBOX
+\ No newline at end of file
+
+
+(2) Add the file secapp_libs/ports/openssl/providers/implementations/rands/seeding/rand_greenbox.c
+
+
+zlib v1.3.1
+https://www.zlib.net/zlib-1.3.1.tar.gz
+
+
+libssh2 v1.11.0
+https://libssh2.org/download/libssh2-1.11.0.tar.gz
+
+
+libssh2 diff
+================================================
+diff --git a/code/secapp_libs/ports/libssh2/src/libssh2_setup.h b/code/secapp_libs/ports/libssh2/src/libssh2_setup.h
+index 87fed1c58..fda1776cd 100644
+--- a/code/secapp_libs/ports/libssh2/src/libssh2_setup.h
++++ b/code/secapp_libs/ports/libssh2/src/libssh2_setup.h
+@@ -102,4 +102,9 @@
+
+ #endif /* WIN32 */
+
++
++#ifdef LIBSSH2_SYS_GREENBOX
++#undef HAVE_POLL
++#endif // LIBSSH2_SYS_GREENBOX
++
+ #endif /* LIBSSH2_SETUP_H */
+
+
+Curl v8.16.0
+https://curl.se/download/curl-8.16.0.zip
+
+
+Curl diff
+================================================
+diff --git a/code/secapp_libs/ports/curl/src/tool_filetime.h b/code/secapp_libs/ports/curl/src/tool_filetime.h
+index c3663617b..34d0baa54 100644
+--- a/code/secapp_libs/ports/curl/src/tool_filetime.h
++++ b/code/secapp_libs/ports/curl/src/tool_filetime.h
+@@ -31,7 +31,7 @@ int getfiletime(const char *filename, curl_off_t *stamp);
+   (defined(_WIN32) && (SIZEOF_CURL_OFF_T >= 8))
+ void setfiletime(curl_off_t filetime, const char *filename);
+ #else
+-#define setfiletime(a,b,c) tool_nop_stmt
++#define setfiletime(a,b) tool_nop_stmt
+ #endif
+ 
+ #endif /* HEADER_CURL_TOOL_FILETIME_H */
+ 
+ 
+jansson v2.14.1
+https://github.com/akheron/jansson/archive/refs/tags/v2.14.1.zip
+
+
+jansson diff
+================================================
+Use the src folder and the jansson.pc only.
+ 
+
+cjose v0.6.2.4
+https://github.com/OpenIDC/cjose/archive/refs/tags/v0.6.2.4.zip
+ 
+
+cjose diff
+================================================
+Use the src folder and include folder only. Use the generated include/version.h
+
+
+liboauth2 v2.1.1
+https://github.com/OpenIDC/liboauth2/archive/refs/tags/v2.1.1.zip
+
+
+liboauth2 diff
+================================================
+1. Prepare a new Ubuntu 24.04 VM to run autogen.sh to generate configure
+ - [NOTE] Run autogen.sh without this step causes errors like "configure.ac:76: error: possibly undefined macro: AC_MSG_WARN" or similar. 
+ - Before running autogen.sh, install the following packages:
+ ```
+ sudo apt-get update -y; \
+ sudo apt-get install -y apache2-dev libcjose-dev libssl-dev check pkg-config; \
+ sudo apt-get install -y libjansson-dev libcurl4-openssl-dev libhiredis-dev libmemcached-dev libpcre2-dev libpcre2-8-0 libjq-dev; \
+ sudo apt-get install build-essential libpcre3 libpcre3-dev zlib1g zlib1g-dev libxml2 libxml2-dev uuid-dev;
+ ```
+
+2. 
+find . -name '*.[ch]' -exec diff -wibu {} ../liboauth2/{} \;
+--- ./test/check_ipc.c	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./test/check_ipc.c	2025-09-17 16:37:14.731893409 -0400
+@@ -91,6 +91,7 @@
+ }
+ END_TEST
+ 
++#ifndef OS_SECOS
+ START_TEST(test_shm)
+ {
+ 	bool rc = false;
+@@ -110,6 +111,7 @@
+ 	shm = NULL;
+ }
+ END_TEST
++#endif // OS_SECOS
+ 
+ Suite *oauth2_check_ipc_suite()
+ {
+--- ./src/util_int.h	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./src/util_int.h	2025-09-17 16:51:26.945629644 -0400
+@@ -37,8 +37,10 @@
+ #include <stddef.h>
+ #include <stdio.h>
+ 
++#ifndef OS_SECOS
+ #define PCRE2_CODE_UNIT_WIDTH 8
+ #include <pcre2.h>
++#endif // OS_SECOS
+ 
+ #include "oauth2/log.h"
+ #include "oauth2/util.h"
+@@ -175,8 +177,10 @@
+ 	_OAUTH2_MEMBER_LIST_IMPLEMENT_UNSET_GET(module, type, list)            \
+ 	_OAUTH2_MEMBER_LIST_IMPLEMENT_ADD(module, type, list)
+ 
++#ifndef OS_SECOS
+ pcre2_code *oauth2_pcre2_compile(const char *regexp);
+ int oauth2_pcre2_exec(pcre2_code *preg, const char *input, int len,
+ 		      char **error_str);
++#endif // OS_SECOS
+ 
+ #endif /* _OAUTH2_UTIL_INT_H_ */
+--- ./src/util.c	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./src/util.c	2025-09-17 16:49:10.183487214 -0400
+@@ -413,10 +413,10 @@
+ 	buf = oauth2_strdup(src);
+ 	start = buf;
+ 
+-	while (isspace(*start))
++	while (isspace((int)*start))
+ 		++start;
+ 	end = &start[strlen(start)];
+-	while (--end >= start && isspace(*end))
++	while (--end >= start && isspace((int)*end))
+ 		*end = '\0';
+ 
+ 	rv = oauth2_strdup(start);
+@@ -1449,6 +1449,7 @@
+ 	return rv;
+ }
+ 
++#ifndef OS_SECOS
+ pcre2_code *oauth2_pcre2_compile(const char *regexp)
+ {
+ 	int errorcode;
+@@ -1494,3 +1495,4 @@
+ 
+ 	return rc;
+ }
++#endif // OS_SECOS
+--- ./src/cache/shm.c	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./src/cache/shm.c	2025-09-17 16:38:52.696044348 -0400
+@@ -18,6 +18,8 @@
+  *
+  **************************************************************************/
+ 
++#ifndef OS_SECOS
++
+ #include <oauth2/cache.h>
+ #include <oauth2/ipc.h>
+ #include <oauth2/mem.h>
+@@ -452,3 +454,5 @@
+ }
+ 
+ OAUTH2_CACHE_TYPE_DECLARE(shm, false)
++
++#endif // OS_SECOS
+--- ./src/proto.c	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./src/proto.c	2025-09-17 16:42:57.534530879 -0400
+@@ -67,7 +67,7 @@
+ 		}
+ 	}
+ 
+-	while (isspace(*auth_line))
++	while (isspace((int)*auth_line))
+ 		auth_line++;
+ 	source_token = oauth2_strdup(auth_line);
+ 
+@@ -261,7 +261,7 @@
+ 			    scheme);
+ 		goto end;
+ 	}
+-	while (isspace(*auth_line))
++	while (isspace((int)*auth_line))
+ 		auth_line++;
+ 
+ 	if (oauth2_base64_decode(log, auth_line, (uint8_t **)&decoded_line,
+--- ./src/http.c	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./src/http.c	2025-09-17 16:42:26.907961954 -0400
+@@ -1004,7 +1004,7 @@
+ 	curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+ 
+ 	if (ctx)
+-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, ctx->timeout);
++		curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)ctx->timeout);
+ 
+ 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
+ 			 oauth2_http_curl_buf_write);
+@@ -1072,7 +1072,7 @@
+ 
+ 	if (data != NULL) {
+ 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
+-		curl_easy_setopt(curl, CURLOPT_POST, 1);
++		curl_easy_setopt(curl, CURLOPT_POST, 1L);
+ 	}
+ 
+ 	if (ctx)
+--- ./src/ipc.c	2025-08-08 04:57:32.000000000 -0400
++++ ../liboauth2/./src/ipc.c	2025-09-17 16:37:34.398795996 -0400
+@@ -20,8 +20,12 @@
+ 
+ #include <sys/types.h>
+ #ifndef _WIN32
++#ifdef OS_SECOS
++#include <unistd.h>
++#else // OS_SECOS
+ #include <sys/mman.h>
+ #include <unistd.h>
++#endif // OS_SECOS
+ #else
+ #include "mmap-windows.c"
+ #ifdef _MSC_VER
+@@ -293,6 +297,7 @@
+ 	return shm;
+ }
+ 
++#ifndef OS_SECOS
+ void oauth2_ipc_shm_free(oauth2_log_t *log, oauth2_ipc_shm_t *shm)
+ {
+ 	if (shm == NULL)
+@@ -361,3 +366,4 @@
+ {
+ 	return shm ? shm->ptr : NULL;
+ }
++#endif // OS_SECOS
+\ No newline at end of file
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

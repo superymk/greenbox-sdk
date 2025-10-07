@@ -1,0 +1,8 @@
+*.[oa]
+*~
+dist/
+openssl/build/
+libssh2/build/
+zlib/build/
+curl/build/
+liboauth2/build/

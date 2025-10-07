@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Driver Files">
+      <UniqueIdentifier>{8E41214B-6785-4CFE-B992-037D68949A14}</UniqueIdentifier>
+      <Extensions>inf;inv;inx;mof;mc;</Extensions>
+    </Filter>
+    <Filter Include="Source Files\x86">
+      <UniqueIdentifier>{75cdf5a4-214b-4815-8e94-8d23bbbfb7cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\common">
+      <UniqueIdentifier>{f034193d-dc22-430f-94dc-4c186d890f9b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\common\arch">
+      <UniqueIdentifier>{3ff6c8e8-300d-4aae-a81a-a8ba8465997f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\common\arch\x86">
+      <UniqueIdentifier>{1ed3d220-e2d7-4137-b50a-288b3f6e1458}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\common\arch\x86\amd64">
+      <UniqueIdentifier>{2fd8e388-9014-44ac-b424-036fb9295c15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\common\arch\x86\i386">
+      <UniqueIdentifier>{dd72929e-0dcb-44fc-a103-10890290b0b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devs">
+      <UniqueIdentifier>{f5397df3-ea6c-49df-9928-42e6c86c75c8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devs\gpu">
+      <UniqueIdentifier>{1f7036eb-e6c1-4853-a042-54cee37ccc63}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\win">
+      <UniqueIdentifier>{fe231b72-f340-48f0-91aa-76767cde9ad0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\device">
+      <UniqueIdentifier>{4d9a95b1-de4c-41c1-b375-0c20f9b19547}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\device\ehci">
+      <UniqueIdentifier>{a44e4acd-2068-4f0f-a119-b156a1681fad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\device\gpu">
+      <UniqueIdentifier>{fc61c8d8-50d3-461a-9d22-4e173e5aeb78}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\device\gpu\intel">
+      <UniqueIdentifier>{2cea3613-b3e7-4920-93f9-40a3cf66b1b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\utils">
+      <UniqueIdentifier>{208988ea-9205-4752-b2eb-203c54882922}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\win">
+      <UniqueIdentifier>{be98c08b-ae83-4b86-841f-8082ef0c1e47}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devs\gpu\intel">
+      <UniqueIdentifier>{a49ff511-01f5-4f85-994d-3346c2968075}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="SecAgent.inf">
+      <Filter>Driver Files</Filter>
+    </Inf>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\app_notif_mgr.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\comm_sos.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\comm_sos_handler.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\debug.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\ioctl_handler.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\perf.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\sa_process.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\secagent.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\sos.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\sos_mm_mgr.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\sos_sp_params.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\stl_dlist.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\apic.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\arch\x86\i386\i386_apic.c">
+      <Filter>Source Files\common\arch\x86\i386</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\ps2.c">
+      <Filter>Source Files\devs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\ehci.c">
+      <Filter>Source Files\devs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\pci.c">
+      <Filter>Source Files\devs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\utils\utils.c">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="driver_entry.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="win_cpu.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="win_funcs.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="win_intr.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="win_mm.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="win_event_notify.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\arch\x86\amd64\amd64_apic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\arch\x86\sa_arch.c">
+      <Filter>Source Files\common\arch\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\intr.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\secbase.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\gpu\gpu.c">
+      <Filter>Source Files\devs\gpu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\gpu\gpu_debug.c">
+      <Filter>Source Files\devs\gpu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\gpu\intel\gen9.c">
+      <Filter>Source Files\devs\gpu\intel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\gpu\intel\ilk.c">
+      <Filter>Source Files\devs\gpu\intel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\gpu\intel\i965_ops.c">
+      <Filter>Source Files\devs\gpu\intel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\untrusted_loader_info.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\devs\xhci_shared.c">
+      <Filter>Source Files\devs</Filter>
+    </ClCompile>
+    <ClCompile Include="win_mm_sdom.c">
+      <Filter>Source Files\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\mm.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\untrusted_loader_utils.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="driver_entry.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="win_cpu.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\os_funcs\os\win_headers.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="win_intr.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="win_mm.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\apic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\app_notif_mgr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\comm_sos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\comm_sos_handler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\ioctl_handler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\os_funcs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\os_logs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\os_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\os_var.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\perf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\sa_headers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\sa_process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\secagent_ops.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\sos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\sos_mm_mgr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\sos_sp_params.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\stl_dlist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\x86_mm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\pci.h">
+      <Filter>Header Files\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\ps2.h">
+      <Filter>Header Files\device</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\usb\ehci.h">
+      <Filter>Header Files\device\ehci</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\gpu\gpu_utils.h">
+      <Filter>Header Files\device\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\gpu\gpu.h">
+      <Filter>Header Files\device\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\gpu\gpu_debug.h">
+      <Filter>Header Files\device\gpu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\device\gpu\intel\i965_regs.h">
+      <Filter>Header Files\device\gpu\intel</Filter>
+    </ClInclude>
+    <ClInclude Include="win_event_notify.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\devs\gpu\intel\gen9.h">
+      <Filter>Source Files\devs\gpu\intel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\devs\gpu\intel\ilk.h">
+      <Filter>Source Files\devs\gpu\intel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\devs\gpu\intel\i965.h">
+      <Filter>Source Files\devs\gpu\intel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\untrusted_loader_info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="win_mm_sdom.h">
+      <Filter>Header Files\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\mm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\untrusted_loader_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="x86\int.asm">
+      <Filter>Source Files\x86</Filter>
+    </MASM>
+    <MASM Include="x86\cpu.asm">
+      <Filter>Source Files\x86</Filter>
+    </MASM>
+  </ItemGroup>
+</Project>

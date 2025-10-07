@@ -1,0 +1,3 @@
+#!/bin/sh
+NM="/usr/bin/nm"
+exec $NM "$@"

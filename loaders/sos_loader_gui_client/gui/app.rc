@@ -1,0 +1,4 @@
+// app.rc
+// #include "wx/msw/wx.rc"   // if you need wxWidgets’ default resources
+
+IDI_APP_ICON ICON "./gui_res/home.ico"

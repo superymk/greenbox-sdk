@@ -1,0 +1,11 @@
+*.[oa]
+*~
+build/
+dist/
+
+config.status
+config.log
+./**/*.cct
+
+*/newlib/libc/sys/secos/aclocal.m4
+*/newlib/libc/sys/secos/configure

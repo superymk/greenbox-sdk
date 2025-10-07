@@ -1,0 +1,42 @@
+{
+	"folders": [
+		{
+			"name": "secapp_demos",
+			"path": "code/secapp_demos"
+		},
+		{
+			"name": "secapp_libs",
+			"path": "code/secapp_libs"
+		},
+		{
+			"name": "loaders",
+			"path": "code/loaders"
+		},
+		{
+			"name": "os_module",
+			"path": "code/os_module"
+		}
+	],
+    "settings": {
+        "files.associations": {
+			"sp_control.h": "c",
+			"*.inc": "c",
+			"queue": "c",
+			"stack": "c",
+			"lib_bridge_tpm_headers.h": "c",
+			"memory": "c",
+			"mutex": "c",
+			"lib-iosm-usb-internal.h": "c",
+			"lib-usb2.h": "c",
+			"usbhid.h": "c",
+			"lib-iosm-usb.h": "c",
+			"usbbuf_mm.h": "c",
+			"sap_headers_libc.h": "c",
+			"*.c_not_compiled": "cpp",
+			"system_error": "c",
+			"xlocale": "c",
+			"dirent.h": "c",
+			"chrono": "c"
+		}
+    }
+}

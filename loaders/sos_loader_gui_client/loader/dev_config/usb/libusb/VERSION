@@ -1,0 +1,3 @@
+For Windows: libusb-1.0.27 (https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.7z)
+
+For Linux: dynamic linking to the system default libusb-1.0-0-dev lib

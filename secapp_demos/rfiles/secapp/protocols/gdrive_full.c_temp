@@ -1,0 +1,1224 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
+// gdrive.c (POSIX/newlib only)
+// Google Drive client (Device Code OAuth2) using liboauth2 v2.1.1 + libcurl.
+// - OAuth form POSTs: for device flow we use curl directly so we can read non-2xx JSON bodies
+// - Drive list/upload/download via libcurl
+// - POSIX-only (newlib) headers & APIs
+// - printf only (no stderr/fputs/fputc)
+
+#include "gdrive.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+
+#include <curl/curl.h>
+#include <jansson.h>
+
+#include "ssl_ca.h"
+
+// ---- Config
+static const char *DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code";
+static const char *TOKEN_URL = "https://oauth2.googleapis.com/token";
+static const char *DRIVE_API = "https://www.googleapis.com/drive/v3";
+static const char *DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+static const char *TOKENS_JSON = "tokens.json";
+
+#define DEFAULT_JOIN_SEP '/'
+
+// ---- Small utilities (printf-only)
+static void die(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    printf("ERROR: ");
+    vprintf(fmt, ap);
+    printf("\n");
+    va_end(ap);
+}
+
+static int is_dir(const char *p)
+{
+    struct stat st;
+    if (stat(p, &st))
+        return 0;
+    return S_ISDIR(st.st_mode);
+}
+__attribute__((unused)) static int is_file(const char *p)
+{
+    struct stat st;
+    if (stat(p, &st))
+        return 0;
+    return S_ISREG(st.st_mode);
+}
+
+static int ensure_dir(const char *path)
+{
+    if (is_dir(path))
+        return 0;
+    if (mkdir(path, 0755) == 0)
+        return 0;
+    if (errno == EEXIST)
+        return 0;
+    return -1;
+}
+
+static void sleep_seconds(int s)
+{
+    sleep(s);
+}
+
+static char *sdup(const char *s)
+{
+    if (!s)
+        return NULL;
+    size_t n = strlen(s);
+    char *r = (char *)malloc(n + 1);
+    if (!r)
+        return NULL;
+    memcpy(r, s, n + 1);
+    return r;
+}
+
+// Detect absolute paths (Unix, Windows drive, or UNC).
+static int is_absolute_path(const char *p)
+{
+    if (!p || !*p)
+        return 0;
+    if (p[0] == '/')
+        return 1;
+    if (p[0] == '\\' && p[1] == '\\')
+        return 1;
+    if (((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) &&
+        p[1] == ':' && (p[2] == '\\' || p[2] == '/'))
+        return 1;
+    return 0;
+}
+
+// Join paths conservatively
+static void path_join(char *out, size_t outsz, const char *a, const char *b)
+{
+    const char *A = (a && *a) ? a : "";
+    const char *B = (b && *b) ? b : "";
+
+    if (is_absolute_path(B) || !*A)
+    {
+        snprintf(out, outsz, "%s", B);
+        return;
+    }
+    size_t la = strlen(A);
+    int A_has_sep = (la > 0 && (A[la - 1] == '/' || A[la - 1] == '\\'));
+    int B_has_sep = (B[0] == '/' || B[0] == '\\');
+
+    if (A_has_sep || B_has_sep)
+        snprintf(out, outsz, "%s%s", A, B);
+    else
+        snprintf(out, outsz, "%s%c%s", A, DEFAULT_JOIN_SEP, B);
+}
+
+// Return pointer inside 'path' to basename.
+static const char *basename_x(const char *path)
+{
+    if (!path)
+        return "";
+    const char *s1 = strrchr(path, '/');
+    const char *s2 = strrchr(path, '\\');
+    const char *s = (!s1 ? s2 : (!s2 ? s1 : (s1 > s2 ? s1 : s2)));
+    return s ? (s + 1) : path;
+}
+
+// ---- HTTP buffer
+struct mem
+{
+    char *ptr;
+    size_t len;
+};
+static size_t write_cb(void *data, size_t sz, size_t nm, void *ud)
+{
+    size_t add = sz * nm;
+    struct mem *m = (struct mem *)ud;
+    char *np = (char *)realloc(m->ptr, m->len + add + 1);
+    if (!np)
+        return 0;
+    m->ptr = np;
+    memcpy(m->ptr + m->len, data, add);
+    m->len += add;
+    m->ptr[m->len] = 0;
+    return add;
+}
+
+static void curl_check(CURLcode rc, const char *where)
+{
+    if (rc != CURLE_OK)
+        die("%s: %s", where, curl_easy_strerror(rc));
+}
+
+// ---------- helpers for URL-encoding query params ----------
+static char *escape_str(CURL *C, const char *s)
+{
+    if (!s)
+        return sdup("");
+    char *e = curl_easy_escape(C, s, 0);
+    if (!e)
+        return sdup("");
+    char *r = sdup(e);
+    curl_free(e);
+    return r;
+}
+
+// ---------- POST x-www-form-urlencoded (returns body + HTTP status; never dies on non-2xx) ----------
+static char *curl_post_form_status(const char *url, const char *pairs[][2], size_t npairs, long *out_status)
+{
+    if (out_status)
+        *out_status = 0;
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return NULL;
+    }
+    sslca_curl_set(C);
+
+    struct mem body = {0};
+    for (size_t i = 0; i < npairs; i++)
+    {
+        const char *k = pairs[i][0] ? pairs[i][0] : "";
+        const char *v = pairs[i][1] ? pairs[i][1] : "";
+        char *ek = curl_easy_escape(C, k, 0);
+        char *ev = curl_easy_escape(C, v, 0);
+        if (!ek || !ev)
+        {
+            if (ek)
+                curl_free(ek);
+            if (ev)
+                curl_free(ev);
+            curl_easy_cleanup(C);
+            free(body.ptr);
+            die("oom");
+            return NULL;
+        }
+        size_t need = (body.len ? 1 : 0) + strlen(ek) + 1 + strlen(ev);
+        char *nb = realloc(body.ptr, body.len + need + 1);
+        if (!nb)
+        {
+            curl_free(ek);
+            curl_free(ev);
+            curl_easy_cleanup(C);
+            free(body.ptr);
+            die("oom");
+            return NULL;
+        }
+        body.ptr = nb;
+        char *dst = body.ptr + body.len;
+        if (body.len)
+            *dst++ = '&';
+        strcpy(dst, ek);
+        dst += strlen(ek);
+        *dst++ = '=';
+        strcpy(dst, ev);
+        body.len += need;
+        body.ptr[body.len] = 0;
+        curl_free(ek);
+        curl_free(ev);
+    }
+
+    struct curl_slist *hdr = NULL;
+    hdr = curl_slist_append(hdr, "Content-Type: application/x-www-form-urlencoded");
+    hdr = curl_slist_append(hdr, "Accept: application/json");
+
+    struct mem resp = {0};
+    curl_easy_setopt(C, CURLOPT_URL, url);
+    curl_easy_setopt(C, CURLOPT_HTTPHEADER, hdr);
+    curl_easy_setopt(C, CURLOPT_POST, 1L);
+    curl_easy_setopt(C, CURLOPT_POSTFIELDS, body.ptr ? body.ptr : "");
+    curl_easy_setopt(C, CURLOPT_POSTFIELDSIZE, (long)body.len);
+    curl_easy_setopt(C, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(C, CURLOPT_WRITEDATA, &resp);
+    curl_easy_setopt(C, CURLOPT_CONNECTTIMEOUT_MS, 30000L);
+    curl_easy_setopt(C, CURLOPT_TIMEOUT_MS, 45000L);
+
+    CURLcode rc = curl_easy_perform(C);
+    long code = 0;
+    if (rc == CURLE_OK)
+        curl_easy_getinfo(C, CURLINFO_RESPONSE_CODE, &code);
+
+    curl_slist_free_all(hdr);
+    curl_easy_cleanup(C);
+    free(body.ptr);
+
+    if (rc != CURLE_OK)
+    {
+        // network/transport error: return NULL so caller can retry/backoff
+        if (resp.ptr)
+            free(resp.ptr);
+        die("POST %s: %s", url, curl_easy_strerror(rc));
+        return NULL;
+    }
+
+    if (out_status)
+        *out_status = code;
+    // return body even for non-2xx so caller can parse {"error": "..."}
+    return resp.ptr; // caller free()
+}
+
+// ---------- Legacy POST that requires 2xx (kept for refresh + uploads) ----------
+__attribute__((unused)) static char *curl_post_form(const char *url, const char *pairs[][2], size_t npairs)
+{
+    long st = 0;
+    char *r = curl_post_form_status(url, pairs, npairs, &st);
+    if (!r)
+        return NULL;
+    if (st / 100 != 2)
+    {
+        free(r);
+        die("HTTP %ld POST %s", st, url);
+        return NULL;
+    }
+    return r;
+}
+
+// Authenticated GET (string) – still enforces 2xx; we only need non-2xx bodies for the OAuth POSTs.
+static char *curl_get_auth(const char *url, const char *bearer)
+{
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return NULL;
+    }
+    sslca_curl_set(C);
+
+    struct mem m = {0};
+    struct curl_slist *hdr = NULL;
+    char auth[1024];
+    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", bearer);
+    hdr = curl_slist_append(hdr, auth);
+    hdr = curl_slist_append(hdr, "Accept: application/json");
+    curl_easy_setopt(C, CURLOPT_HTTPHEADER, hdr);
+    curl_easy_setopt(C, CURLOPT_URL, url);
+    curl_easy_setopt(C, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(C, CURLOPT_WRITEDATA, &m);
+    CURLcode rc = curl_easy_perform(C);
+    if (rc != CURLE_OK)
+    {
+        curl_slist_free_all(hdr);
+        curl_easy_cleanup(C);
+        if (m.ptr)
+            free(m.ptr);
+        die("GET auth: %s", curl_easy_strerror(rc));
+        return NULL;
+    }
+    long code = 0;
+    curl_easy_getinfo(C, CURLINFO_RESPONSE_CODE, &code);
+    curl_slist_free_all(hdr);
+    curl_easy_cleanup(C);
+    if (code / 100 != 2)
+    {
+        free(m.ptr);
+        die("HTTP %ld GET %s", code, url);
+        return NULL;
+    }
+    return m.ptr;
+}
+
+static void curl_get_auth_to_file(const char *url, const char *bearer, const char *outpath)
+{
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return;
+    }
+    sslca_curl_set(C);
+
+    FILE *f = fopen(outpath, "wb");
+    if (!f)
+    {
+        die("open %s: %s", outpath, strerror(errno));
+        curl_easy_cleanup(C);
+        return;
+    }
+    struct curl_slist *hdr = NULL;
+    char auth[1024];
+    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", bearer);
+    hdr = curl_slist_append(hdr, auth);
+    curl_easy_setopt(C, CURLOPT_HTTPHEADER, hdr);
+    curl_easy_setopt(C, CURLOPT_URL, url);
+    curl_easy_setopt(C, CURLOPT_WRITEDATA, f);
+    CURLcode rc = curl_easy_perform(C);
+    if (rc != CURLE_OK)
+    {
+        curl_slist_free_all(hdr);
+        curl_easy_cleanup(C);
+        fclose(f);
+        die("GET->file: %s", curl_easy_strerror(rc));
+        return;
+    }
+    long code = 0;
+    curl_easy_getinfo(C, CURLINFO_RESPONSE_CODE, &code);
+    curl_slist_free_all(hdr);
+    curl_easy_cleanup(C);
+    fclose(f);
+    if (code / 100 != 2)
+        die("HTTP %ld GET %s", code, url);
+}
+
+static char *curl_post_multipart_auth(const char *url, const char *bearer,
+                                      const char *json_meta, const char *filepath, const char *mime)
+{
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return NULL;
+    }
+    sslca_curl_set(C);
+
+    struct mem m = {0};
+    struct curl_slist *hdr = NULL;
+    char auth[1024];
+    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", bearer);
+    hdr = curl_slist_append(hdr, auth);
+
+    curl_mime *mp = curl_mime_init(C);
+    curl_mimepart *part;
+
+    part = curl_mime_addpart(mp);
+    curl_mime_name(part, "metadata");
+    curl_mime_data(part, json_meta, CURL_ZERO_TERMINATED);
+    curl_mime_type(part, "application/json; charset=UTF-8");
+
+    part = curl_mime_addpart(mp);
+    curl_mime_name(part, "file");
+    curl_mime_filedata(part, filepath);
+    if (mime && *mime)
+        curl_mime_type(part, mime);
+
+    curl_easy_setopt(C, CURLOPT_URL, url);
+    curl_easy_setopt(C, CURLOPT_MIMEPOST, mp);
+    curl_easy_setopt(C, CURLOPT_HTTPHEADER, hdr);
+    curl_easy_setopt(C, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(C, CURLOPT_WRITEDATA, &m);
+
+    CURLcode rc = curl_easy_perform(C);
+    curl_check(rc, "POST multipart");
+    long code = 0;
+    curl_easy_getinfo(C, CURLINFO_RESPONSE_CODE, &code);
+
+    curl_mime_free(mp);
+    curl_slist_free_all(hdr);
+    curl_easy_cleanup(C);
+    if (code / 100 != 2)
+    {
+        free(m.ptr);
+        die("HTTP %ld POST multipart %s", code, url);
+        return NULL;
+    }
+    return m.ptr;
+}
+
+// ---- Tokens
+typedef struct
+{
+    char *access_token;
+    char *refresh_token;
+    char *scope;
+    char *token_type;
+    time_t expires_at;
+    char *client_id;
+    char *client_secret;
+} tokens_t;
+
+static void tokens_free(tokens_t *t)
+{
+    if (!t)
+        return;
+    free(t->access_token);
+    free(t->refresh_token);
+    free(t->scope);
+    free(t->token_type);
+    free(t->client_id);
+    free(t->client_secret);
+    memset(t, 0, sizeof(*t));
+}
+
+static int tokens_load(tokens_t *t)
+{
+    json_error_t e;
+    json_t *J = json_load_file(TOKENS_JSON, 0, &e);
+    if (!J)
+        return -1;
+    memset(t, 0, sizeof(*t));
+    json_t *v;
+#define GETS(name)                                \
+    do                                            \
+    {                                             \
+        if ((v = json_object_get(J, #name)))      \
+            t->name = sdup(json_string_value(v)); \
+    } while (0)
+    GETS(access_token);
+    GETS(refresh_token);
+    GETS(scope);
+    GETS(token_type);
+    GETS(client_id);
+    GETS(client_secret);
+#undef GETS
+    if ((v = json_object_get(J, "expires_at")))
+        t->expires_at = (time_t)json_integer_value(v);
+    json_decref(J);
+    return 0;
+}
+
+static int tokens_save(const tokens_t *t)
+{
+    json_t *J = json_object();
+#define PUTS(name) json_object_set_new(J, #name, json_string(t->name ? t->name : ""))
+    PUTS(access_token);
+    PUTS(refresh_token);
+    PUTS(scope);
+    PUTS(token_type);
+    PUTS(client_id);
+    PUTS(client_secret);
+#undef PUTS
+    json_object_set_new(J, "expires_at", json_integer((json_int_t)t->expires_at));
+    int rc = json_dump_file(J, TOKENS_JSON, JSON_INDENT(2));
+    json_decref(J);
+    return rc;
+}
+
+// legacy OA2 POST (requires 2xx) kept for refresh only
+static char *oa2_post_form(const char *url, const char *pairs[][2], size_t npairs)
+{
+    return curl_post_form(url, pairs, npairs);
+}
+
+static void refresh_access_token(tokens_t *T)
+{
+    const char *pairs_no_secret[][2] = {
+        {"client_id", T->client_id},
+        {"grant_type", "refresh_token"},
+        {"refresh_token", T->refresh_token},
+    };
+    const char *pairs_with_secret[][2] = {
+        {"client_id", T->client_id},
+        {"client_secret", T->client_secret ? T->client_secret : ""},
+        {"grant_type", "refresh_token"},
+        {"refresh_token", T->refresh_token},
+    };
+    size_t n = (T->client_secret && *T->client_secret) ? 4 : 3;
+    const char *(*pp)[2] = (n == 4) ? pairs_with_secret : pairs_no_secret;
+
+    char *resp = oa2_post_form(TOKEN_URL, pp, n);
+    if (!resp)
+        die("refresh: no response");
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+        die("refresh parse: %s", je.text);
+
+    const char *at = json_string_value(json_object_get(J, "access_token"));
+    const char *tt = json_string_value(json_object_get(J, "token_type"));
+    const char *sc = json_string_value(json_object_get(J, "scope"));
+    int expires_in = (int)json_integer_value(json_object_get(J, "expires_in"));
+    const char *rt = json_string_value(json_object_get(J, "refresh_token"));
+
+    if (!at || !tt)
+    {
+        json_decref(J);
+        die("refresh missing fields");
+    }
+    free(T->access_token);
+    T->access_token = sdup(at);
+    free(T->token_type);
+    T->token_type = sdup(tt);
+    if (sc)
+    {
+        free(T->scope);
+        T->scope = sdup(sc);
+    }
+    if (rt && *rt)
+    {
+        free(T->refresh_token);
+        T->refresh_token = sdup(rt);
+    }
+    T->expires_at = time(NULL) + (expires_in ? expires_in : 3600);
+    json_decref(J);
+    tokens_save(T);
+}
+
+static void ensure_fresh_access_token(tokens_t *T)
+{
+    if (tokens_load(T) != 0)
+        die("Not logged in. Run: gdrive login ...");
+    time_t now = time(NULL);
+    if (T->access_token && (now + 60) < T->expires_at)
+        return;
+    if (!T->refresh_token || !*T->refresh_token)
+        die("No refresh_token; re-login needed.");
+    refresh_access_token(T);
+}
+
+// ---- Device Authorization Grant (login)
+static int do_login(const char *client_id, const char *client_secret, const char *scope)
+{
+    // 1) request device & user code (we need the body even on non-2xx)
+    const char *pairs[][2] = {
+        {"client_id", client_id},
+        {"scope", scope},
+    };
+    long st = 0;
+    char *resp = curl_post_form_status(DEVICE_CODE_URL, pairs, 2, &st);
+    if (!resp)
+    { // transport error; brief backoff and try once more
+        sleep_seconds(2);
+        resp = curl_post_form_status(DEVICE_CODE_URL, pairs, 2, &st);
+        if (!resp)
+        {
+            SAP_ERR("device_code: transport error!\n");
+            return 1;
+        }
+    }
+
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+    {
+        SAP_ERR("device_code parse: %s!\n", je.text);
+        return 1;
+    }
+
+    if (st / 100 != 2)
+    {
+        const char *es = json_string_value(json_object_get(J, "error"));
+        const char *ed = json_string_value(json_object_get(J, "error_description"));
+        SAP_ERR("device_code error (%ld): %s%s%s\n", st,
+                es ? es : "(unknown)",
+                (ed && *ed) ? " - " : "",
+                (ed && *ed) ? ed : "");
+        json_decref(J);
+        return 1;
+    }
+
+    const char *device_code = json_string_value(json_object_get(J, "device_code"));
+    const char *user_code = json_string_value(json_object_get(J, "user_code"));
+    const char *v_uri = json_string_value(json_object_get(J, "verification_uri"));
+    if (!v_uri)
+        v_uri = json_string_value(json_object_get(J, "verification_url"));
+    const char *v_complete = json_string_value(json_object_get(J, "verification_uri_complete"));
+    int interval = (int)json_integer_value(json_object_get(J, "interval"));
+    if (!interval)
+        interval = 5;
+    int expires_in = (int)json_integer_value(json_object_get(J, "expires_in"));
+
+    if (!device_code || !user_code || !v_uri)
+    {
+        json_decref(J);
+        SAP_ERR("device_code: missing fields!\n");
+        return 1;
+    }
+
+    char quick[2048] = {0};
+    if (v_complete && *v_complete)
+        snprintf(quick, sizeof(quick), "%s", v_complete);
+    else
+        snprintf(quick, sizeof(quick), "%s?user_code=%s", v_uri, user_code);
+
+    SAP_INFO("=== Scan or open URL ===\n%s\n", quick);
+    SAP_INFO("=== If typing manually, visit ===\n%s\n", v_uri);
+    SAP_INFO("=== Enter code ===\n%s\n\n", user_code);
+
+    // 2) poll token endpoint until authorized
+    tokens_t T = (tokens_t){0};
+    T.client_id = sdup(client_id);
+    T.client_secret = sdup(client_secret ? client_secret : "");
+    T.scope = sdup(scope);
+
+    time_t start = time(NULL);
+    int poll_interval = interval;
+    for (;;)
+    {
+        const char *pairs2_no_secret[][2] = {
+            {"client_id", T.client_id},
+            {"device_code", device_code},
+            {"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
+        };
+        const char *pairs2_with_secret[][2] = {
+            {"client_id", T.client_id},
+            {"client_secret", T.client_secret},
+            {"device_code", device_code},
+            {"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
+        };
+        size_t n = (T.client_secret && *T.client_secret) ? 4 : 3;
+        const char *(*pp)[2] = (n == 4) ? pairs2_with_secret : pairs2_no_secret;
+
+        long pst = 0;
+        char *resp2 = curl_post_form_status(TOKEN_URL, pp, n, &pst);
+        if (!resp2)
+        {
+            // Transport error (e.g., "Failure when receiving data from the peer"): backoff with jitter
+            int jitter = 1 + (int)(rand() % 3);
+            sleep_seconds(poll_interval + jitter);
+            if (expires_in && (time(NULL) - start) > expires_in)
+            {
+                SAP_ERR("authorization timed out (transport)!\n");
+                tokens_free(&T);
+                json_decref(J);
+                return 1;
+            }
+            continue;
+        }
+
+        json_t *K = json_loads(resp2, 0, &je);
+        free(resp2);
+        if (!K)
+        {
+            SAP_ERR("token poll parse: %s!\n", je.text);
+            tokens_free(&T);
+            json_decref(J);
+            return 1;
+        }
+
+        // Handle expected non-2xx with error objects
+        if (pst / 100 != 2)
+        {
+            const char *es = json_string_value(json_object_get(K, "error"));
+            const char *ed = json_string_value(json_object_get(K, "error_description"));
+            if (es && !strcmp(es, "authorization_pending"))
+            {
+                json_decref(K);
+                sleep_seconds(poll_interval);
+                if (expires_in && (time(NULL) - start) > expires_in)
+                {
+                    SAP_ERR("authorization timed out!\n");
+                    tokens_free(&T);
+                    json_decref(J);
+                    return 1;
+                }
+                continue;
+            }
+            if (es && !strcmp(es, "slow_down"))
+            {
+                json_decref(K);
+                poll_interval += 5;
+                sleep_seconds(poll_interval);
+                continue;
+            }
+            // Any other non-2xx is fatal
+            SAP_ERR("token poll error (%ld): %s%s%s\n", pst,
+                    es ? es : "(unknown)",
+                    (ed && *ed) ? " - " : "",
+                    (ed && *ed) ? ed : "");
+            json_decref(K);
+            tokens_free(&T);
+            json_decref(J);
+            return 1;
+        }
+
+        const char *at = json_string_value(json_object_get(K, "access_token"));
+        const char *rt = json_string_value(json_object_get(K, "refresh_token"));
+        const char *tt = json_string_value(json_object_get(K, "token_type"));
+        int at_expires = (int)json_integer_value(json_object_get(K, "expires_in"));
+        const char *sc = json_string_value(json_object_get(K, "scope"));
+
+        if (!at || !tt)
+        {
+            json_decref(K);
+            SAP_ERR("token poll: missing fields!\n");
+            tokens_free(&T);
+            json_decref(J);
+            return 1;
+        }
+        T.access_token = sdup(at);
+        if (rt)
+            T.refresh_token = sdup(rt);
+        if (sc)
+        {
+            free(T.scope);
+            T.scope = sdup(sc);
+        }
+        T.token_type = sdup(tt);
+        T.expires_at = time(NULL) + (at_expires ? at_expires : 3600);
+        json_decref(K);
+        break;
+    }
+
+    if (tokens_save(&T) != 0)
+    {
+        SAP_ERR("save tokens.json failed!\n");
+        tokens_free(&T);
+        json_decref(J);
+        return 1;
+    }
+
+    SAP_INFO("Login OK. Tokens saved to %s\n", TOKENS_JSON);
+    tokens_free(&T);
+    json_decref(J);
+    return 0;
+}
+
+// ---- Drive helpers
+char *drive_upload_file(const char *bearer, const char *local_path, const char *name_opt,
+                        const char *parent_id_opt, const char *mime_opt)
+{
+    (void)parent_id_opt;
+    const char *base = name_opt ? name_opt : basename_x(local_path);
+
+    json_t *meta = json_object();
+    json_object_set_new(meta, "name", json_string(base));
+    if (parent_id_opt && *parent_id_opt)
+    {
+        json_t *arr = json_array();
+        json_array_append_new(arr, json_string(parent_id_opt));
+        json_object_set_new(meta, "parents", arr);
+    }
+    char *meta_str = json_dumps(meta, JSON_COMPACT);
+    json_decref(meta);
+
+    char *resp = curl_post_multipart_auth(DRIVE_UPLOAD, bearer, meta_str, local_path, mime_opt);
+    free(meta_str);
+
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+        die("upload parse: %s", je.text);
+    const char *id = json_string_value(json_object_get(J, "id"));
+    if (!id)
+    {
+        json_decref(J);
+        die("upload: no id");
+    }
+    char *ret = sdup(id);
+    json_decref(J);
+    return ret;
+}
+
+static char *drive_create_folder(const char *bearer, const char *name, const char *parent_id_opt)
+{
+    char url[256];
+    snprintf(url, sizeof(url), "%s/files", DRIVE_API);
+
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return NULL;
+    }
+    sslca_curl_set(C);
+
+    struct mem m = {0};
+    struct curl_slist *hdr = NULL;
+    char auth[1024];
+    snprintf(auth, sizeof(auth), "Authorization: Bearer %s", bearer);
+    hdr = curl_slist_append(hdr, auth);
+    hdr = curl_slist_append(hdr, "Content-Type: application/json; charset=UTF-8");
+    hdr = curl_slist_append(hdr, "Accept: application/json");
+
+    json_t *meta = json_object();
+    json_object_set_new(meta, "name", json_string(name));
+    json_object_set_new(meta, "mimeType", json_string("application/vnd.google-apps.folder"));
+    if (parent_id_opt && *parent_id_opt)
+    {
+        json_t *arr = json_array();
+        json_array_append_new(arr, json_string(parent_id_opt));
+        json_object_set_new(meta, "parents", arr);
+    }
+    char *meta_str = json_dumps(meta, JSON_COMPACT);
+    json_decref(meta);
+
+    curl_easy_setopt(C, CURLOPT_URL, url);
+    curl_easy_setopt(C, CURLOPT_HTTPHEADER, hdr);
+    curl_easy_setopt(C, CURLOPT_POST, 1L);
+    curl_easy_setopt(C, CURLOPT_POSTFIELDS, meta_str);
+    curl_easy_setopt(C, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(C, CURLOPT_WRITEDATA, &m);
+
+    CURLcode rc = curl_easy_perform(C);
+    curl_check(rc, "folder create");
+    long code = 0;
+    curl_easy_getinfo(C, CURLINFO_RESPONSE_CODE, &code);
+    curl_slist_free_all(hdr);
+    curl_easy_cleanup(C);
+    free(meta_str);
+    if (code / 100 != 2)
+    {
+        free(m.ptr);
+        die("HTTP %ld creating folder", code);
+        return NULL;
+    }
+
+    json_error_t je;
+    json_t *J = json_loads(m.ptr, 0, &je);
+    free(m.ptr);
+    if (!J)
+        die("create folder parse: %s", je.text);
+    const char *id = json_string_value(json_object_get(J, "id"));
+    if (!id)
+    {
+        json_decref(J);
+        die("create folder: no id");
+    }
+    char *ret = sdup(id);
+    json_decref(J);
+    return ret;
+}
+
+char *drive_find_or_create_path(const char *bearer, const char *parent_id, const char *comp)
+{
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return NULL;
+    }
+    sslca_curl_set(C);
+
+    char q_raw[1024];
+    snprintf(q_raw, sizeof(q_raw),
+             "name='%s' and mimeType='application/vnd.google-apps.folder' and '%s' in parents and trashed=false",
+             comp, parent_id);
+    char *q_esc = escape_str(C, q_raw);
+
+    char url[2048];
+    snprintf(url, sizeof(url), "%s/files?pageSize=10&fields=files(id,name)&q=%s", DRIVE_API, q_esc);
+
+    curl_easy_cleanup(C);
+    free(q_esc);
+
+    char *resp = curl_get_auth(url, bearer);
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+        die("find folder parse: %s", je.text);
+    json_t *files = json_object_get(J, "files");
+    json_t *first = (files && json_array_size(files) > 0) ? json_array_get(files, 0) : NULL;
+    const char *id = first ? json_string_value(json_object_get(first, "id")) : NULL;
+    char *ret = NULL;
+    if (id)
+        ret = sdup(id);
+    json_decref(J);
+    if (ret)
+        return ret;
+    return drive_create_folder(bearer, comp, parent_id);
+}
+
+static int drive_list(const char *bearer, const char *parent_opt)
+{
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return 1;
+    }
+    sslca_curl_set(C);
+
+    char q_raw[1024] = {0};
+    if (parent_opt && *parent_opt)
+        snprintf(q_raw, sizeof(q_raw), "trashed=false and '%s' in parents", parent_opt);
+    else
+        snprintf(q_raw, sizeof(q_raw), "trashed=false");
+    char *q_esc = escape_str(C, q_raw);
+
+    char url[2048];
+    snprintf(url, sizeof(url),
+             "%s/files?pageSize=1000&fields=files(id,name,mimeType,parents)&q=%s", DRIVE_API, q_esc);
+
+    curl_easy_cleanup(C);
+    free(q_esc);
+
+    char *resp = curl_get_auth(url, bearer);
+    if (!resp)
+        return 1;
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+    {
+        SAP_ERR("list parse: %s!\n", je.text);
+        return 1;
+    }
+
+    json_t *files = json_object_get(J, "files");
+    if (!files || !json_is_array(files))
+    {
+        json_decref(J);
+        SAP_ERR("list: files[] !\n");
+        return 1;
+    }
+    size_t i;
+    json_t *it;
+    json_array_foreach(files, i, it)
+    {
+        const char *id = json_string_value(json_object_get(it, "id"));
+        const char *nm = json_string_value(json_object_get(it, "name"));
+        const char *mt = json_string_value(json_object_get(it, "mimeType"));
+        SAP_INFO("%-40s  %-4s  %s\n", id, (mt && strstr(mt, "folder")) ? "DIR" : "FILE", nm ? nm : "(no name)");
+    }
+    json_decref(J);
+    return 0;
+}
+
+static void drive_download_file(const char *bearer, const char *id, const char *name, const char *dest)
+{
+    char path[1024];
+    path_join(path, sizeof(path), dest, name);
+    char url[1024];
+    snprintf(url, sizeof(url), "%s/files/%s?alt=media", DRIVE_API, id);
+    curl_get_auth_to_file(url, bearer, path);
+    SAP_INFO("saved: %s\n", path);
+}
+
+static void drive_download_folder(const char *bearer, const char *id, const char *name, const char *dest)
+{
+    CURL *C = curl_easy_init();
+    if (!C)
+    {
+        die("curl init");
+        return;
+    }
+    sslca_curl_set(C);
+
+    char newdir[1024];
+    path_join(newdir, sizeof(newdir), dest, name);
+    if (ensure_dir(newdir) != 0)
+    {
+        curl_easy_cleanup(C);
+        die("mkdir %s failed", newdir);
+    }
+
+    char q_raw[1024];
+    snprintf(q_raw, sizeof(q_raw), "'%s' in parents and trashed=false", id);
+    char *q_esc = escape_str(C, q_raw);
+
+    char url[2048];
+    snprintf(url, sizeof(url), "%s/files?pageSize=1000&fields=files(id,name,mimeType)&q=%s", DRIVE_API, q_esc);
+
+    curl_easy_cleanup(C);
+    free(q_esc);
+
+    char *resp = curl_get_auth(url, bearer);
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+        die("children parse: %s", je.text);
+
+    size_t i;
+    json_t *it;
+    json_t *files = json_object_get(J, "files");
+    json_array_foreach(files, i, it)
+    {
+        const char *cid = json_string_value(json_object_get(it, "id"));
+        const char *nm = json_string_value(json_object_get(it, "name"));
+        const char *mt = json_string_value(json_object_get(it, "mimeType"));
+        if (mt && strstr(mt, "folder"))
+            drive_download_folder(bearer, cid, nm, newdir);
+        else
+            drive_download_file(bearer, cid, nm, newdir);
+    }
+    json_decref(J);
+}
+
+__attribute__((unused)) static void drive_download_recursive(const char *bearer, const char *id, const char *dest)
+{
+    char url[1024];
+    snprintf(url, sizeof(url), "%s/files/%s?fields=id,name,mimeType", DRIVE_API, id);
+    char *resp = curl_get_auth(url, bearer);
+    json_error_t je;
+    json_t *J = json_loads(resp, 0, &je);
+    free(resp);
+    if (!J)
+        die("meta parse: %s", je.text);
+    const char *name = json_string_value(json_object_get(J, "name"));
+    const char *mt = json_string_value(json_object_get(J, "mimeType"));
+    if (!name || !mt)
+    {
+        json_decref(J);
+        die("missing name/mimeType");
+    }
+    if (strstr(mt, "folder"))
+        drive_download_folder(bearer, id, name, dest);
+    else
+        drive_download_file(bearer, id, name, dest);
+    json_decref(J);
+}
+
+/********* Public functions *********/
+SAP_STATUS gdrive_init(void)
+{
+    sslca_init();
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    return SUCCESS;
+}
+
+void gdrive_fini(void) {}
+
+// Keep scopes minimal until the OAuth consent is verified.
+// For listing root reliably, add drive.metadata.readonly later.
+SAP_STATUS gdrive_login(char *username, char *password)
+{
+    (void)username;
+    (void)password;
+
+    const char *client_id = "544657840600-nmq99f57bvs4c9ojacj9il8tuj29sf5d.apps.googleusercontent.com";
+    const char *client_secret = "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";
+
+    const char *scope =
+        "https://www.googleapis.com/auth/drive.file "
+        "openid "
+        "email";
+
+    // If you need listing/search: append
+    // " https://www.googleapis.com/auth/drive.metadata.readonly"
+
+    int ret = do_login(client_id, client_secret, scope);
+    if (ret)
+    {
+        SAP_ERR("login failed\n");
+        return EINTERNAL;
+    }
+    return SUCCESS;
+}
+
+SAP_STATUS gdrive_list_rootdir(void)
+{
+    static tokens_t T = {0};
+    ensure_fresh_access_token(&T);
+
+    int ret = drive_list(T.access_token, "root");
+    tokens_free(&T);
+    if (ret)
+        return EINTERNAL;
+    return SUCCESS;
+}
+
+// // ---- CLI
+// static void usage(void)
+// {
+//     SAP_INFO(
+//         "Usage:\n"
+//         "  gdrive --client-id ID [--client-secret SECRET] [--scope S] login\n"
+//         "  gdrive list [--parent ID]\n"
+//         "  gdrive upload <path> [--parent ID]\n"
+//         "  gdrive download --id ID [--dest DIR]\n");
+// }
+
+// int main(int argc, char **argv)
+// {
+//     int ret = 0;
+//     const char *client_id = NULL, *client_secret = NULL;
+//     const char *scope = "https://www.googleapis.com/auth/drive.file%20https://www.googleapis.com/auth/docs%20https://www.googleapis.com/auth/drive%20https://www.googleapis.com/auth/drive.readonly%20https://www.googleapis.com/auth/drive.metadata.readonly";
+//     const char *parent = NULL, *dest = ".";
+//     const char *id = NULL;
+
+//     curl_global_init(CURL_GLOBAL_DEFAULT);
+//     _log_setup();
+
+//     for (int i = 1; i < argc; i++)
+//     {
+//         if (!strcmp(argv[i], "--client-id") && i + 1 < argc)
+//             client_id = argv[++i];
+//         else if (!strcmp(argv[i], "--client-secret") && i + 1 < argc)
+//             client_secret = argv[++i];
+//         else if (!strcmp(argv[i], "--scope") && i + 1 < argc)
+//             scope = argv[++i];
+//         else if (!strcmp(argv[i], "--parent") && i + 1 < argc)
+//             parent = argv[++i];
+//         else if (!strcmp(argv[i], "--dest") && i + 1 < argc)
+//             dest = argv[++i];
+//         else if (!strcmp(argv[i], "--id") && i + 1 < argc)
+//             id = argv[++i];
+//     }
+
+//     if (argc < 2)
+//     {
+//         usage();
+
+//         ret = 1;
+//         goto out;
+//     }
+
+//     if (strstr(argv[argc - 1], "login"))
+//     {
+//         if (!client_id)
+//         {
+//             usage();
+//             die("--client-id required for login");
+
+//             ret = 1;
+//             goto out;
+//         }
+//         do_login(client_id, client_secret ? client_secret : "", scope);
+
+//         ret = 0;
+//         goto out;
+//     }
+
+//     tokens_t T = {0};
+//     ensure_fresh_access_token(&T);
+
+//     if (strstr(argv[1], "list"))
+//     {
+//         drive_list(T.access_token, parent);
+//     }
+//     else if (strstr(argv[1], "upload"))
+//     {
+//         if (argc < 3)
+//         {
+//             usage();
+//             die("upload needs a path");
+
+//             ret = 1;
+//             goto out;
+//         }
+//         drive_upload_path(T.access_token, argv[2], parent);
+//     }
+//     else if (strstr(argv[1], "download"))
+//     {
+//         if (!id)
+//         {
+//             usage();
+//             die("download needs --id");
+
+//             ret = 1;
+//             goto out;
+//         }
+//         if (ensure_dir(dest) != 0)
+//         {
+//             die("mkdir %s failed", dest);
+
+//             ret = 1;
+//             goto out;
+//         }
+//         drive_download_recursive(T.access_token, id, dest);
+//     }
+//     else
+//     {
+//         usage();
+//         die("Unknown command");
+
+//         ret = 1;
+//         goto out;
+//     }
+
+//     tokens_free(&T);
+
+//     ret = 0;
+
+// out:
+//     _log_teardown();
+//     return ret;
+// }

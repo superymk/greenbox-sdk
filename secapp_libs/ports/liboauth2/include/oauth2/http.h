@@ -1,0 +1,264 @@
+#ifndef _OAUTH2_HTTP_H_
+#define _OAUTH2_HTTP_H_
+
+/***************************************************************************
+ *
+ * Copyright (C) 2018-2025 - ZmartZone Holding BV
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * @Author: Hans Zandbelt - hans.zandbelt@openidc.com
+ *
+ **************************************************************************/
+
+#include "oauth2/cfg.h"
+#include "oauth2/util.h"
+#include <jansson.h>
+
+/*
+ * header names
+ */
+// TODO: can these be http.c internal with the set and get functions available?
+#define OAUTH2_HTTP_HDR_X_FORWARDED_PROTO "X-Forwarded-Proto"
+#define OAUTH2_HTTP_HDR_X_FORWARDED_PORT "X-Forwarded-Port"
+#define OAUTH2_HTTP_HDR_X_FORWARDED_HOST "X-Forwarded-Host"
+#define OAUTH2_HTTP_HDR_HOST "Host"
+#define OAUTH2_HTTP_HDR_COOKIE "Cookie"
+#define OAUTH2_HTTP_HDR_CONTENT_TYPE "Content-Type"
+#define OAUTH2_HTTP_HDR_CONTENT_LENGTH "Content-Length"
+#define OAUTH2_HTTP_HDR_AUTHORIZATION "Authorization"
+#define OAUTH2_HTTP_HDR_X_REQUESTED_WITH "X-Requested-With"
+#define OAUTH2_HTTP_HDR_ACCEPT "Accept"
+#define OAUTH2_HTTP_HDR_LOCATION "Location"
+#define OAUTH2_HTTP_HDR_SET_COOKIE "Set-Cookie"
+
+#define OAUTH2_HTTP_HDR_BEARER "Bearer"
+#define OAUTH2_HTTP_HDR_BASIC "Basic"
+
+#define OAUTH2_HTTP_HDR_REALM "realm"
+
+#define OAUTH2_HTTP_HDR_WWW_AUTHENTICATE "WWW-Authenticate"
+#define OAUTH2_HTTP_HDR_XML_HTTP_REQUEST "XMLHttpRequest"
+
+#define OAUTH2_TLS_CERT_VAR_NAME "SSL_CLIENT_CERT"
+
+/*
+ * content type
+ */
+#define OAUTH2_CONTENT_TYPE_FORM_ENCODED "application/x-www-form-urlencoded"
+#define OAUTH2_CONTENT_TYPE_JSON "application/json"
+#define OAUTH2_CONTENT_TYPE_TEXT_HTML "text/html"
+#define OAUTH2_CONTENT_TYPE_APP_XHTML_XML "application/xhtml+xml"
+#define OAUTH2_CONTENT_TYPE_ANY "*/*"
+
+/*
+ * protocol
+ */
+#define OAUTH2_HTTP_SCHEME_HTTP "http"
+#define OAUTH2_HTTP_SCHEME_HTTPS "https"
+
+typedef enum {
+	OAUTH2_HTTP_METHOD_UNKNOWN,
+	OAUTH2_HTTP_METHOD_GET,
+	OAUTH2_HTTP_METHOD_PUT,
+	OAUTH2_HTTP_METHOD_POST,
+	OAUTH2_HTTP_METHOD_DELETE,
+	OAUTH2_HTTP_METHOD_CONNECT,
+	OAUTH2_HTTP_METHOD_OPTIONS
+} oauth2_http_method_t;
+
+typedef oauth2_uint_t oauth2_http_status_code_t;
+
+/*
+ * TODO: make sure the caller calls:
+ *       1. oauth2_http_request_scheme_set to set the "native" URL scheme on
+ * which the request was received i.e. without taking into account headers
+ *       2. oauth2_http_request_hostname_set to set the configured server
+ * hostname
+ *       3. oauth2_http_request_port_set to set the "hative" port on which the
+ *       request was received
+ *       4. oauth2_http_request_path_set for the path that is accessed
+ *       5. oauth2_http_request_method_set for the HTTP method used
+ *       6. oauth2_http_request_query_set for the query string
+ *       7. oauth2_http_request_header_set for each incoming header
+ */
+OAUTH2_TYPE_DECLARE(http, request)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, request, scheme, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, request, hostname, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, request, path, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, request, method, oauth2_http_method_t)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, request, query, char *)
+const char *oauth2_http_request_method_get_str(oauth2_log_t *,
+					       oauth2_http_request_t *);
+bool oauth2_http_request_context_set(oauth2_log_t *log,
+				     oauth2_http_request_t *request,
+				     const char *name, const char *value);
+const char *oauth2_http_request_context_get(
+    oauth2_log_t *log, const oauth2_http_request_t *request, const char *name);
+
+OAUTH2_TYPE_DECLARE(http, response)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, response, headers, oauth2_nv_list_t *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET_GET(http, response, status_code,
+				   oauth2_http_status_code_t)
+
+bool oauth2_http_response_header_set(oauth2_log_t *log,
+				     oauth2_http_response_t *response,
+				     const char *name, const char *value);
+const char *
+oauth2_http_response_header_get(oauth2_log_t *log,
+				const oauth2_http_response_t *response,
+				const char *name);
+const char *oauth2_http_response_header_set_cookie_prefix_get(
+    oauth2_log_t *log, oauth2_http_response_t *response, const char *prefix);
+bool oauth2_http_response_cookie_set(oauth2_log_t *log,
+				     oauth2_http_response_t *response,
+				     const char *name, const char *value,
+				     const char *path, const bool is_secure,
+				     oauth2_time_t max_age);
+void oauth2_http_response_headers_loop(oauth2_log_t *log,
+				       const oauth2_http_response_t *response,
+				       oauth2_nv_list_loop_cb_t *callback,
+				       void *rec);
+
+// typedef bool (*oauth2_http_read_post_callback_t)(oauth2_log_t *log,
+// oauth2_http_request_t *request, char **data);
+
+bool oauth2_http_request_port_set(oauth2_log_t *log, oauth2_http_request_t *r,
+				  unsigned long port);
+char *oauth2_http_request_port_get(oauth2_log_t *log,
+				   const oauth2_http_request_t *r);
+
+/*
+ * currently accessed url functions
+ */
+char *oauth2_http_request_url_base_get(oauth2_log_t *log,
+				       const oauth2_http_request_t *r);
+char *oauth2_http_request_url_path_get(oauth2_log_t *log,
+				       const oauth2_http_request_t *request);
+char *oauth2_http_request_url_get(oauth2_log_t *log,
+				  const oauth2_http_request_t *r);
+
+/*
+ * request header functions
+ */
+
+OAUTH2_MEMBER_LIST_DECLARE_SET_UNSET_ADD_GET(http, request, header)
+
+void oauth2_http_request_headers_loop(oauth2_log_t *log,
+				      oauth2_http_request_t *request,
+				      oauth2_nv_list_loop_cb_t *callback,
+				      void *rec);
+
+const char *
+oauth2_http_request_header_content_type_get(oauth2_log_t *log,
+					    const oauth2_http_request_t *r);
+const char *
+oauth2_http_request_header_cookie_get(oauth2_log_t *log,
+				      const oauth2_http_request_t *r);
+const char *
+oauth2_http_request_header_content_length_get(oauth2_log_t *log,
+					      const oauth2_http_request_t *r);
+bool oauth2_http_request_header_content_length_set(oauth2_log_t *log,
+						   oauth2_http_request_t *r,
+						   size_t len);
+const char *
+oauth2_http_request_header_x_requested_with_get(oauth2_log_t *log,
+						const oauth2_http_request_t *r);
+const char *
+oauth2_http_request_header_accept_get(oauth2_log_t *log,
+				      const oauth2_http_request_t *request);
+
+bool oauth2_http_request_is_xml_http_request(
+    oauth2_log_t *log, const oauth2_http_request_t *request);
+bool oauth2_http_request_is_secure(oauth2_log_t *log,
+				   const oauth2_http_request_t *request);
+
+/*
+ * request args functions
+ */
+
+char *oauth2_http_url_query_encode(oauth2_log_t *log, const char *url,
+				   const oauth2_nv_list_t *args);
+char *oauth2_http_url_form_encode(oauth2_log_t *log,
+				  const oauth2_nv_list_t *args);
+bool oauth2_http_request_query_param_add(oauth2_log_t *log,
+					 oauth2_http_request_t *request,
+					 const char *name, const char *value);
+const char *oauth2_http_request_query_param_get(oauth2_log_t *log,
+						oauth2_http_request_t *request,
+						const char *name);
+bool oauth2_http_request_query_param_unset(oauth2_log_t *log,
+					   oauth2_http_request_t *request,
+					   const char *name);
+
+/*
+ * http call context object
+ */
+
+OAUTH2_TYPE_DECLARE(http, call_ctx)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, bearer_token, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, content_type, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, outgoing_proxy, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, ca_info, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, ssl_cert, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, ssl_key, char *)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, timeout, int)
+OAUTH2_TYPE_DECLARE_MEMBER_SET(http, call_ctx, ssl_verify, bool)
+OAUTH2_MEMBER_LIST_DECLARE_SET_UNSET_ADD_GET(http, call_ctx, cookie)
+OAUTH2_MEMBER_LIST_DECLARE_SET_UNSET_ADD_GET(http, call_ctx, hdr)
+bool oauth2_http_call_ctx_basic_auth_set(oauth2_log_t *log,
+					 oauth2_http_call_ctx_t *ctx,
+					 const char *username,
+					 const char *password, bool url_encode);
+
+/*
+ * http call functions
+ */
+
+bool oauth2_http_call(oauth2_log_t *log, const char *url, const char *data,
+		      oauth2_http_call_ctx_t *ctx, char **response,
+		      oauth2_http_status_code_t *status_code);
+bool oauth2_http_get(oauth2_log_t *log, const char *url,
+		     const oauth2_nv_list_t *params,
+		     oauth2_http_call_ctx_t *ctx, char **response,
+		     oauth2_http_status_code_t *status_code);
+bool oauth2_http_post_form(oauth2_log_t *log, const char *url,
+			   const oauth2_nv_list_t *params,
+			   oauth2_http_call_ctx_t *ctx, char **response,
+			   oauth2_http_status_code_t *status_code);
+bool oauth2_http_post_json(oauth2_log_t *log, const char *url,
+			   const json_t *json, oauth2_http_call_ctx_t *ctx,
+			   char **response,
+			   oauth2_http_status_code_t *status_code);
+
+/*
+ * http cookie functions
+ */
+
+char *oauth2_http_request_cookie_get(oauth2_log_t *log,
+				     oauth2_http_request_t *r, const char *name,
+				     bool strip);
+bool oauth2_http_request_cookie_set(oauth2_log_t *log, oauth2_http_request_t *r,
+				    const char *name, const char *value);
+
+/*
+ * http auth
+ */
+
+bool oauth2_http_auth_client_cert(oauth2_log_t *log, const char *ssl_cert,
+				  const char *ssl_key,
+				  oauth2_http_call_ctx_t *ctx);
+bool oauth2_http_auth_basic(oauth2_log_t *log, const char *username,
+			    const char *passwd, oauth2_http_call_ctx_t *ctx);
+
+#endif /* _OAUTH2_HTTP_H_ */

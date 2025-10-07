@@ -1,0 +1,16 @@
+# cjose - JOSE implementation for C
+#
+#
+
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: cjose
+URL: https://github.com/cisco/cjose
+Description: JOSE implementation for C
+Version: 0.6.2.4
+Requires: jansson >= 2.3, libcrypto >= 1.0.1
+Cflags: -I${includedir}
+Libs: -L${libdir} -lcjose

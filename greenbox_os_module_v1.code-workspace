@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "code/os_module"
+		}
+    ],
+	"settings": {
+		"files.associations": {
+			"functional": "c"
+		}
+	}
+}

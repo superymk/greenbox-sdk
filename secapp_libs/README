@@ -1,0 +1,10 @@
+newlib
+=============================
+Checkout:
+git clone git://sourceware.org/git/newlib-cygwin.git
+
+We are currently in newlib-secos branch
+
+Compile:
+../configure --target=i386-secos --disable-multilib
+make all

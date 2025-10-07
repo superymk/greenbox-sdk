@@ -1,0 +1,16 @@
+*.[oa]
+# *~
+*.cmd
+build/
+linux/*.mod
+linux/*.mod.c
+linux/*.cmd
+linux/*.ko
+linux/*.symvers
+linux/*.order
+linux/.tmp_versions/
+win/.vs/
+*.cache.mk
+*.ur-safe
+*.ur-detected
+*.o.d

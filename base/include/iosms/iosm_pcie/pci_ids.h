@@ -1,0 +1,162 @@
+/*
+ * Copyright (c) 2016 Cisco and/or its affiliates.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/*
+ * pci.h: PCI definitions.
+ *
+ * Copyright (c) 2008 Eliot Dresselhaus
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ *  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ *  LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ *  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ *  WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/// @file Device classes and subclasses
+
+#ifndef IOSM_PCIE_PCI_IDS_H
+#define IOSM_PCIE_PCI_IDS_H
+
+typedef enum
+{
+    PCI_CLASS_NOT_DEFINED = 0x0000,
+    PCI_CLASS_NOT_DEFINED_VGA = 0x0001,
+
+    PCI_CLASS_STORAGE_SCSI = 0x0100,
+    PCI_CLASS_STORAGE_IDE = 0x0101,
+    PCI_CLASS_STORAGE_FLOPPY = 0x0102,
+    PCI_CLASS_STORAGE_IPI = 0x0103,
+    PCI_CLASS_STORAGE_RAID = 0x0104,
+    PCI_CLASS_STORAGE_OTHER = 0x0180,
+    PCI_CLASS_STORAGE = 0x0100,
+
+    PCI_CLASS_NETWORK_ETHERNET = 0x0200,
+    PCI_CLASS_NETWORK_TOKEN_RING = 0x0201,
+    PCI_CLASS_NETWORK_FDDI = 0x0202,
+    PCI_CLASS_NETWORK_ATM = 0x0203,
+    PCI_CLASS_NETWORK_OTHER = 0x0280,
+    PCI_CLASS_NETWORK = 0x0200,
+
+    PCI_CLASS_DISPLAY_VGA = 0x0300,
+    PCI_CLASS_DISPLAY_XGA = 0x0301,
+    PCI_CLASS_DISPLAY_3D = 0x0302,
+    PCI_CLASS_DISPLAY_OTHER = 0x0380,
+    PCI_CLASS_DISPLAY = 0x0300,
+
+    PCI_CLASS_MULTIMEDIA_VIDEO = 0x0400,
+    PCI_CLASS_MULTIMEDIA_AUDIO = 0x0401,
+    PCI_CLASS_MULTIMEDIA_PHONE = 0x0402,
+    PCI_CLASS_MULTIMEDIA_OTHER = 0x0480,
+    PCI_CLASS_MULTIMEDIA = 0x0400,
+
+    PCI_CLASS_MEMORY_RAM = 0x0500,
+    PCI_CLASS_MEMORY_FLASH = 0x0501,
+    PCI_CLASS_MEMORY_OTHER = 0x0580,
+    PCI_CLASS_MEMORY = 0x0500,
+
+    PCI_CLASS_BRIDGE_HOST = 0x0600,
+    PCI_CLASS_BRIDGE_ISA = 0x0601,
+    PCI_CLASS_BRIDGE_EISA = 0x0602,
+    PCI_CLASS_BRIDGE_MC = 0x0603,
+    PCI_CLASS_BRIDGE_PCI = 0x0604,
+    PCI_CLASS_BRIDGE_PCMCIA = 0x0605,
+    PCI_CLASS_BRIDGE_NUBUS = 0x0606,
+    PCI_CLASS_BRIDGE_CARDBUS = 0x0607,
+    PCI_CLASS_BRIDGE_RACEWAY = 0x0608,
+    PCI_CLASS_BRIDGE_OTHER = 0x0680,
+    PCI_CLASS_BRIDGE = 0x0600,
+
+    PCI_CLASS_COMMUNICATION_SERIAL = 0x0700,
+    PCI_CLASS_COMMUNICATION_PARALLEL = 0x0701,
+    PCI_CLASS_COMMUNICATION_MULTISERIAL = 0x0702,
+    PCI_CLASS_COMMUNICATION_MODEM = 0x0703,
+    PCI_CLASS_COMMUNICATION_OTHER = 0x0780,
+    PCI_CLASS_COMMUNICATION = 0x0700,
+
+    PCI_CLASS_SYSTEM_PIC = 0x0800,
+    PCI_CLASS_SYSTEM_DMA = 0x0801,
+    PCI_CLASS_SYSTEM_TIMER = 0x0802,
+    PCI_CLASS_SYSTEM_RTC = 0x0803,
+    PCI_CLASS_SYSTEM_PCI_HOTPLUG = 0x0804,
+    PCI_CLASS_SYSTEM_OTHER = 0x0880,
+    PCI_CLASS_SYSTEM = 0x0800,
+
+    PCI_CLASS_INPUT_KEYBOARD = 0x0900,
+    PCI_CLASS_INPUT_PEN = 0x0901,
+    PCI_CLASS_INPUT_MOUSE = 0x0902,
+    PCI_CLASS_INPUT_SCANNER = 0x0903,
+    PCI_CLASS_INPUT_GAMEPORT = 0x0904,
+    PCI_CLASS_INPUT_OTHER = 0x0980,
+    PCI_CLASS_INPUT = 0x0900,
+
+    PCI_CLASS_DOCKING_GENERIC = 0x0a00,
+    PCI_CLASS_DOCKING_OTHER = 0x0a80,
+    PCI_CLASS_DOCKING = 0x0a00,
+
+    PCI_CLASS_PROCESSOR_386 = 0x0b00,
+    PCI_CLASS_PROCESSOR_486 = 0x0b01,
+    PCI_CLASS_PROCESSOR_PENTIUM = 0x0b02,
+    PCI_CLASS_PROCESSOR_ALPHA = 0x0b10,
+    PCI_CLASS_PROCESSOR_POWERPC = 0x0b20,
+    PCI_CLASS_PROCESSOR_MIPS = 0x0b30,
+    PCI_CLASS_PROCESSOR_CO = 0x0b40,
+    PCI_CLASS_PROCESSOR = 0x0b00,
+
+    PCI_CLASS_SERIAL_FIREWIRE = 0x0c00,
+    PCI_CLASS_SERIAL_ACCESS = 0x0c01,
+    PCI_CLASS_SERIAL_SSA = 0x0c02,
+    PCI_CLASS_SERIAL_USB = 0x0c03,
+    PCI_CLASS_SERIAL_FIBER = 0x0c04,
+    PCI_CLASS_SERIAL_SMBUS = 0x0c05,
+    PCI_CLASS_SERIAL = 0x0c00,
+
+    PCI_CLASS_INTELLIGENT_I2O = 0x0e00,
+    PCI_CLASS_INTELLIGENT = 0x0e00,
+
+    PCI_CLASS_SATELLITE_TV = 0x0f00,
+    PCI_CLASS_SATELLITE_AUDIO = 0x0f01,
+    PCI_CLASS_SATELLITE_VOICE = 0x0f03,
+    PCI_CLASS_SATELLITE_DATA = 0x0f04,
+    PCI_CLASS_SATELLITE = 0x0f00,
+
+    PCI_CLASS_CRYPT_NETWORK = 0x1000,
+    PCI_CLASS_CRYPT_ENTERTAINMENT = 0x1001,
+    PCI_CLASS_CRYPT_OTHER = 0x1080,
+    PCI_CLASS_CRYPT = 0x1000,
+
+    PCI_CLASS_SP_DPIO = 0x1100,
+    PCI_CLASS_SP_OTHER = 0x1180,
+    PCI_CLASS_SP = 0x1100,
+} pci_device_class_t;
+
+#define PCI_CLASS_OTHERS 0xff
+
+// Capabilities
+#define PCI_CAPABILITY_TYPE_PME (0x1)
+
+#endif // IOSM_PCIE_PCI_IDS_H

@@ -1,0 +1,3 @@
+#!/bin/sh
+AS="/usr/bin/as"
+exec $AS "$@"

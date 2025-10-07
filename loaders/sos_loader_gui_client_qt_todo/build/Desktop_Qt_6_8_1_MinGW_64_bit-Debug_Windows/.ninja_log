@@ -1,0 +1,17 @@
+# ninja log v6
+289	1218	7566021530570654	sos_loader_gui_client_autogen/mocs_compilation.cpp	39a8e0c3234b42f0
+22	310	7566023196381603	Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/cmake.verify_globs	b4527c8ff22d6a2e
+289	1218	7566021530570654	sos_loader_gui_client_autogen/timestamp	39a8e0c3234b42f0
+289	1218	7566021530570654	Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/sos_loader_gui_client_autogen/timestamp	39a8e0c3234b42f0
+289	1218	7566021530570654	Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/sos_loader_gui_client_autogen/mocs_compilation.cpp	39a8e0c3234b42f0
+1473	2788	7566021533670283	CMakeFiles/sos_loader_gui_client.dir/sos_loader_gui_client_autogen/mocs_compilation.cpp.obj	ea7e8177af974103
+1245	1472	7566021533500849	sos_loader_gui_client_autogen/EWIEGA46WW/qrc_resources.cpp	69a40e853f04015e
+1245	1472	7566021533500849	Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/sos_loader_gui_client_autogen/EWIEGA46WW/qrc_resources.cpp	69a40e853f04015e
+1475	2807	7566021533690216	CMakeFiles/sos_loader_gui_client.dir/main.cpp.obj	af8b9e7795addba3
+1479	3241	7566021533740049	CMakeFiles/sos_loader_gui_client.dir/GUI_Log.cpp.obj	662ca8d52caf377a
+1481	3325	7566021533759983	CMakeFiles/sos_loader_gui_client.dir/GUI_SPMgr.cpp.obj	44514258e7326764
+1477	3640	7566021533720116	CMakeFiles/sos_loader_gui_client.dir/GUI_Main.cpp.obj	27a55a292245750d
+1485	7095	7566021533799851	CMakeFiles/sos_loader_gui_client.dir/sos_loader_gui_client_autogen/EWIEGA46WW/qrc_resources.cpp.obj	baaf53eaabd4d5d3
+7096	10327	7566021589896450	sos_loader_gui_client.exe	af8ee474ce318acc
+446	1772	7566024121059760	build.ninja	ca0ac9c13f5014e2
+25	311	7566024128043629	Y:/code/loaders/sos_loader_gui_client/build/Desktop_Qt_6_8_1_MinGW_64_bit-Debug_Windows/CMakeFiles/cmake.verify_globs	b4527c8ff22d6a2e

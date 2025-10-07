@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Eric Li (Carnegie Mellon University)
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
+#ifndef __WIN_CONFIG_XMHF_LOG_H__
+#define __WIN_CONFIG_XMHF_LOG_H__
+
+// This macro must be the same as secbase/hypapps/whitevisor/config.mk .
+// If secbase/hypapps/whitevisor/config.mk defines XMHF_LOG_BUF_SIZE variable,
+// then XMHF_LOG_BUF_SIZE macro must have the same value here.
+// If secbase/hypapps/whitevisor/config.mk does NOT define XMHF_LOG_BUF_SIZE
+// variable, then XMHF_LOG_BUF_SIZE macro must NOT be defined here.
+#define XMHF_LOG_BUF_SIZE 256
+
+#endif /* !__WIN_CONFIG_XMHF_LOG_H__ */

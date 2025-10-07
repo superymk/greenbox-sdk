@@ -1,0 +1,7 @@
+*.[oa]
+*~
+cc
+ld
+pkg-config
+configure
+Makefile
