@@ -199,12 +199,12 @@ static SL_STATUS _cfg_parse_local_fs(cJSON *root_json, SAP_CONFIG *out_cfg)
         if (cJSON_IsString(node_json))
         {
             strncpy(out_cfg->fs_local_info.home_dir, node_json->valuestring, RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN);
-            out_cfg->fs_local_info.home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN] = '\0';
+            out_cfg->fs_local_info.home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN - 1] = '\0';
         }
         else
         {
             memset(out_cfg->fs_local_info.home_dir, 0, RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN);
-            out_cfg->fs_local_info.home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN] = '\0';
+            out_cfg->fs_local_info.home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN - 1] = '\0';
         }
     }
 

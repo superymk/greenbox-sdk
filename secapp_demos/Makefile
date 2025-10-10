@@ -52,12 +52,22 @@ first_build_clean:
 ifeq ($(PAL_DEMO), RDESKTOP_PAL)
 	@$(MAKE) -C rdesktop first_build_clean
 endif
+ifeq ($(PAL_DEMO), GB_BUNDLED_GUI_SAPS)
+	@$(MAKE) -C rdesktop first_build_clean
+endif
 
 .PHONY: first_build
 first_build:
 ifeq ($(PAL_DEMO), RDESKTOP_PAL)
 	@$(MAKE) -C rdesktop first_build
 endif
+ifeq ($(PAL_DEMO), GB_BUNDLED_GUI_SAPS)
+	@$(MAKE) -C rdesktop first_build
+endif
+
+# All GUI SecApps that are always released together with GreenBox
+.PHONY: GB_BUNDLED_GUI_SAPS
+GB_BUNDLED_GUI_SAPS: RICH_GUI_SAP RDESKTOP_PAL RFILES_SAP
 	
 .PHONY: RICH_GUI_SAP
 RICH_GUI_SAP:

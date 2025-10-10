@@ -36,7 +36,8 @@ export CONFIG_DEBUG_LOADERS_MEMLEAK     = n
 # Verbose Level: V_DEBUG V_PERF V_INFO V_NOTICE V_WARNING V_ERR V_CRIT V_EMERG
 export VERBOSE_LVL              = V_DEBUG
 
-# PAL_DEMO could be either SP_EXAMPLE_SAP or SP_TEST_PAL or RDESKTOP_PAL or RICH_GUI_SAP or RFILES_SAP
+# PAL_DEMO could be either standalone SecApps like SP_EXAMPLE_SAP or SP_TEST_PAL or RDESKTOP_PAL or RICH_GUI_SAP or RFILES_SAP,
+# or groups of SecApps like GB_BUNDLED_GUI_SAPS
 export PAL_DEMO                 = RICH_GUI_SAP
 
 # [Copied from the old SecBase]
