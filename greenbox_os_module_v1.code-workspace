@@ -1,12 +1,9 @@
 {
 	"folders": [
 		{
-			"path": "code/os_module"
+			"name": "os_module",
+			"path": "os_module"
 		}
-    ],
-	"settings": {
-		"files.associations": {
-			"functional": "c"
-		}
-	}
+	],
+    "settings": {}
 }

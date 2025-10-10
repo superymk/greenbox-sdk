@@ -2,7 +2,7 @@
 	"folders": [
 		{
 			"name": "os_module",
-			"path": "code/os_module"
+			"path": "os_module"
 		}
 	],
     "settings": {}
