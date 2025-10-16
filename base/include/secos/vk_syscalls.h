@@ -3,7 +3,7 @@
 // Author: Virgil Gligor (Carnegie Mellon University)
 
 /*
- * Public API Header — Limited License
+ * Public API Header - Limited License
  * Copyright (c) 2021 - 2026 Miao Yu, Virgil Gligor
  *
  * Permission is granted to use, copy, and redistribute this header file
