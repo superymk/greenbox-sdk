@@ -1141,6 +1141,7 @@ void win_intr_fini(void)
 // 	return INVALID_IRQ;
 // }
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 void win_os_intr_remove_affinity(void)
 {
 	OSSTATUS status = OS_SUCCESS;
@@ -1156,9 +1157,11 @@ void win_os_intr_restore_affinity(void)
 {
 	// Do nothing
 }
+#endif // GREENBOX_USE_UXMHF64_V1
 
 static uint32_t _win_os_dedicated_cpu_get_id(void)
 {
+	// Return the CPU ID of the BSP.
 	return 0;
 }
 
@@ -1198,6 +1201,7 @@ OSSTATUS win_sos_os_intr_probe_and_register(void)
 
 	// On success
 	sos_os_intr = result;
+	DRV_INFO("Assign IRQ for SecOS-OS communication. Interrupt vector:%u\n", sos_os_intr);
 
 	os_cpu_id = _win_os_dedicated_cpu_get_id();
 

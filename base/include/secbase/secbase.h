@@ -65,9 +65,11 @@
 
 #define SECBASE_MAX_CPUS 256
 
-// Isolated Execution Environment ID
-#define DOMAIN_UNTRUSTED 1
-#define DOMAIN_SECOS 2
+// Isolated Execution Environment ID. 0 is reserved for mHV. 1 is for the NS domain. They must be the same with 
+// <DOMAIN_UXMHF64>, <DOMAIN_NONSECURE> and <DOMAIN_OTHER> defined in uxmhf64-commons.h
+#define DOMAIN_MHV	(DOMAIN_UXMHF64)
+#define DOMAIN_UNTRUSTED (DOMAIN_NONSECURE)
+#define DOMAIN_SECOS (DOMAIN_OTHER)
 
 #ifndef __ASSEMBLY__
 

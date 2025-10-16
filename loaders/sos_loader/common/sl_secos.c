@@ -197,6 +197,93 @@ static void _sync_sos_run_params_status_set(struct secos_run_params* params, SL_
     (void)__sync_lock_test_and_set(&params->status, new_status);
 }
 
+
+#ifdef GREENBOX_USE_UXMHF64_V1
+/// @brief SecBase with the legacy UXMHF64 v1 requires to run/resume SecOS on the same core that registering the SecOS.
+/// @param out_need_break_loop 
+static void _secos_run_loop(bool *out_need_break_loop)
+{
+    bool secagent_success = true;
+
+    // Get SecOS status
+    status = secagent_get_secos_status(&secagent_success);
+    if (!secagent_success)
+    {
+        SL_ERR("Failed to get SecOS's status!\n");
+        *out_need_break_loop = true;
+        return;
+    }
+
+    // secagent_trigger_all_intrs(sos_status->intr);
+
+    if (status == SECOS_INFO_PREEMPTED || status == SECOS_INFO_RETURN_FROM_PREEMPTION)
+    {
+        // Resume SecOS execution, if SecOS is not exited
+        // [NOTE] Stay in red OS/Apps for 1ms so red OS on this core can response cross-core requests (e.g., system
+        // calls that need to be handled by all CPUs).
+        // Why usleep but not mdelay? mdelay may sleep longer (~20ms ish). SecOS does not expect to yield CPU for
+        // that long.
+        // usleep(10000);
+
+        sos_resume();
+
+        // udelay(1000);
+        // sleep_ms(10);
+    }
+    else
+    {
+        SL_INFO("SecOS status2:0x%08X\n", status);
+        _sync_sos_run_params_status_set(sos_params, SL_E_SOS_RUN);
+        cmd = STOP;
+    }
+
+    // sos_status->intr[0] = 0;
+    // sos_status->intr[1] = 0;
+    // sos_status->intr[2] = 0;
+    // sos_status->intr[3] = 0;
+    // sos_status->intr[4] = 0;
+    // sos_status->intr[5] = 0;
+    // sos_status->intr[6] = 0;
+    // sos_status->intr[7] = 0xFFFFFFFF;
+    // secagent_trigger_all_intrs(sos_status->intr);
+
+    // mdelay(10);
+}
+
+#else // !GREENBOX_USE_UXMHF64_V1
+
+/// @brief SecBase with newer UXMHF64 allows to run/resume SecOS on the dedicated core for SecOS.
+/// @param out_need_break_loop 
+static void _secos_run_loop(bool *out_need_break_loop)
+{
+    bool secagent_success = true;
+
+    // Get SecOS status
+    status = secagent_get_secos_status(&secagent_success);
+    if (!secagent_success)
+    {
+        SL_ERR("Failed to get SecOS's status!\n");
+        *out_need_break_loop = true;
+        return;
+    }
+
+    if (status == SECOS_INFO_PREEMPTED)
+    {
+        // Do nothing
+    }
+    else
+    {
+        SL_INFO("SecOS status2:0x%08X\n", status);
+        _sync_sos_run_params_status_set(sos_params, SL_E_SOS_RUN);
+        cmd = STOP;
+    }
+
+    // Yield CPU.
+    msleep(200);
+}
+
+#endif // GREENBOX_USE_UXMHF64_V1
+
 // The main thread to run SecOS
 static void *thread_run_secos(void *data)
 {
@@ -255,50 +342,12 @@ static void *thread_run_secos(void *data)
 
     while (cmd == RUN)
     {
-        bool secagent_success = true;
+        bool need_break_loop = false;
+        
+        _secos_run_loop(&need_break_loop);
 
-        // Get SecOS status
-        status = secagent_get_secos_status(&secagent_success);
-        if (!secagent_success)
-        {
-            SL_ERR("Failed to get SecOS's status!\n");
+        if(need_break_loop)
             break;
-        }
-
-        // secagent_trigger_all_intrs(sos_status->intr);
-
-        if (status == SECOS_INFO_PREEMPTED || status == SECOS_INFO_RETURN_FROM_PREEMPTION)
-        {
-            // Resume SecOS execution, if SecOS is not exited
-            // [NOTE] Stay in red OS/Apps for 1ms so red OS on this core can response cross-core requests (e.g., system
-            // calls that need to be handled by all CPUs).
-            // Why usleep but not mdelay? mdelay may sleep longer (~20ms ish). SecOS does not expect to yield CPU for
-            // that long.
-            // usleep(10000);
-
-            sos_resume();
-
-            // udelay(1000);
-            // sleep_ms(10);
-        }
-        else
-        {
-            SL_INFO("SecOS status2:0x%08X\n", status);
-            _sync_sos_run_params_status_set(sos_params, SL_E_SOS_RUN);
-            cmd = STOP;
-        }
-
-        // sos_status->intr[0] = 0;
-        // sos_status->intr[1] = 0;
-        // sos_status->intr[2] = 0;
-        // sos_status->intr[3] = 0;
-        // sos_status->intr[4] = 0;
-        // sos_status->intr[5] = 0;
-        // sos_status->intr[6] = 0;
-        // sos_status->intr[7] = 0xFFFFFFFF;
-        // secagent_trigger_all_intrs(sos_status->intr);
-
-        // mdelay(10);
     }
 
     sl_state_transit(SECOS_RUNNING, SECOS_REGISTERED);
@@ -327,11 +376,19 @@ static bool _block_wait_secos_booted(uint32_t timeout_ms)
         // Thus, we do not print errors of <secagent_get_secos_status> and just wait SecOS to boot.
         if (secagent_success)
         {
+        #ifdef GREENBOX_USE_UXMHF64_V1
             if ((status == SECOS_INFO_PREEMPTED) || (status == SECOS_INFO_RETURN_FROM_PREEMPTION))
             {
                 secos_booted = true;
                 break;
             }
+        #else
+            if (status == SECOS_INFO_PREEMPTED)
+            {
+                secos_booted = true;
+                break;
+            }
+        #endif // GREENBOX_USE_UXMHF64_V1
         }
 
         // Errors happen in <thread_run_secos>, so SecOS is not booted.

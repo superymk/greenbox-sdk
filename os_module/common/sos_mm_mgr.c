@@ -120,7 +120,7 @@ void sos_comm_resc_return(void)
 #ifndef WINNT
 	// Release SOS-OS communication interrupt resource.
 	// [TODO][Issue 104] Due to Issue 104, SecAgent only invokes IoDisconnectInterrupt during DriverUnload
-	os->sos_os_intr_unregister();
+	// os->sos_os_intr_unregister();
 #endif
 
 }

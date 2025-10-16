@@ -43,5 +43,8 @@ extern ulong_t linux_hypercall_2args(ulong_t fn, ulong_t arg1, ulong_t arg2);
 extern ulong_t linux_hypercall_3args(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3);
 extern ulong_t linux_hypercall_4args(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3, ulong_t arg4);
 extern ulong_t linux_hypercall_ret1(ulong_t fn, ulong_t* arg1);
+extern ulong_t linux_hypercall_ret2(ulong_t fn, ulong_t* arg1, ulong_t* arg2);
+extern ulong_t linux_hypercall_ret3(ulong_t fn, ulong_t* arg1, ulong_t* arg2, ulong_t* arg3);
+extern ulong_t linux_hypercall_ret4(ulong_t fn, ulong_t* arg1, ulong_t* arg2, ulong_t* arg3, ulong_t* arg4);
 
 #endif // SECAGENT_LINUX_CPU_H

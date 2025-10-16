@@ -188,10 +188,30 @@ ulong_t win_hypercall_4args(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3
 }
 
 extern void Int3(void);
+
 ulong_t win_hypercall_ret1(ulong_t fn, ulong_t *arg1)
 {
     ulong_t reserved = 0;
 
     // Int3();
     return Intel_VMCALL_ret4(fn, arg1, &reserved, &reserved, &reserved);
+}
+
+ulong_t win_hypercall_ret2(ulong_t fn, ulong_t *arg1, ulong_t *arg2)
+{
+    ulong_t reserved = 0;
+
+    return Intel_VMCALL_ret4(fn, arg1, arg2, &reserved, &reserved);
+}
+
+ulong_t win_hypercall_ret3(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t* arg3)
+{
+    ulong_t reserved = 0;
+
+    return Intel_VMCALL_ret4(fn, arg1, arg2, arg3, &reserved);
+}
+
+ulong_t win_hypercall_ret4(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t* arg3, ulong_t* arg4)
+{
+    return Intel_VMCALL_ret4(fn, arg1, arg2, arg3, arg4);
 }

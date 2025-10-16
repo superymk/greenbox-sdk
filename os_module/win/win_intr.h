@@ -40,9 +40,10 @@ extern intr_t win_intr_timer(void);
 
 extern lapic_id_t win_sos_os_intr_get_os_lapic_id(void);
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 extern void win_os_intr_remove_affinity(void);
 extern void win_os_intr_restore_affinity(void);
-
+#endif // GREENBOX_USE_UXMHF64_V1
 
 
 extern void win_debug_intr_get_current_irq_priority(void);

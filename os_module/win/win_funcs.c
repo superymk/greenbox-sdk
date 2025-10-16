@@ -110,8 +110,10 @@ void os_init(void)
 	os->timer_msleep = win_msleep;
 
     // interrupt functions
+#ifdef GREENBOX_USE_UXMHF64_V1
 	os->os_intr_remove_affinity = win_os_intr_remove_affinity;
 	os->os_intr_restore_affinity = win_os_intr_restore_affinity;
+#endif // GREENBOX_USE_UXMHF64_V1
 	os->intr_local_irq_enable = NULL;
 	os->intr_local_irq_disable = NULL;
 	os->intr_trigger_interrupt = win_intr_trigger_interrupt;
@@ -129,6 +131,9 @@ void os_init(void)
 	os->hypercall_3args = win_hypercall_3args;
 	os->hypercall_4args = win_hypercall_4args;
     os->hypercall_ret1 = win_hypercall_ret1;
+	os->hypercall_ret2 = win_hypercall_ret2;
+	os->hypercall_ret3 = win_hypercall_ret3;
+	os->hypercall_ret4 = win_hypercall_ret4;
 
 	// Debug
 	os->int3_debug_break = win_int3_debug_break;

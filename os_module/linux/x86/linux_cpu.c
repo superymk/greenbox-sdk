@@ -280,3 +280,22 @@ ulong_t linux_hypercall_ret1(ulong_t fn, ulong_t *arg1)
 
     return linux_hypercall_ret4(fn, arg1, &reserved, &reserved, &reserved);
 }
+
+ulong_t linux_hypercall_ret2(ulong_t fn, ulong_t *arg1, ulong_t *arg2)
+{
+    ulong_t reserved = 0;
+
+    return _linux_hypercall_ret4(fn, arg1, arg2, &reserved, &reserved);
+}
+
+ulong_t linux_hypercall_ret3(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t* arg3)
+{
+    ulong_t reserved = 0;
+
+    return _linux_hypercall_ret4(fn, arg1, arg2, arg3, &reserved);
+}
+
+ulong_t linux_hypercall_ret4(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t* arg3, ulong_t* arg4)
+{
+    return _linux_hypercall_ret4(fn, arg1, arg2, arg3, arg4);
+}

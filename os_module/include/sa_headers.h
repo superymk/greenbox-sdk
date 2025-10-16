@@ -61,5 +61,6 @@
 #include <secagent_ops.h>
 #include <sos_sp_params.h>
 #include <sos.h>
+#include <tos.h>
 
 #endif // SECAGENT_H

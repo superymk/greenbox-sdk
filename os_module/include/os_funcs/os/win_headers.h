@@ -15,6 +15,10 @@
 // Configuration file that defines XMHF_LOG_BUF_SIZE
 #include "win_config_xmhf_log.h"
 
+// Config - Force using legacy UXMHF64.
+#undef GREENBOX_USE_UXMHF64_V1
+// #define GREENBOX_USE_UXMHF64_V1 1
+
 #ifdef _AMD64_
 #undef __i386__
 #define __amd64__

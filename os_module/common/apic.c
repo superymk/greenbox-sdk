@@ -245,11 +245,9 @@ static void _os_intr_restore_affinity_in_ioapic(void)
 	}
 }
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 
-
-
-/********* Public Functions *********/
-OSSTATUS sa_init_secos_os_comm_intr(void)
+static OSSTATUS _sa_init_secos_os_comm_intr(void)
 {
     ulong_t ret = 0;
     ulong_t val = 0;
@@ -271,13 +269,64 @@ OSSTATUS sa_init_secos_os_comm_intr(void)
     return OS_SUCCESS;
 }
 
-void sa_fini_secos_os_comm_intr(void)
+static void _sa_fini_secos_os_comm_intr(void)
 {
     secos_lapic_id = INVALID_LAPIC_ID;
 
     // // Restore interrupt affinity to this core
     // os->os_intr_restore_affinity();
     // _os_intr_restore_affinity_in_ioapic();
+}
+
+#else
+
+static OSSTATUS _sa_init_secos_os_comm_intr(void)
+{
+    OSSTATUS status = OS_SUCCESS;
+    NS_HC_RESP_GET_TINYOS_INFO tos_info = {0};
+
+    // Read OS's configuration of IOAPIC
+    _os_intr_read_ioapic_affinity_in_ioapic();
+
+    // Get the LAPIC ID of the CPU running TinyOS as it will run SecOS.
+    status = sb_get_tos_info(&tos_info);
+    if (SA_FAIL(status))
+    {
+        DRV_ERR("Init SecOS-OS Comm: Failed to get TinyOS's info! status:%lu\n", status);
+        return E_INTERNAL_ERROR;
+    }
+
+    if(tos_info.running_status != TINYOS_STATUS_RUNNING)
+    {
+        DRV_ERR("Init SecOS-OS Comm: TinyOS is not running!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    secos_lapic_id = (lapic_id_t)tos_info.tos_lapic_id;
+    DRV_INFO("Init SecOS-OS Comm: SecOS LAPIC id: 0x%08X\n", secos_lapic_id);
+    return OS_SUCCESS;
+}
+
+static void _sa_fini_secos_os_comm_intr(void)
+{
+    secos_lapic_id = INVALID_LAPIC_ID;
+
+    // Restore interrupt affinity to this core
+    _os_intr_restore_affinity_in_ioapic();
+}
+
+#endif // GREENBOX_USE_UXMHF64_V1
+
+
+/********* Public Functions *********/
+OSSTATUS sa_init_secos_os_comm_intr(void)
+{
+    return _sa_init_secos_os_comm_intr();
+}
+
+void sa_fini_secos_os_comm_intr(void)
+{
+    _sa_fini_secos_os_comm_intr();
 }
 
 // OSSTATUS sa_register_sos_os_irq(void)
@@ -345,8 +394,15 @@ void notify_secos(void)
 
     // Send IPI to SecOS if its status is <SECOS_INFO_RETURN_FROM_PREEMPTION>
     status = sos_get_status(&sos_status);
+
+#ifdef GREENBOX_USE_UXMHF64_V1
     if(SA_PASS(status) && (sos_status == SECOS_INFO_RETURN_FROM_PREEMPTION))
         os_send_ipi_to_cpu(vector, secos_lapic_id);
+#else
+    if(SA_PASS(status) && (sos_status == SECOS_INFO_PREEMPTED))
+        os_send_ipi_to_cpu(vector, secos_lapic_id);
+#endif // GREENBOX_USE_UXMHF64_V1
+
 }
 
 OSSTATUS x86_ioapic_read_entire_table(struct IO_APIC_entry *out_entries)

@@ -99,8 +99,10 @@ struct os_funcs
 	void (*timer_msleep)(uint32_t ms);
 
 	// interrupt
+#ifdef GREENBOX_USE_UXMHF64_V1
 	void (*os_intr_remove_affinity)(void);
 	void (*os_intr_restore_affinity)(void);
+#endif // GREENBOX_USE_UXMHF64_V1
 	void (*intr_local_irq_enable)(void);
 	void (*intr_local_irq_disable)(void);
 	void (*intr_trigger_interrupt)(uint32_t vector);
@@ -118,6 +120,9 @@ struct os_funcs
 	ulong_t (*hypercall_3args)(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3);
 	ulong_t (*hypercall_4args)(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3, ulong_t arg4);
     ulong_t (*hypercall_ret1)(ulong_t fn, ulong_t* arg1);
+	ulong_t (*hypercall_ret2)(ulong_t fn, ulong_t* arg1, ulong_t* arg2);
+	ulong_t (*hypercall_ret3)(ulong_t fn, ulong_t* arg1, ulong_t* arg2, ulong_t* arg3);
+	ulong_t (*hypercall_ret4)(ulong_t fn, ulong_t* arg1, ulong_t* arg2, ulong_t* arg3, ulong_t* arg4);
 
 	// Debug
 	void (*int3_debug_break)(void);

@@ -90,7 +90,6 @@ static OSSTATUS sos_get_ret_intr(uint32_t** out_intr)
         return E_INV_ARG;
     }
 
-
     // Flush cache to read fresh data
     os->cache_flush_range((vaddr_t)boot_params, sizeof(struct sos_boot_params));
 
@@ -116,13 +115,17 @@ OSSTATUS do_CMD_PROBE_SECOS_STATUS(struct tz_cmd_packet *cmd_packet)
 
     if(cmd_packet->arg1 == SECOS_INFO_PREEMPTED)
         sos_is_running = true;
+#ifdef GREENBOX_USE_UXMHF64_V1
     else if (cmd_packet->arg1 == SECOS_INFO_RETURN_FROM_PREEMPTION) 
         sos_is_running = true;
+#endif // GREENBOX_USE_UXMHF64_V1
     else
         sos_is_running = false;
 
     return OS_SUCCESS;
 }
+
+#ifdef GREENBOX_USE_UXMHF64_V1
 
 OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
 {
@@ -145,6 +148,143 @@ OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
 
     return OS_SUCCESS;
 }
+
+#else
+
+OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
+{
+    OSSTATUS status = OS_SUCCESS;
+    ulong_t hyp_ret = 0;
+    struct sos_boot_params* boot_params = (struct sos_boot_params*)sos_addrs.param_start;
+    uint32_t timeout_ms = 5000;
+
+    DRV_INFO("Starting SecOS\n");
+
+    // Initialize inter-processor-interrupt (IPI) to TinyOS.
+    {
+        bool tos_is_running = false;
+
+        status = tos_probe_configs(&tos_is_running);
+        if(SA_FAIL(status) || !tos_is_running)
+        {
+            DRV_ERR("[IOCTL-CMD_RUN_SECOS] Failed to probe TinyOS!\n");
+            return E_INV_ARG;
+        }
+    }
+
+    // Call TinyOS to boot SecOS
+    //// Notify TinyOS to handle any pending requests.
+    status = tos_notify_ipi();
+    if(SA_FAIL(status))
+    {
+        DRV_ERR("[IOCTL-CMD_RUN_SECOS] Notify TinyOS to process pending requests error!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    //// Request TinyOS to boot SecOS
+    hyp_ret = os->hypercall_4args(NS_HC_REQUEST_TINYOS, REQ_TINYOS_CMD_BOOT_SECOS, 0, 0, 0);
+    if (hyp_ret)
+    {
+        DRV_ERR("[IOCTL-CMD_RUN_SECOS] Failed to request TinyOS to run SecOS! status:%lu\n", hyp_ret);
+        return E_INTERNAL_ERROR;
+    }
+
+    //// Notify TinyOS to handle the new request.
+    status = tos_notify_ipi();
+    if(SA_FAIL(status))
+    {
+        DRV_ERR("[IOCTL-CMD_RUN_SECOS] Notify TinyOS to process the current request error!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    // // Get returned SecOS status
+    // //// Flush cache to read fresh data
+    // os->cache_flush_range((vaddr_t)boot_params, sizeof(struct sos_boot_params));
+    
+    // cmd_packet->arg1 = boot_params->status.status;
+
+    {
+        sos_is_running = false;
+        while(1)
+        {
+            if(!timeout_ms)
+            {
+                // Timeout
+                status = E_TIMEOUT;
+                break;
+            }
+
+            // Get returned SecOS status
+            //// Flush cache to read fresh data
+            os->cache_flush_range((vaddr_t)boot_params, sizeof(struct sos_boot_params));
+
+            if(boot_params->status.status)
+            {
+                sos_is_running = true;
+                status = OS_SUCCESS;
+                break;
+            }
+
+            os->udelay(1000);
+            timeout_ms--;
+        }
+    }
+
+    cmd_packet->arg1 = boot_params->status.status;
+
+
+
+    // // [Superymk]
+    // {
+    //     ulong_t tos_resp_cmd = REQ_TINYOS_CMD_INVALID;
+    //     ulong_t tos_resp_status1, tos_resp_status2, tos_resp_status3;
+    // 
+    //     sos_is_running = false;
+    //     while(1)
+    //     {
+    //         if(!timeout_ms)
+    //         {
+    //             // Timeout
+    //             status = E_TIMEOUT;
+    //             break;
+    //         }
+
+    //         hyp_ret = os->hypercall_ret4(NS_HC_GET_TINYOS_RESPONSE, &tos_resp_cmd, &tos_resp_status1, &tos_resp_status2, &tos_resp_status3);
+    //         if (hyp_ret)
+    //         {
+    //             DRV_ERR("[IOCTL-CMD_RUN_SECOS] Failed to get response from TinyOS! status:%lu\n", hyp_ret);
+    //             status = E_INTERNAL_ERROR;
+    //             break;
+    //         }
+
+    //         if(tos_resp_cmd == REQ_TINYOS_CMD_BOOT_SECOS)
+    //         {
+    //             // Get the response from TinyOS
+
+    //             if(tos_resp_status1 == RESP_TINYOS_SUCCESS)
+    //             {
+    //                 sos_is_running = true;
+    //                 status = OS_SUCCESS;
+    //             }
+    //             else
+    //             {
+    //                 DRV_ERR("[IOCTL-CMD_RUN_SECOS] TinyOS boot SecOS failed! status:%lu\n", tos_resp_status1);
+    //                 status = E_INTERNAL_ERROR;
+    //             }
+
+    //             break;
+    //         }
+
+    //         os->udelay(1000);
+    //         timeout_ms--;
+    //     }
+    // }
+    // // [Superymk] End
+
+    return status;
+}
+
+#endif // GREENBOX_USE_UXMHF64_V1
 
 OSSTATUS do_CMD_REGISTER_SECOS_PREPARE(struct tz_cmd_packet *cmd_packet)
 {

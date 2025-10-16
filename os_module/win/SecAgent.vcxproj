@@ -194,6 +194,7 @@
     <ClCompile Include="..\common\sos_mm_mgr.c" />
     <ClCompile Include="..\common\sos_sp_params.c" />
     <ClCompile Include="..\common\stl_dlist.c" />
+    <ClCompile Include="..\common\tos.c" />
     <ClCompile Include="..\common\untrusted_loader_info.c" />
     <ClCompile Include="..\common\untrusted_loader_utils.c" />
     <ClCompile Include="..\devs\ehci.c" />
@@ -246,6 +247,7 @@
     <ClInclude Include="..\include\sos_mm_mgr.h" />
     <ClInclude Include="..\include\sos_sp_params.h" />
     <ClInclude Include="..\include\stl_dlist.h" />
+    <ClInclude Include="..\include\tos.h" />
     <ClInclude Include="..\include\untrusted_loader_info.h" />
     <ClInclude Include="..\include\untrusted_loader_utils.h" />
     <ClInclude Include="..\include\utils.h" />

@@ -20,6 +20,11 @@ endif
 
 CFLAGS += -DOS_SECOS
 
+## Use the legacy UXMHF64 v1 or not.
+ifeq ($(CONFIG_USE_LEGACY_UXMHF64_V1), y)
+CFLAGS += -DGREENBOX_USE_UXMHF64_V1
+endif
+
 # We only compile perf module when we need the output
 ifeq ($(VERBOSE_LVL), V_DEBUG)
 export CFLAGS += -DPERF
