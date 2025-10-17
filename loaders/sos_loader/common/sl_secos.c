@@ -201,8 +201,9 @@ static void _sync_sos_run_params_status_set(struct secos_run_params* params, SL_
 #ifdef GREENBOX_USE_UXMHF64_V1
 /// @brief SecBase with the legacy UXMHF64 v1 requires to run/resume SecOS on the same core that registering the SecOS.
 /// @param out_need_break_loop 
-static void _secos_run_loop(bool *out_need_break_loop)
+static void _secos_run_loop(struct secos_run_params *sos_params, bool *out_need_break_loop)
 {
+    int status = 0;
     bool secagent_success = true;
 
     // Get SecOS status
@@ -254,8 +255,9 @@ static void _secos_run_loop(bool *out_need_break_loop)
 
 /// @brief SecBase with newer UXMHF64 allows to run/resume SecOS on the dedicated core for SecOS.
 /// @param out_need_break_loop 
-static void _secos_run_loop(bool *out_need_break_loop)
+static void _secos_run_loop(struct secos_run_params *sos_params, bool *out_need_break_loop)
 {
+    int status = 0;
     bool secagent_success = true;
 
     // Get SecOS status
@@ -344,7 +346,7 @@ static void *thread_run_secos(void *data)
     {
         bool need_break_loop = false;
         
-        _secos_run_loop(&need_break_loop);
+        _secos_run_loop(sos_params, &need_break_loop);
 
         if(need_break_loop)
             break;

@@ -11,13 +11,16 @@
 #include <stdio.h>
 
 #include "compilers.h"
+#include <secbase_fn_flags.h>
 
 // Configuration file that defines XMHF_LOG_BUF_SIZE
 #include "win_config_xmhf_log.h"
 
-// Config - Force using legacy UXMHF64.
+// Detect SecBase implemented functions
 #undef GREENBOX_USE_UXMHF64_V1
-// #define GREENBOX_USE_UXMHF64_V1 1
+#if (SECBASE_FUNC_SECOS_RICH_OS_SHARE_CPU == 1)
+#define GREENBOX_USE_UXMHF64_V1 1
+#endif // (SECBASE_FUNC_SECOS_RICH_OS_SHARE_CPU == 1)
 
 #ifdef _AMD64_
 #undef __i386__

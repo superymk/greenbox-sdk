@@ -196,7 +196,7 @@ static inline ulong_t linux_hypercall(ulong_t eax,
     return eax;
 }
 
-static inline ulong_t linux_hypercall_ret4(ulong_t arg_ax, ulong_t *arg_cx, ulong_t *arg_dx,
+static inline ulong_t _linux_hypercall_ret4(ulong_t arg_ax, ulong_t *arg_cx, ulong_t *arg_dx,
                                            ulong_t *arg_si, ulong_t *arg_di)
 {
     // Flush cache first to ensure parameters to SecBase are flushed to memory
@@ -278,7 +278,7 @@ ulong_t linux_hypercall_ret1(ulong_t fn, ulong_t *arg1)
 {
     ulong_t reserved = 0;
 
-    return linux_hypercall_ret4(fn, arg1, &reserved, &reserved, &reserved);
+    return _linux_hypercall_ret4(fn, arg1, &reserved, &reserved, &reserved);
 }
 
 ulong_t linux_hypercall_ret2(ulong_t fn, ulong_t *arg1, ulong_t *arg2)

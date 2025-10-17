@@ -1,0 +1,24 @@
+/*
+ * -------------------------------------------------------------------------------------
+ * Carnegie Mellon University
+ * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
+ *
+ * This software is the proprietary information of Carnegie Mellon University.
+ * Use is subject to license terms.
+ *
+ * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
+ * written consent of Carnegie Mellon University. is strictly prohibited.
+ * -------------------------------------------------------------------------------------
+ *
+ * Authors: Miao Yu
+ *          Virgil Gligor
+ */
+
+#ifndef SECBASE_FUNCS_FLAGS_H
+#define SECBASE_FUNCS_FLAGS_H
+
+// Flags - SecBase implemented function.
+/// @brief If 1, then SecBase requires SecOS and the rich red OS shares the same CPU.
+#define SECBASE_FUNC_SECOS_RICH_OS_SHARE_CPU  (0)
+
+#endif // SECBASE_FUNCS_FLAGS_H

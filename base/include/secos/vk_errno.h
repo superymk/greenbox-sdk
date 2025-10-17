@@ -51,9 +51,13 @@
 /// @brief uTPM is not available
 #define E_UTPM_NOT_AVAILABLE    250
 
-#define SECOS_INFO_PREEMPTED		801
-#define SECOS_INFO_RETURN_FROM_PREEMPTION	    803     //! SecOS resumes after red OS preempts its execution
+#define SECOS_INFO_PREEMPTED		801  //! SecAgent needs to know this status so it can correctly send IPIs to SecOS
+
+#ifdef GREENBOX_USE_UXMHF64_V1
+    #define SECOS_INFO_RETURN_FROM_PREEMPTION	    803     //! SecOS resumes after red OS preempts its execution
                                             //! SecAgent needs to know this status so it can correctly send IPIs to SecOS
+#endif // GREENBOX_USE_UXMHF64_V1
+
 #define SECOS_INFO_EXITED			804
 
 #define E_NOT_IMPLEMENTED		900		//! Not implemented
