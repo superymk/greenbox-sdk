@@ -28,15 +28,17 @@ ifeq ($(DEBUG),y)
 endif
  
 .PHONY: all
-all: $(OBJECTS) static copy_cfg
+all: $(OBJECTS) static copy_files
 	
 %.o: %.S Makefile FORCE
 	$(CC) -c $(APP_INCLUDE) $(CFLAGS) -D__ASSEMBLY__ -o $@ $<
 %.o: %.c Makefile FORCE
 	$(CC) -c $(APP_INCLUDE) $(CFLAGS) -o $@ $<
 
-.PHONY: copy_cfg
-copy_cfg:
+.PHONY: copy_files
+copy_files:
+	@$(CP) -f ./*.crt $(DIST_SAP_PATH)/
+	@$(CP) -f ./*.crt $(DIST_PRIV_SAP_PATH)/
 	@$(CP) -f ./*.json $(DIST_SAP_PATH)/
 	@$(CP) -f ./*.json $(DIST_PRIV_SAP_PATH)/
 

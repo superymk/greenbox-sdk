@@ -19,6 +19,7 @@ struct sap_window_conf
 
 struct sap_fs_local_conf
 {
+    char certs_filepath[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN];
     char home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN];
 };
 
