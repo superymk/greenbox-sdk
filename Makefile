@@ -216,6 +216,7 @@ _WIN_POST_BUILD_delete_linux_exe:
 	@$(RM) ./win/imgs/sap/app
 	@$(RM) ./win/imgs/sap/sl_demo_sp
 	@$(RM) ./win/imgs/sap/sl_rdesktop
+	@$(RM) ./win/imgs/sap/sl_rfiles
 	@$(RM) ./win/imgs/tools/debugger
 
 # Distribute binaries (no symbols) to $(DIST_PATH)

@@ -4,7 +4,7 @@
 
 .PHONY: all
 all: 
-	@$(ECHO) "Building the Remote Desktop Demo..."
+	@$(ECHO) "Building the Remote Files Demo..."
 	@$(MAKE) -C ./secapp all
 	@$(MAKE) -C ./app all
 
