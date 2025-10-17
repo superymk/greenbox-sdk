@@ -139,16 +139,16 @@ static int read_file_all(const char *path, unsigned char **out_buf, size_t *out_
 //     }
 // }
 
-/* If curl is built with Schannel on Windows, CAINFO options are typically ignored. */
-__attribute__((unused)) static int curl_uses_schannel(void)
-{
-#ifdef _WIN32
-    const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
-    if (vi && vi->ssl_version && strstr(vi->ssl_version, "Schannel"))
-        return 1;
-#endif
-    return 0;
-}
+// /* If curl is built with Schannel on Windows, CAINFO options are typically ignored. */
+// __attribute__((unused)) static int curl_uses_schannel(void)
+// {
+// #ifdef _WIN32
+//     const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
+//     if (vi && vi->ssl_version && strstr(vi->ssl_version, "Schannel"))
+//         return 1;
+// #endif
+//     return 0;
+// }
 
 /********* Public Functions *********/
 SAP_STATUS sslca_init(const char *certs_filepath)
@@ -223,7 +223,7 @@ capath_err:
         free(g_capath);
         g_capath = NULL;
     }
-    
+
 cafile_err:
     if (g_cafile)
     {
@@ -236,6 +236,16 @@ cafile_err:
 
 void sslca_fini(void)
 {
+    // Clear <g_cablob>
+    memset(&g_cablob, 0, sizeof(g_cablob));
+    g_cabuf_len = 0;
+    if (g_cabuf)
+    {
+        free(g_cabuf);
+        g_cabuf = NULL;
+    }
+
+    // Clear <g_cafile> and <g_capath>
     if (g_cafile)
     {
         free(g_cafile);
@@ -254,13 +264,13 @@ void sslca_curl_set(CURL *easy)
     if (!easy)
         return;
 
-#ifdef _WIN32
-    if (curl_uses_schannel())
-    {
-        /* Schannel uses Windows System Store automatically—no CAINFO/CA blob needed. */
-        return;
-    }
-#endif
+// #ifdef _WIN32
+//     if (curl_uses_schannel())
+//     {
+//         /* Schannel uses Windows System Store automatically—no CAINFO/CA blob needed. */
+//         return;
+//     }
+// #endif
 
     /* Prefer in-memory CA bundle if available and libcurl supports it. */
     // #if defined(CURLOPT_CAINFO_BLOB)
@@ -270,7 +280,7 @@ void sslca_curl_set(CURL *easy)
         /* Strong verification by default */
         curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-        SAP_DEBUG("<sslca_curl_set> Used CA blob for the connection.\n");
+        SAP_INFO("SSL-CA: Used CA blob for the connection.\n");
         return;
     }
     // #endif
