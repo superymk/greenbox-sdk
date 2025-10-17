@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <curl/curl.h>
 
+#include "utils_fs.h"
+
 #ifdef _WIN32
 /* If libcurl was built with Schannel, Windows System Store is used automatically. */
 #endif
@@ -43,6 +45,7 @@ static bool dir_exists(const char *p)
     struct stat st;
     return (p && *p && stat(p, &st) == 0 && (st.st_mode & S_IFDIR));
 }
+
 static char *dup_str(const char *s)
 {
     if (!s)
@@ -97,44 +100,44 @@ static int read_file_all(const char *path, unsigned char **out_buf, size_t *out_
     return 0;
 }
 
-/* Common Linux/Unix locations (order matters) */
-static const char *const CAFILE_CANDIDATES[] = {
-    "/etc/ssl/certs/ca-certificates.crt", /* Debian/Ubuntu */
-    "/etc/pki/tls/certs/ca-bundle.crt",   /* RHEL/CentOS/Fedora */
-    "/etc/ssl/cert.pem",                  /* Alpine/musl, macOS Homebrew */
-    "/etc/ssl/ca-bundle.pem",             /* SUSE/openSUSE */
-    NULL};
-static const char *const CAPATH_CANDIDATES[] = {
-    "/etc/ssl/certs",
-    "/etc/pki/tls/certs",
-    NULL};
+// /* Common Linux/Unix locations (order matters) */
+// static const char *const CAFILE_CANDIDATES[] = {
+//     "/etc/ssl/certs/ca-certificates.crt", /* Debian/Ubuntu */
+//     "/etc/pki/tls/certs/ca-bundle.crt",   /* RHEL/CentOS/Fedora */
+//     "/etc/ssl/cert.pem",                  /* Alpine/musl, macOS Homebrew */
+//     "/etc/ssl/ca-bundle.pem",             /* SUSE/openSUSE */
+//     NULL};
+// static const char *const CAPATH_CANDIDATES[] = {
+//     "/etc/ssl/certs",
+//     "/etc/pki/tls/certs",
+//     NULL};
 
-/* Detect Unix-ish CA file & dir; Windows Schannel is handled by curl itself. */
-static void detect_unix_ca(void)
-{
-    if (!g_cafile)
-    {
-        for (int i = 0; CAFILE_CANDIDATES[i]; i++)
-        {
-            if (file_exists(CAFILE_CANDIDATES[i]))
-            {
-                g_cafile = dup_str(CAFILE_CANDIDATES[i]);
-                break;
-            }
-        }
-    }
-    if (!g_capath)
-    {
-        for (int i = 0; CAPATH_CANDIDATES[i]; i++)
-        {
-            if (dir_exists(CAPATH_CANDIDATES[i]))
-            {
-                g_capath = dup_str(CAPATH_CANDIDATES[i]);
-                break;
-            }
-        }
-    }
-}
+// /* Detect Unix-ish CA file & dir; Windows Schannel is handled by curl itself. */
+// static void detect_unix_ca(void)
+// {
+//     if (!g_cafile)
+//     {
+//         for (int i = 0; CAFILE_CANDIDATES[i]; i++)
+//         {
+//             if (file_exists(CAFILE_CANDIDATES[i]))
+//             {
+//                 g_cafile = dup_str(CAFILE_CANDIDATES[i]);
+//                 break;
+//             }
+//         }
+//     }
+//     if (!g_capath)
+//     {
+//         for (int i = 0; CAPATH_CANDIDATES[i]; i++)
+//         {
+//             if (dir_exists(CAPATH_CANDIDATES[i]))
+//             {
+//                 g_capath = dup_str(CAPATH_CANDIDATES[i]);
+//                 break;
+//             }
+//         }
+//     }
+// }
 
 /* If curl is built with Schannel on Windows, CAINFO options are typically ignored. */
 __attribute__((unused)) static int curl_uses_schannel(void)
@@ -147,23 +150,45 @@ __attribute__((unused)) static int curl_uses_schannel(void)
     return 0;
 }
 
-/* ---------- Public API ---------- */
-
-void sslca_init(void)
+/********* Public Functions *********/
+SAP_STATUS sslca_init(const char *certs_filepath)
 {
+    SAP_STATUS status = SUCCESS;
+
+    // Check: params must be valid
+    if (!certs_filepath)
+        return EINVAL;
+
     if (g_inited)
-        return;
+        return EINVAL;
     g_inited = 1;
 
-#ifndef _WIN32
-    /* Autodetect on Unix-like systems */
-    detect_unix_ca();
-#else
-    /* On Windows: if not Schannel (e.g., OpenSSL build), user may still have a CA file
-       in a common path (e.g., Git for Windows bundle). We can try typical Unix paths
-       too in case of MSYS2/MinGW environments. */
-    detect_unix_ca();
-#endif
+    // #ifndef _WIN32
+    //     /* Autodetect on Unix-like systems */
+    //     detect_unix_ca();
+    // #else
+    //     /* On Windows: if not Schannel (e.g., OpenSSL build), user may still have a CA file
+    //        in a common path (e.g., Git for Windows bundle). We can try typical Unix paths
+    //        too in case of MSYS2/MinGW environments. */
+    //     detect_unix_ca();
+    // #endif
+
+    // Check: <certs_filepath> must be good.
+    g_cafile = dup_str(certs_filepath);
+    if (!file_exists(g_cafile))
+    {
+        SAP_ERR("SSL-CA Init Error: Invalid CA file (%s)!\n", g_cafile);
+        status = EINVAL;
+        goto cafile_err;
+    }
+
+    g_capath = path_dirname(certs_filepath);
+    if (!dir_exists(g_capath))
+    {
+        SAP_ERR("SSL-CA Init Error: Invalid CA Directory (%s)!\n", g_capath);
+        status = EINVAL;
+        goto capath_err;
+    }
 
     /* Load the CA file into memory if we have a path */
     if (g_cafile)
@@ -188,6 +213,40 @@ void sslca_init(void)
             }
         }
     }
+
+    // On success
+    return SUCCESS;
+
+capath_err:
+    if (g_capath)
+    {
+        free(g_capath);
+        g_capath = NULL;
+    }
+    
+cafile_err:
+    if (g_cafile)
+    {
+        free(g_cafile);
+        g_cafile = NULL;
+    }
+
+    return status;
+}
+
+void sslca_fini(void)
+{
+    if (g_cafile)
+    {
+        free(g_cafile);
+        g_cafile = NULL;
+    }
+
+    if (g_capath)
+    {
+        free(g_capath);
+        g_capath = NULL;
+    }
 }
 
 void sslca_curl_set(CURL *easy)
@@ -204,7 +263,7 @@ void sslca_curl_set(CURL *easy)
 #endif
 
     /* Prefer in-memory CA bundle if available and libcurl supports it. */
-// #if defined(CURLOPT_CAINFO_BLOB)
+    // #if defined(CURLOPT_CAINFO_BLOB)
     if (g_cabuf && g_cabuf_len > 0)
     {
         curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
@@ -214,7 +273,7 @@ void sslca_curl_set(CURL *easy)
         SAP_DEBUG("<sslca_curl_set> Used CA blob for the connection.\n");
         return;
     }
-// #endif
+    // #endif
 
     /* Fallback: point to the CA file path if present */
     if (g_cafile && *g_cafile)

@@ -109,7 +109,7 @@ typedef struct
 } wnd_list_t;
 
 /// @brief LVGL filepath of the home folder of the local computer.
-static char _lv_fs_local_home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN] = {0};
+static char _lv_fs_local_home_dir[RFILES_DIR_FILEPATH_MAXLEN] = {0};
 
 /* --------------------------- Forward decls -------------------------------- */
 static void set_status(wnd_list_t *w, const char *fmt, ...);
@@ -1067,7 +1067,8 @@ SAP_STATUS wnd_rfiles_list_init_cfgs(SAP_CONFIG* sap_cfg)
     if (!sap_cfg)
         return EINVAL;
 
-    _fs_abs_path_to_lvgl_abs_path(_lv_fs_local_home_dir, sap_cfg->fs_local_info.home_dir, RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN);
+    // Initialize LVGL file system paths.
+    _fs_abs_path_to_lvgl_abs_path(_lv_fs_local_home_dir, sap_cfg->fs_local_info.home_dir, RFILES_DIR_FILEPATH_MAXLEN);
 
     // On success
     return SUCCESS;

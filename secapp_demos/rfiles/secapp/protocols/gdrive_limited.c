@@ -1571,9 +1571,21 @@ static char *_gdrive_upload_file(const char *local_path, const char *name_opt,
 }
 
 /********* Public functions *********/
-SAP_STATUS gdrive_init(void)
+SAP_STATUS gdrive_init(SAP_CONFIG* sap_cfg)
 {
-    sslca_init();
+    SAP_STATUS status = SUCCESS;
+
+    // Check: params must be valid
+    if (!sap_cfg)
+        return EINVAL;
+
+    status = sslca_init(sap_cfg->fs_local_info.certs_filepath);
+    if (FAIL(status))
+    {
+        SAP_ERR("GDrive Init Error: SSL CA init error! status:%lu\n", status);
+        return EINTERNAL;
+    }
+
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
     // Create a shared object to share DNS cache across all easy handles
@@ -1583,6 +1595,8 @@ SAP_STATUS gdrive_init(void)
         curl_share_setopt(g_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
         // single-threaded: no lock callbacks required
     }
+
+    // On success
     return SUCCESS;
 }
 
@@ -1593,6 +1607,8 @@ void gdrive_fini(void)
         curl_share_cleanup(g_share);
         g_share = NULL;
     }
+
+    sslca_fini();
 }
 
 SAP_STATUS gdrive_login_query_device_user_code(device_user_code_t *out_duc)
@@ -1963,9 +1979,9 @@ int gdrive_delete_one(const char *id)
 }
 
 /********* Debug Functions *********/
-void gdrive_test(void)
+void gdrive_test(SAP_CONFIG* sap_cfg)
 {
-    gdrive_init();
+    gdrive_init(sap_cfg);
 
     if (gdrive_login(NULL, NULL) == SUCCESS)
     {

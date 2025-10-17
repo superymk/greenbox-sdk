@@ -22,8 +22,7 @@ static int _process_instance_lock_grab(void)
 	char flock_filepath[FS_MAX_PATH_BUFFER_LEN] = {0};
     char* flock_filename = "sl_secapp.lock";
 
-    strncpy(flock_filepath, apploader_get_exe_directory(), MAX_PATH_LEN);
-    strcat(flock_filepath, flock_filename);
+	snprintf(flock_filepath, MAX_PATH_LEN, "%s%s", apploader_get_exe_directory(), flock_filename);
 
 	return os_file_lock_create(flock_filepath, &flock_fd);
 }
