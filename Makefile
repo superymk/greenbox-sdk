@@ -95,8 +95,8 @@ endif
 # Returns "true" if the directory exists, otherwise "false".
 if_dir_exists_bool = $(shell test -d $(1) && echo true || echo false)
 
-# Embed version number
-GREENBOX_VERSION_NUMBER := $(shell echo `date +'%Y%m%d%H%M%S'`)
+# Embed version number (+1 day to ensure SecApps' versions are newer than SecBase, SecOS, and SecServices)
+GREENBOX_VERSION_NUMBER := $(shell date -d '+1 day' +'%Y%m%d%H%M%S')
 SELFCONTAIN_FLAGS += -DGREENBOX_VERSION_NUMBER=$(GREENBOX_VERSION_NUMBER)
 
 export PLATFORM

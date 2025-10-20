@@ -133,7 +133,7 @@ process_host() {
       echo "  Verification: OK (${host})"
     else
       echo "  Verification: FAILED (${host})"
-      # Don¡¯t exit; continue other hosts
+      # Donï¿½ï¿½t exit; continue other hosts
     fi
   fi
 
