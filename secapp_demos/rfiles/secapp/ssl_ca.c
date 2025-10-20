@@ -199,6 +199,7 @@ SAP_STATUS sslca_init(const char *certs_filepath)
             memset(&g_cablob, 0, sizeof(g_cablob));
             g_cablob.data = g_cabuf;
             g_cablob.len = g_cabuf_len;
+            g_cablob.flags = CURL_BLOB_COPY;
             /* We keep ownership of g_cabuf and free it on process exit if needed.
                libcurl does not free this memory. */
         }
@@ -259,45 +260,59 @@ void sslca_fini(void)
     }
 }
 
+__attribute__((unused)) static void sslca_curl_set_no_ssl_verify(CURL *easy)
+{
+    SAP_ERR("!!! Warning: Disabled SSL verification !!!\n");
+
+    curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 0L);
+}
+
 void sslca_curl_set(CURL *easy)
 {
     if (!easy)
         return;
 
-// #ifdef _WIN32
-//     if (curl_uses_schannel())
-//     {
-//         /* Schannel uses Windows System Store automatically—no CAINFO/CA blob needed. */
-//         return;
-//     }
-// #endif
+    // [TODO][Issue 186] Disabled SSL verification temorally. 
+    sslca_curl_set_no_ssl_verify(easy);
+    return;
 
-    /* Prefer in-memory CA bundle if available and libcurl supports it. */
-    // #if defined(CURLOPT_CAINFO_BLOB)
-    if (g_cabuf && g_cabuf_len > 0)
-    {
-        curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
-        /* Strong verification by default */
-        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
-        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-        SAP_INFO("SSL-CA: Used CA blob for the connection.\n");
-        return;
-    }
-    // #endif
+    // /* If you want to see which TLS backend you’re using */
+    // const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
+    // SAP_INFO("SSL backend: %s\n", vi && vi->ssl_version ? vi->ssl_version : "(unknown)");
 
-    /* Fallback: point to the CA file path if present */
-    if (g_cafile && *g_cafile)
-    {
-        curl_easy_setopt(easy, CURLOPT_CAINFO, g_cafile);
-        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
-        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-    }
+    // /* Prefer in-memory bundle */
+    // if (g_cabuf && g_cabuf_len > 0)
+    // {
+    //     CURLcode rc = curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
+    //     if (rc != CURLE_OK)
+    //     {
+    //         SAP_ERR("CURLOPT_CAINFO_BLOB failed: %s\n", curl_easy_strerror(rc));
+    //     }
+    //     else
+    //     {
+    //         SAP_INFO("SSL-CA: Using CAINFO_BLOB (%lu bytes)\n", g_cabuf_len);
+    //     }
 
-    /* Optional extra: CAPATH is useful on some distros if CAINFO was not found/read. */
-    if (g_capath && *g_capath)
-    {
-        curl_easy_setopt(easy, CURLOPT_CAPATH, g_capath);
-    }
+    //     /* Strong verification */
+    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
+    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
+    //     return;
+    // }
+
+    // /* Fallback: file path */
+    // if (g_cafile && *g_cafile)
+    // {
+    //     curl_easy_setopt(easy, CURLOPT_CAINFO, g_cafile);
+    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
+    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
+    //     SAP_INFO("SSL-CA: Using CAINFO path: %s\n", g_cafile);
+    // }
+
+    // /* CAPATH only helps on Unix when directory is c_rehash-hashed */
+    // if (g_capath && *g_capath) {
+    //     curl_easy_setopt(easy, CURLOPT_CAPATH, g_capath);
+    // }
 }
 
 const char *sslca_get_cafile(void) { return g_cafile; }

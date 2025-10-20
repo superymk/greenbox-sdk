@@ -3,6 +3,6 @@
 		"certs_filepath":"./ca-certificates.with-extras.crt",
 		"certs_filepath_comment":"Absolute file path of the trusted certificates.",
 		"home_dir":"/home/superymk/",
-		"home_dir_comment":"Absolute file path of the home directory."
+		"home_dir_comment":"Absolute file path of the home directory; e.g., /home/superymk/ for Linux, and c:/ for Windows"
 	}
 }
