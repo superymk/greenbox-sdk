@@ -1,6 +1,6 @@
 {
 	"local_fs":	{
-		"certs_filepath":"./ca-certificates.crt",
+		"certs_filepath":"./ca-certificates.with-extras.crt",
 		"certs_filepath_comment":"Absolute file path of the trusted certificates.",
 		"home_dir":"/home/superymk/",
 		"home_dir_comment":"Absolute file path of the home directory."
