@@ -143,6 +143,9 @@
 #define     TINYOS_IPI_VECTOR           (0x80) // Use legacy rich OSes' system call interrupt vector, because they are
                                             // less likely to configure peripheral devices to use this interrupt vector.
 
+/// @brief Boot TinyOS on the hided AP CPUs. The current CPU sends an INIT signal to those CPUs.                                            
+#define NS_HC_BOOT_TINYOS                 (NS_HC_FN_NUM_START + 99801)
+
 /// @brief Send a request from the untrusted rich OS to TinyOS.
 /// @param CPU_REG_CX The command to the TinyOS.
 /// @param CPU_REG_DX Arg1 of the command.
