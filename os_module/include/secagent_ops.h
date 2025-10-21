@@ -19,6 +19,10 @@ extern void os_init(void);
 
 extern void os_fini(void);
 
+#ifndef GREENBOX_USE_UXMHF64_V1
+OSSTATUS do_CMD_SECBASE_BOOT_TINYOS(struct tz_cmd_packet* cmd_packet);
+#endif // !GREENBOX_USE_UXMHF64_V1
+
 extern OSSTATUS do_CMD_SECBASE_INIT_ONDEMAND_PER_CPU(struct tz_cmd_packet *cmd_packet);
 extern OSSTATUS do_CMD_SECBASE_FINI_ONDEMAND_PER_CPU(struct tz_cmd_packet *cmd_packet);
 extern OSSTATUS do_CMD_SECAGENT_PRESENCE_REQ(struct tz_cmd_packet *cmd_packet);

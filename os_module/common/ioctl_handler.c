@@ -28,6 +28,9 @@ OSSTATUS ioctl_request_handler(struct tz_cmd_packet *cmd_packet, int* copy_retva
 	{
 		HANDLE(CMD_SECBASE_INIT_ONDEMAND_PER_CPU);
 		HANDLE(CMD_SECBASE_FINI_ONDEMAND_PER_CPU);
+#ifndef GREENBOX_USE_UXMHF64_V1
+		HANDLE(CMD_SECBASE_BOOT_TINYOS);
+#endif // !GREENBOX_USE_UXMHF64_V1
 		case CMD_SECAGENT_TEST1:
 		{
 			// uint8_t val = 0;

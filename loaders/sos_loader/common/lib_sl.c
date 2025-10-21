@@ -36,6 +36,15 @@ __attribute__((unused)) static void _secagent_init_secbase(void)
     uint32_t i = 0;
     uint32_t num_cpus = app_cpus_get_procs_num();
 
+#ifndef GREENBOX_USE_UXMHF64_V1
+    // Invoke SecBase to boot TinyOS
+    secagent_secbase_boot_tinyos();
+
+    // Sleep for 100ms so TinyOS finishes booting.
+    usleep(100 * 1000); 
+
+#endif // !GREENBOX_USE_UXMHF64_V1
+
     for (i = 0; i < num_cpus; i++)
     {
         app_set_cpu_affinity(i);
