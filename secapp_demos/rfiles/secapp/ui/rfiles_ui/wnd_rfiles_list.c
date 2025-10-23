@@ -802,7 +802,7 @@ static void on_upload_clicked(lv_event_t *e)
     {
         lv_bar_set_value(w->status_bar, 0, LV_ANIM_OFF);
         set_status(w, "Upload failed.");
-        _msgbox_show_info("Upload Failed", "File size >= 4MB or connection error!");
+        _msgbox_show_info("Upload Failed", "File size >= 64MB or connection error!");
     }
 }
 

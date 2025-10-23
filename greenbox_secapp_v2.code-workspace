@@ -52,7 +52,9 @@
 			"format": "c",
 			"thread": "c",
 			"vector": "c",
-			"version": "c"
+			"version": "c",
+			"sl_rpc_protocol.h": "c",
+			"tpmtool_header.h": "c"
 		}
     }
 }

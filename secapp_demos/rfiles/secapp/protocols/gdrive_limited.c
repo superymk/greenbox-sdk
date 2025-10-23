@@ -46,7 +46,7 @@ typedef struct gdrive_poll_state
 
 } gdrive_tokens_poll_state_t;
 
-#define GDRIVE_UPLOAD_DOWNLOAD_FILE_SIZE_MAX (MB(4))
+#define GDRIVE_UPLOAD_DOWNLOAD_FILE_SIZE_MAX (MB(64))
 
 const char *g_client_id = "544657840600-nmq99f57bvs4c9ojacj9il8tuj29sf5d.apps.googleusercontent.com";
 const char *g_client_secret = "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";
@@ -56,7 +56,7 @@ const char *g_scope =
     "email";
 
 // ---- Config
-static const int min_poll_interval = 7; // Poll interval is >= 7 seconds.
+static const int min_poll_interval = 3; // Poll interval is >= 3 seconds.
 static const char *DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code";
 static const char *TOKEN_URL = "https://oauth2.googleapis.com/token";
 static const char *DRIVE_API = "https://www.googleapis.com/drive/v3";

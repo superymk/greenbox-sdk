@@ -13,6 +13,8 @@
 #include <app_log.h>
 #include <app_stdlib.h>
 #include <ipc/varbuf.h>
+#include <vk_mm_defs.h>
+
 #include "_info.h"
 #include "socket_ops.h"
 
@@ -88,7 +90,8 @@ static bool _deserialize_socklen_t(varbuf_t *varbuf, socklen_t *out_addrlen)
         return false;
     }
 
-    *out_addrlen = (socklen_t)addrlen_temp;
+    if (out_addrlen)
+        *out_addrlen = (socklen_t)addrlen_temp;
 
     // On success
     return true;
@@ -374,8 +377,6 @@ size_t do_CMD_SOCK_GETSOCKNAME(struct libc_msg *msg)
     // Call the function
     libc_clear_errno();
     result = (uint64_t)getsockname(sockfd, (struct sockaddr *)&addr, &addrlen);
-    printf("[Superymk] <getsockname> After. sockfd:%u, addr.ss_family:%u, addrlen:%u, result:%d, errno:%u\n",
-           sockfd, (uint32_t)addr.ss_family, (uint32_t)addrlen, (int)result, (uint32_t)errno);
 
 out:
     if (varbuf)
@@ -1052,10 +1053,10 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
     int sockfd = 0;
     int flags = 0;
     size_t len = 0;
-    struct sockaddr_storage addr;
-    socklen_t addrlen;
+    struct sockaddr_storage addr, *p_addr = NULL;
+    socklen_t addrlen, *p_addrlen = NULL;
 
-    const size_t buf_max_sz = 65536;
+    const size_t buf_max_sz = KB(256); // 256 KB limit
     uint8_t buf[buf_max_sz];
 
     uint64_t result = -1;
@@ -1094,17 +1095,37 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
         goto out;
     }
 
-    ret = _deserialize_sockaddr(varbuf, &addr);
-    if (!ret)
+    // Test if <addr> is NULL
+    if (varbuf_tryread_nil(varbuf))
     {
-        ERR("CMD_SOCK_RECVFROM Request Failed: <addr>\n");
-        goto out;
-    }
+        // The serialized <src_addr> must be NULL.
+        if (!varbuf_read_nil(varbuf))
+            goto out;
 
-    if (!varbuf_read_fixdata(varbuf, &addrlen, sizeof(addrlen)))
+        // The serialized <addrlen> must be NULL.
+        if (!varbuf_read_nil(varbuf))
+            goto out;
+
+        p_addr = NULL;
+        p_addrlen = NULL;
+    }
+    else
     {
-        ERR("CMD_SOCK_RECVFROM Request Failed: <addrlen>\n");
-        goto out;
+        ret = _deserialize_sockaddr(varbuf, &addr);
+        if (!ret)
+        {
+            ERR("CMD_SOCK_RECVFROM Request Failed: <addr>\n");
+            goto out;
+        }
+
+        if (!_deserialize_socklen_t(varbuf, &addrlen))
+        {
+            ERR("CMD_SOCK_RECVFROM Request Failed: <addrlen>\n");
+            goto out;
+        }
+
+        p_addr = &addr;
+        p_addrlen = &addrlen;
     }
 
     varbuf_access_finish(varbuf);
@@ -1115,7 +1136,7 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
 
     // Call the function
     libc_clear_errno();
-    result = (uint64_t)recvfrom(sockfd, buf, len, flags, (struct sockaddr *)&addr, &addrlen);
+    result = (uint64_t)recvfrom(sockfd, buf, len, flags, (struct sockaddr *)p_addr, p_addrlen);
 
 out:
     if (varbuf)

@@ -541,7 +541,8 @@ bool varbuf_deserialize_size_t(varbuf_t *varbuf, size_t* out_size)
         return false;
     }
 
-    *out_size = (size_t)size_temp;
+    if (out_size)
+    	*out_size = (size_t)size_temp;
 
     // On success
     return true;
