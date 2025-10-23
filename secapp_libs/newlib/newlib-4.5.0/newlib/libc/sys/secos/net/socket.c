@@ -94,6 +94,34 @@ static bool _serialize_sockaddr(varbuf_t *varbuf, const struct sockaddr_storage 
     return true;
 }
 
+static bool _serialize_socklen_t(varbuf_t *varbuf, socklen_t addrlen)
+{
+    uint64_t addrlen_temp = (uint64_t)addrlen;
+
+    if (!varbuf_write_data(varbuf, &addrlen_temp, sizeof(uint64_t))) // serialize socklen_t as uint64_t
+    {
+        return false;
+    }
+
+    // On success
+    return true;
+}
+
+static bool _deserialize_socklen_t(varbuf_t *varbuf, socklen_t *out_addrlen)
+{
+    uint64_t addrlen_temp = 0;
+
+    if (!varbuf_read_fixdata(varbuf, &addrlen_temp, sizeof(uint64_t)))
+    {
+        return false;
+    }
+
+    *out_addrlen = (socklen_t)addrlen_temp;
+
+    // On success
+    return true;
+}
+
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     struct _reent *reent = _REENT;
@@ -129,7 +157,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
         goto err;
     if (addrlen)
     {
-        if (!varbuf_read_fixdata(varbuf, addrlen, sizeof(*addrlen)))
+        if (!_deserialize_socklen_t(varbuf, addrlen))
             goto err;
     }
     varbuf_access_finish(varbuf);
@@ -162,7 +190,7 @@ int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         goto err;
     if (!_serialize_sockaddr(varbuf, (struct sockaddr_storage *)addr, addrlen))
         goto err;
-    if (!varbuf_write_data(varbuf, &addrlen, sizeof(addrlen)))
+    if (!_serialize_socklen_t(varbuf, addrlen))
         goto err;
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
@@ -209,7 +237,7 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         goto err;
     if (!_serialize_sockaddr(varbuf, addr, addrlen))
         goto err;
-    if (!varbuf_write_data(varbuf, &addrlen, sizeof(uint32_t))) // Serialize <socklen_t> as <uint32_t>
+    if (!_serialize_socklen_t(varbuf, addrlen))
         goto err;
 
     msg_data_sz = varbuf_size(varbuf);
@@ -252,8 +280,13 @@ int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     varbuf = varbuf_access_start(req_msg->req_data);
     if (!varbuf)
         goto err;
+
     if (!varbuf_write_data(varbuf, &sockfd, sizeof(int)))
         goto err;
+
+    if (!_serialize_socklen_t(varbuf, *addrlen))
+        goto err;
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -272,7 +305,7 @@ int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
         goto err;
     if (addrlen)
     {
-        if (!varbuf_read_fixdata(varbuf, addrlen, sizeof(*addrlen)))
+        if (!_deserialize_socklen_t(varbuf, addrlen))
             goto err;
     }
     varbuf_access_finish(varbuf);
@@ -402,7 +435,7 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags)
         goto err;
     if (!varbuf_write_data(varbuf, &sockfd, sizeof(int)))
         goto err;
-    if (!varbuf_write_data(varbuf, &len, sizeof(size_t)))
+    if (!varbuf_serialize_size_t(varbuf, len))
         goto err;
     if (!varbuf_write_data(varbuf, &flags, sizeof(int)))
         goto err;
@@ -444,9 +477,9 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     void *result_buf = NULL;
     size_t result_buf_size = 0;
-    const size_t buf_max_sz = 4096; // Must be the same between the libc-backend and the newlib extention for SecProcesses.
+    const size_t buf_max_sz = 65536; // Must be the same between the libc-backend and the newlib extention for SecProcesses.
 
-    // [Limitation] Check: buf must be no bigger than 4096 bytes.
+    // [Limitation] Check: buf must be no bigger than 65536 bytes.
     if (len > buf_max_sz)
         goto err;
 
@@ -461,7 +494,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         goto err;
     if (!varbuf_write_data(varbuf, &flags, sizeof(int)))
         goto err;
-    if (!varbuf_write_data(varbuf, &len, sizeof(uint64_t))) // Serialize size_t as uint64_t
+    if (!varbuf_serialize_size_t(varbuf, len))
         goto err;
     if (!_serialize_sockaddr(varbuf, src_addr, addrlen))
         goto err;
@@ -483,7 +516,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         goto err;
 
     if (result > 0)
-	{
+    {
         result_buf = varbuf_read_vardata(varbuf, &result_buf_size);
         if (!result_buf)
         {
@@ -499,9 +532,9 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
             if (!varbuf_read_fixdata(varbuf, addrlen, sizeof(*addrlen)))
                 goto err;
         }
-	}
-	else if (result == 0)
-	{
+    }
+    else if (result == 0)
+    {
         if (!_deserialize_sockaddr(varbuf, src_addr))
             goto err;
         if (addrlen)
@@ -509,8 +542,8 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
             if (!varbuf_read_fixdata(varbuf, addrlen, sizeof(*addrlen)))
                 goto err;
         }
-	}
-    
+    }
+
     varbuf_access_finish(varbuf);
 
     sp_comm_app_free_msg(req_msg, resp_msg);
@@ -551,7 +584,7 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags)
         goto err;
     if (!varbuf_write_data(varbuf, &sockfd, sizeof(int)))
         goto err;
-    if (!varbuf_write_data(varbuf, &len, sizeof(size_t)))
+    if (!varbuf_serialize_size_t(varbuf, len))
         goto err;
     if (!varbuf_write_data(varbuf, &flags, sizeof(int)))
         goto err;
@@ -622,7 +655,7 @@ int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optl
         goto err;
     if (!varbuf_write_data(varbuf, &optname, sizeof(int)))
         goto err;
-    if (!varbuf_write_data(varbuf, optlen, sizeof(socklen_t)))
+    if (!_serialize_socklen_t(varbuf, *optlen))
         goto err;
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
@@ -642,7 +675,7 @@ int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optl
         goto err;
     if (optlen)
     {
-        if (!varbuf_read_fixdata(varbuf, optlen, sizeof(*optlen)))
+        if (!_deserialize_socklen_t(varbuf, optlen))
             goto err;
     }
     varbuf_access_finish(varbuf);
@@ -678,7 +711,7 @@ int setsockopt(int sockfd, int level, int optname,
         goto err;
     if (!varbuf_write_data(varbuf, &optname, sizeof(int)))
         goto err;
-    if (!varbuf_write_data(varbuf, &optlen, sizeof(optlen)))
+    if (!_serialize_socklen_t(varbuf, optlen))
         goto err;
     if (optval)
     {

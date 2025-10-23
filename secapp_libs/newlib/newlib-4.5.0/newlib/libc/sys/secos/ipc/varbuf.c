@@ -84,7 +84,10 @@ void varbuf_access_finish(varbuf_t *varbuf)
         return;
 
     if (varbuf->private)
+    {
         free(varbuf->private);
+        varbuf->private = NULL;
+    }
 
     free(varbuf);
 }
@@ -344,7 +347,10 @@ out:
         *datasz = size;
 
     if (result && !success)
+    {
         free(result);
+        result = NULL;
+    }
 
     return result;
 }
@@ -509,5 +515,34 @@ bool varbuf_util_read_result(varbuf_t *varbuf, uint64_t *result, int *err)
             return false;
     }
 
+    return true;
+}
+
+/********* Public Functions - Utils for Types *********/
+bool varbuf_serialize_size_t(varbuf_t *varbuf, size_t size)
+{
+    uint64_t size_temp = (uint64_t)size; 
+
+    if (!varbuf_write_data(varbuf, &size_temp, sizeof(uint64_t))) // serialize size_t as uint64_t
+    {
+       return false;
+    }
+
+    // On success
+    return true;
+}
+
+bool varbuf_deserialize_size_t(varbuf_t *varbuf, size_t* out_size)
+{
+    uint64_t size_temp = 0;
+
+    if (!varbuf_read_fixdata(varbuf, &size_temp, sizeof(uint64_t)))
+    {
+        return false;
+    }
+
+    *out_size = (size_t)size_temp;
+
+    // On success
     return true;
 }

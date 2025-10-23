@@ -36,6 +36,7 @@ export SAP_PORT_LIBS_DIST_DIR
 
 .PHONY: all
 all: create_dist_dir lib_tier0 lib_tier1 lib_tier2
+#all: lib_empty openssl
 #all: lib_empty libcurl
 #all: liboauth2 
 

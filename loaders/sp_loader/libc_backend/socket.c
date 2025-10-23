@@ -33,10 +33,13 @@ static bool _deserialize_sockaddr(varbuf_t *varbuf, struct sockaddr_storage *soc
     if (!status)
         return false;
 
-    // sa_family
+    // sock
     status = varbuf_read_fixdata(varbuf, sock, datasz);
     if (!status)
         return false;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    sock->ss_family = (sa_family_t)newlib_to_os_socket_addr_family(sock->ss_family);
 
     return true;
 }
@@ -48,15 +51,46 @@ static bool _serialize_sockaddr(varbuf_t *varbuf, struct sockaddr_storage *sock,
     // Sanity check
     if (!sock || !addrlen)
         return false;
-    
+
     if (addrlen > sizeof(struct sockaddr_storage))
         return false;
 
-    // sa_family
+    // Translate OS-specific posix definitions to newlib's constants 
+    sock->ss_family = (sa_family_t)os_to_newlib_socket_addr_family(sock->ss_family);
+
+    // sock
     status = varbuf_write_data(varbuf, sock, addrlen);
     if (!status)
         return false;
 
+    return true;
+}
+
+static bool _serialize_socklen_t(varbuf_t *varbuf, socklen_t addrlen)
+{
+    uint64_t addrlen_temp = (uint64_t)addrlen;
+
+    if (!varbuf_write_data(varbuf, &addrlen_temp, sizeof(uint64_t))) // serialize socklen_t as uint64_t
+    {
+        return false;
+    }
+
+    // On success
+    return true;
+}
+
+static bool _deserialize_socklen_t(varbuf_t *varbuf, socklen_t *out_addrlen)
+{
+    uint64_t addrlen_temp = 0;
+
+    if (!varbuf_read_fixdata(varbuf, &addrlen_temp, sizeof(uint64_t)))
+    {
+        return false;
+    }
+
+    *out_addrlen = (socklen_t)addrlen_temp;
+
+    // On success
     return true;
 }
 
@@ -74,19 +108,45 @@ size_t do_CMD_SOCK_ACCEPT(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_ACCEPT Request Failed: <addr>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)accept(sockfd, (struct sockaddr *)&addr, &addrlen);
 
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
-    _serialize_sockaddr(varbuf, &addr, addrlen);
-    varbuf_write_data(varbuf, &addrlen, sizeof(addrlen));
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_ACCEPT Response Failed\n");
+
+    if (!_serialize_sockaddr(varbuf, &addr, addrlen))
+    {
+        ERR("CMD_SOCK_ACCEPT Response Failed: <addr>\n");
+    }
+
+    if (!_serialize_socklen_t(varbuf, addrlen))
+    {
+        ERR("CMD_SOCK_ACCEPT Response Failed: <addrlen>\n");
+    }
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -107,19 +167,47 @@ size_t do_CMD_SOCK_BIND(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
-    _deserialize_sockaddr(varbuf, &addr);
-    varbuf_read_fixdata(varbuf, &addrlen, sizeof(addrlen));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_BIND Request Failed: <sockfd>\n");
+        goto out;
+    }
+
+    if (!_deserialize_sockaddr(varbuf, &addr))
+    {
+        ERR("CMD_SOCK_BIND Request Failed: <addr>\n");
+        goto out;
+    }
+
+    if (!_deserialize_socklen_t(varbuf, &addrlen))
+    {
+        ERR("CMD_SOCK_BIND Request Failed: <addrlen>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)bind(sockfd, (struct sockaddr *)&addr, addrlen);
 
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_BIND Response Failed\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -152,13 +240,13 @@ size_t do_CMD_SOCK_CONNECT(struct libc_msg *msg)
     }
 
     ret = _deserialize_sockaddr(varbuf, &addr);
-    if(!ret)
+    if (!ret)
     {
         ERR("CMD_SOCK_CONNECT Request Failed: <addr>\n");
         goto out;
     }
 
-    if (!varbuf_read_fixdata(varbuf, &addrlen, sizeof(uint32_t))) // Deserialize <socklen_t> from <uint32_t>
+    if (!_deserialize_socklen_t(varbuf, &addrlen))
     {
         ERR("CMD_SOCK_CONNECT Request Failed: <addrlen>\n");
         goto out;
@@ -172,7 +260,7 @@ size_t do_CMD_SOCK_CONNECT(struct libc_msg *msg)
     result = (uint64_t)connect(sockfd, (struct sockaddr *)&addr, addrlen);
 
 out:
-    if(varbuf)
+    if (varbuf)
         varbuf_access_finish(varbuf);
 
     // return the result
@@ -181,7 +269,9 @@ out:
         return 0;
 
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_CONNECT Response Failed\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -202,19 +292,47 @@ size_t do_CMD_SOCK_GETPEERNAME(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_GETPEERNAME Request Failed: <sockfd>\n");
+        goto out;
+    }
+
+    if (!_deserialize_socklen_t(varbuf, &addrlen))
+    {
+        ERR("CMD_SOCK_GETPEERNAME Request Failed: <addrlen>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)getpeername(sockfd, (struct sockaddr *)&addr, &addrlen);
 
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
-    _serialize_sockaddr(varbuf, &addr, addrlen);
-    varbuf_write_data(varbuf, &addrlen, sizeof(addrlen));
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_GETPEERNAME Response Failed\n");
+
+    if (!_serialize_sockaddr(varbuf, &addr, addrlen))
+        ERR("CMD_SOCK_GETPEERNAME Response Failed: <addr>\n");
+
+    if (!_serialize_socklen_t(varbuf, addrlen))
+        ERR("CMD_SOCK_GETPEERNAME Response Failed: <addrlen>\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -244,7 +362,7 @@ size_t do_CMD_SOCK_GETSOCKNAME(struct libc_msg *msg)
         goto out;
     }
 
-    if (!varbuf_read_fixdata(varbuf, &addrlen, sizeof(uint32_t))) // Deserialize <socklen_t> from <uint32_t>
+    if (!_deserialize_socklen_t(varbuf, &addrlen))
     {
         ERR("CMD_SOCK_GETSOCKNAME Request Failed: <addrlen>\n");
         goto out;
@@ -256,9 +374,11 @@ size_t do_CMD_SOCK_GETSOCKNAME(struct libc_msg *msg)
     // Call the function
     libc_clear_errno();
     result = (uint64_t)getsockname(sockfd, (struct sockaddr *)&addr, &addrlen);
+    printf("[Superymk] <getsockname> After. sockfd:%u, addr.ss_family:%u, addrlen:%u, result:%d, errno:%u\n",
+           sockfd, (uint32_t)addr.ss_family, (uint32_t)addrlen, (int)result, (uint32_t)errno);
 
 out:
-    if(varbuf)
+    if (varbuf)
         varbuf_access_finish(varbuf);
 
     // Response
@@ -267,11 +387,11 @@ out:
 
     if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
         ERR("CMD_SOCK_GETSOCKNAME Response Failed: <result>\n");
-        
+
     if (!_serialize_sockaddr(varbuf, &addr, addrlen))
         ERR("CMD_SOCK_GETSOCKNAME Response Failed: <addr>\n");
 
-    if (!varbuf_write_data(varbuf, &addrlen, sizeof(uint32_t)))
+    if (!_serialize_socklen_t(varbuf, addrlen))
         ERR("CMD_SOCK_GETSOCKNAME Response Failed: <addrlen>\n");
 
     msg_data_sz = varbuf_size(varbuf);
@@ -295,29 +415,67 @@ size_t do_CMD_SOCK_RECV(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
-    varbuf_read_fixdata(varbuf, &len, sizeof(size_t));
-    varbuf_read_fixdata(varbuf, &flags, sizeof(int));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_RECV Request Failed: <sockfd>\n");
+        goto out;
+    }
+
+    if (!varbuf_deserialize_size_t(varbuf, &len))
+    {
+        ERR("CMD_SOCK_RECV Request Failed: <len>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &flags, sizeof(int)))
+    {
+        ERR("CMD_SOCK_RECV Request Failed: <flags>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    flags = newlib_to_os_socket_send_recv_flags(flags);
 
     buf = malloc(len);
+    if (!buf)
+    {
+        ERR("CMD_SOCK_RECV Request Failed: no mem for <buf>\n");
+        goto out;
+    }
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)recv(sockfd, buf, len, flags);
 
-    // _libc_backend_dbg_print_mem_as_string("CMD_SOCK_RECV", buf, len);
-    // APP_ERR("[Superymk] <do_CMD_SOCK_RECV> sockfd:%d, result:0x%llX, os_errno:%d\n", (int)sockfd, (uint64_t)result, (int)errno);
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
 
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
-    varbuf_write_data(varbuf, buf, len);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_RECV Response Failed\n");
+
+    if (result != -1)
+    {
+        if (!varbuf_write_data(varbuf, buf, (uint32_t)result))
+            ERR("CMD_SOCK_RECV Response Failed: <buf> buf:0x%lX, len:%u\n", (ulong_t)buf, (uint32_t)len);
+    }
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
-    if(buf)
+    if (buf)
         free(buf);
 
     return msg_data_sz;
@@ -329,7 +487,7 @@ size_t do_CMD_SOCK_SEND(struct libc_msg *msg)
     int sockfd = 0;
     size_t len = 0;
     int flags = 0;
-    char *buf = NULL;
+    void *buf = NULL;
 
     uint64_t result = -1;
     int newlib_errno = 0;
@@ -338,26 +496,60 @@ size_t do_CMD_SOCK_SEND(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
-    varbuf_read_fixdata(varbuf, &len, sizeof(size_t));
-    varbuf_read_fixdata(varbuf, &flags, sizeof(int));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SEND Request Failed: <sockfd>\n");
+        goto out;
+    }
+
+    if (!varbuf_deserialize_size_t(varbuf, &len))
+    {
+        ERR("CMD_SOCK_SEND Request Failed: <len>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &flags, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SEND Request Failed: <flags>\n");
+        goto out;
+    }
 
     buf = varbuf_read_vardata(varbuf, NULL);
+    if (!buf)
+    {
+        ERR("CMD_SOCK_SEND Request Failed: <buf>\n");
+        goto out;
+    }
 
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    flags = newlib_to_os_socket_send_recv_flags(flags);
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)send(sockfd, buf, len, flags);
 
-    // _libc_backend_dbg_print_mem_as_string("CMD_SOCK_SEND", buf, len);
-    // APP_ERR("[Superymk] <CMD_SOCK_SEND> sockfd:%d, result:%llu\n", sockfd, result);
-    free(buf);
+out:
+    if (buf)
+        free(buf);
+
+    if (varbuf)
+        varbuf_access_finish(varbuf);
 
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_SEND Response Failed\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -381,33 +573,76 @@ size_t do_CMD_SOCK_GETSOCKOPT(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
-    varbuf_read_fixdata(varbuf, &level, sizeof(int));
-    varbuf_read_fixdata(varbuf, &optname, sizeof(int));
-    varbuf_read_fixdata(varbuf, &optlen, sizeof(socklen_t));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_GETSOCKOPT Request Failed: <sockfd>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &level, sizeof(int)))
+    {
+        ERR("CMD_SOCK_GETSOCKOPT Request Failed: <level>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &optname, sizeof(int)))
+    {
+        ERR("CMD_SOCK_GETSOCKOPT Request Failed: <optname>\n");
+        goto out;
+    }
+
+    if (!_deserialize_socklen_t(varbuf, &optlen))
+    {
+        ERR("CMD_SOCK_GETSOCKOPT Request Failed: <optlen>\n");
+        goto out;
+    }
 
     // Translate newlib's socket input constants to OS-specific posix definitions
     level = newlib_to_os_socket_option_level(level);
     optname = newlib_to_os_socket_option_flags(optname);
 
     buf = (char *)malloc((uint32_t)optlen);
-    // varbuf_read_vardata_direct(varbuf, buf, (uint32_t*)&optlen);
+    if (!buf)
+    {
+        ERR("CMD_SOCK_GETSOCKOPT Request Failed: no memory for <buf>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)getsockopt(sockfd, level, optname, buf, &optlen);
 
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
-    varbuf_write_data(varbuf, buf, sizeof(optlen));
-    varbuf_write_data(varbuf, &optlen, sizeof(optlen));
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_GETSOCKOPT Response Failed\n");
+
+    if (!varbuf_write_data(varbuf, buf, optlen))
+        ERR("CMD_SOCK_GETSOCKNAME Response Failed: <buf>\n");
+
+    if (!_serialize_socklen_t(varbuf, optlen))
+        ERR("CMD_SOCK_GETSOCKNAME Response Failed: <optlen>\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
-    free(buf);
+    if (buf)
+        free(buf);
+
     return msg_data_sz;
 }
 
@@ -419,7 +654,7 @@ size_t do_CMD_SOCK_SETSOCKOPT(struct libc_msg *msg)
     int level = 0;
     int optname = 0;
     socklen_t optlen = 0;
-    char *buf = NULL;
+    void *buf = NULL;
 
     uint64_t result = -1;
     int newlib_errno = 0;
@@ -428,24 +663,80 @@ size_t do_CMD_SOCK_SETSOCKOPT(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &sockfd, sizeof(int));
-    varbuf_read_fixdata(varbuf, &level, sizeof(int));
-    varbuf_read_fixdata(varbuf, &optname, sizeof(int));
-    varbuf_read_fixdata(varbuf, &optlen, sizeof(optlen));
+    if (!varbuf)
+        goto out;
 
-    buf = varbuf_read_vardata(varbuf, NULL);
+    if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SETSOCKOPT Request Failed: <file>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &level, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SETSOCKOPT Request Failed: <level>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &optname, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SETSOCKOPT Request Failed: <optname>\n");
+        goto out;
+    }
+
+    if (!_deserialize_socklen_t(varbuf, &optlen))
+    {
+        ERR("CMD_SOCK_SETSOCKOPT Request Failed: <optlen>\n");
+        goto out;
+    }
+
+    if (optlen)
+    {
+        buf = varbuf_read_vardata(varbuf, NULL);
+        if (!buf)
+        {
+            ERR("CMD_SOCK_SETSOCKOPT Request Failed: <optval>\n");
+            goto out;
+        }
+    }
+    else
+    {
+        if (!varbuf_read_nil(varbuf))
+        {
+            ERR("CMD_SOCK_SETSOCKOPT Request Failed: <optval> as NULL\n");
+            goto out;
+        }
+
+        buf = NULL;
+    }
 
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    level = newlib_to_os_socket_option_level(level);
+    optname = newlib_to_os_socket_option_flags(optname);
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)setsockopt(sockfd, level, optname, buf, optlen);
-    free(buf);
 
-    // Response
+out:
+    if (buf)
+        free(buf);
+
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
+    // return the result
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_SETSOCKOPT Response Failed\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -466,19 +757,52 @@ size_t do_CMD_SOCK_SOCKET(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &domain, sizeof(int));
-    varbuf_read_fixdata(varbuf, &type, sizeof(int));
-    varbuf_read_fixdata(varbuf, &protocol, sizeof(int));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &domain, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKET Request Failed: <domain>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &type, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKET Request Failed: <type>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &protocol, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKET Request Failed: <protocol>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    domain = newlib_to_os_socket_addr_family(domain);
+    type = newlib_to_os_socket_type(type);
+    protocol = newlib_to_os_socket_protocol(protocol);
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)socket(domain, type, protocol);
 
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_SOCKET Response Failed\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -500,21 +824,64 @@ size_t do_CMD_SOCK_SOCKETPAIR(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
-    varbuf_read_fixdata(varbuf, &domain, sizeof(int));
-    varbuf_read_fixdata(varbuf, &type, sizeof(int));
-    varbuf_read_fixdata(varbuf, &protocol, sizeof(int));
-    varbuf_read_fixdata(varbuf, &sv[0], sizeof(int));
-    varbuf_read_fixdata(varbuf, &sv[1], sizeof(int));
+    if (!varbuf)
+        goto out;
+
+    if (!varbuf_read_fixdata(varbuf, &domain, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKETPAIR Request Failed: <domain>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &type, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKETPAIR Request Failed: <type>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &protocol, sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKETPAIR Request Failed: <protocol>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &sv[0], sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKETPAIR Request Failed: <sv[0]>\n");
+        goto out;
+    }
+
+    if (!varbuf_read_fixdata(varbuf, &sv[1], sizeof(int)))
+    {
+        ERR("CMD_SOCK_SOCKETPAIR Request Failed: <sv[1]>\n");
+        goto out;
+    }
+
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    domain = newlib_to_os_socket_addr_family(domain);
+    type = newlib_to_os_socket_type(type);
+    protocol = newlib_to_os_socket_protocol(protocol);
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)socketpair(domain, type, protocol, sv);
 
+out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // Response
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
-    varbuf_util_write_result(varbuf, &result, &newlib_errno);
+    if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
+        ERR("CMD_SOCK_SOCKETPAIR Response Failed\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -534,6 +901,8 @@ size_t do_CMD_SOCK_LISTEN(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
+    if (!varbuf)
+        goto out;
 
     if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
     {
@@ -548,17 +917,25 @@ size_t do_CMD_SOCK_LISTEN(struct libc_msg *msg)
     }
 
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)listen(sockfd, backlog);
 
 out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // return the result
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
     if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
         ERR("CMD_SOCK_LISTEN Response Failed: <result>\n");
+
     msg_data_sz = varbuf_size(varbuf);
     varbuf_access_finish(varbuf);
 
@@ -578,6 +955,8 @@ size_t do_CMD_SOCK_SHUTDOWN(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
+    if (!varbuf)
+        goto out;
 
     if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
     {
@@ -592,14 +971,24 @@ size_t do_CMD_SOCK_SHUTDOWN(struct libc_msg *msg)
     }
 
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
+
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    how = newlib_to_os_socket_shutdown_howto(how);
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)shutdown(sockfd, how);
 
 out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // return the result
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
     if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
         ERR("CMD_SOCK_SHUTDOWN Response Failed: <result>\n");
@@ -609,7 +998,7 @@ out:
     return msg_data_sz;
 }
 
-size_t do_CMD_SOCK_SOCKATMARK(struct libc_msg* msg)
+size_t do_CMD_SOCK_SOCKATMARK(struct libc_msg *msg)
 {
     // Origin: int sockatmark(int sockfd)
     int sockfd = 0;
@@ -621,6 +1010,8 @@ size_t do_CMD_SOCK_SOCKATMARK(struct libc_msg* msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
+    if (!varbuf)
+        goto out;
 
     if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
     {
@@ -629,14 +1020,21 @@ size_t do_CMD_SOCK_SOCKATMARK(struct libc_msg* msg)
     }
 
     varbuf_access_finish(varbuf);
+    varbuf = NULL;
 
     // Call the function
     libc_clear_errno();
     result = (uint64_t)sockatmark(sockfd);
 
 out:
+    if (varbuf)
+        varbuf_access_finish(varbuf);
+
     // return the result
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
     if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
         ERR("CMD_SOCK_SOCKATMARK Response Failed: <result>\n");
@@ -657,7 +1055,7 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
     struct sockaddr_storage addr;
     socklen_t addrlen;
 
-    const size_t buf_max_sz = 4096;
+    const size_t buf_max_sz = 65536;
     uint8_t buf[buf_max_sz];
 
     uint64_t result = -1;
@@ -669,6 +1067,8 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
 
     // Read the request
     varbuf = varbuf_access_start(msg->req_data);
+    if (!varbuf)
+        goto out;
 
     if (!varbuf_read_fixdata(varbuf, &sockfd, sizeof(int)))
     {
@@ -682,7 +1082,7 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
         goto out;
     }
 
-    if (!varbuf_read_fixdata(varbuf, &len, sizeof(uint64_t)))
+    if (!varbuf_deserialize_size_t(varbuf, &len))
     {
         ERR("CMD_SOCK_RECVFROM Request Failed: <len>\n");
         goto out;
@@ -710,16 +1110,22 @@ size_t do_CMD_SOCK_RECVFROM(struct libc_msg *msg)
     varbuf_access_finish(varbuf);
     varbuf = NULL;
 
+    // Translate newlib's socket input constants to OS-specific posix definitions
+    flags = newlib_to_os_socket_send_recv_flags(flags);
+
     // Call the function
     libc_clear_errno();
     result = (uint64_t)recvfrom(sockfd, buf, len, flags, (struct sockaddr *)&addr, &addrlen);
 
 out:
-    if(varbuf)
+    if (varbuf)
         varbuf_access_finish(varbuf);
 
     // return the result
     varbuf = varbuf_access_start(msg->resp_data);
+    if (!varbuf)
+        return 0;
+
     newlib_errno = os_to_newlib_errno(errno);
     if (!varbuf_util_write_result(varbuf, &result, &newlib_errno))
         ERR("CMD_SOCK_RECVFROM Response Failed: <result>\n");
@@ -728,13 +1134,19 @@ out:
     {
         varbuf_write_data(varbuf, buf, min(len, buf_max_sz));
 
-        _serialize_sockaddr(varbuf, &addr, addrlen);
-        varbuf_write_data(varbuf, &addrlen, sizeof(addrlen));
+        if (!_serialize_sockaddr(varbuf, &addr, addrlen))
+            ERR("CMD_SOCK_RECVFROM Response Failed: <addr>\n");
+
+        if (!_serialize_socklen_t(varbuf, addrlen))
+            ERR("CMD_SOCK_RECVFROM Response Failed: <addrlen>\n");
     }
     else if (result == 0)
     {
-        _serialize_sockaddr(varbuf, &addr, addrlen);
-        varbuf_write_data(varbuf, &addrlen, sizeof(addrlen));
+        if (!_serialize_sockaddr(varbuf, &addr, addrlen))
+            ERR("CMD_SOCK_RECVFROM Response Failed: <addr>\n");
+
+        if (!_serialize_socklen_t(varbuf, addrlen))
+            ERR("CMD_SOCK_RECVFROM Response Failed: <addrlen>\n");
     }
 
     msg_data_sz = varbuf_size(varbuf);
