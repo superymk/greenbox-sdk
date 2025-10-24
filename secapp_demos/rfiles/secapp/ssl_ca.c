@@ -273,46 +273,46 @@ void sslca_curl_set(CURL *easy)
     if (!easy)
         return;
 
-    // [TODO][Issue 186] Disabled SSL verification temorally. 
-    sslca_curl_set_no_ssl_verify(easy);
-    return;
+    // // [TODO][Issue 186] Disabled SSL verification temorally. 
+    // sslca_curl_set_no_ssl_verify(easy);
+    // return;
 
-    // /* If you want to see which TLS backend you’re using */
-    // const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
-    // SAP_INFO("SSL backend: %s\n", vi && vi->ssl_version ? vi->ssl_version : "(unknown)");
+    /* If you want to see which TLS backend you’re using */
+    const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
+    SAP_INFO("SSL backend: %s\n", vi && vi->ssl_version ? vi->ssl_version : "(unknown)");
 
-    // /* Prefer in-memory bundle */
-    // if (g_cabuf && g_cabuf_len > 0)
-    // {
-    //     CURLcode rc = curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
-    //     if (rc != CURLE_OK)
-    //     {
-    //         SAP_ERR("CURLOPT_CAINFO_BLOB failed: %s\n", curl_easy_strerror(rc));
-    //     }
-    //     else
-    //     {
-    //         SAP_INFO("SSL-CA: Using CAINFO_BLOB (%lu bytes)\n", g_cabuf_len);
-    //     }
+    /* Prefer in-memory bundle */
+    if (g_cabuf && g_cabuf_len > 0)
+    {
+        CURLcode rc = curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
+        if (rc != CURLE_OK)
+        {
+            SAP_ERR("CURLOPT_CAINFO_BLOB failed: %s\n", curl_easy_strerror(rc));
+        }
+        else
+        {
+            SAP_INFO("SSL-CA: Using CAINFO_BLOB (%lu bytes)\n", g_cabuf_len);
+        }
 
-    //     /* Strong verification */
-    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
-    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-    //     return;
-    // }
+        /* Strong verification */
+        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
+        return;
+    }
 
-    // /* Fallback: file path */
-    // if (g_cafile && *g_cafile)
-    // {
-    //     curl_easy_setopt(easy, CURLOPT_CAINFO, g_cafile);
-    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
-    //     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-    //     SAP_INFO("SSL-CA: Using CAINFO path: %s\n", g_cafile);
-    // }
+    /* Fallback: file path */
+    if (g_cafile && *g_cafile)
+    {
+        curl_easy_setopt(easy, CURLOPT_CAINFO, g_cafile);
+        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
+        SAP_INFO("SSL-CA: Using CAINFO path: %s\n", g_cafile);
+    }
 
-    // /* CAPATH only helps on Unix when directory is c_rehash-hashed */
-    // if (g_capath && *g_capath) {
-    //     curl_easy_setopt(easy, CURLOPT_CAPATH, g_capath);
-    // }
+    /* CAPATH only helps on Unix when directory is c_rehash-hashed */
+    if (g_capath && *g_capath) {
+        curl_easy_setopt(easy, CURLOPT_CAPATH, g_capath);
+    }
 }
 
 const char *sslca_get_cafile(void) { return g_cafile; }
