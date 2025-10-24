@@ -97,14 +97,32 @@ void wnd_rdesktop_refresh_all(void)
 
 void wnd_rdesktop_refresh_dirty(int x, int y, int w, int h)
 {
-    if (_rdesktop_canvas)
-    {
-        lv_area_t dirty;
-        dirty.x1 = x;         /* left */
-        dirty.y1 = y;         /* top */
-        dirty.x2 = x + w - 1; /* right  */
-        dirty.y2 = y + h - 1; /* bottom */
+    if (!_rdesktop_canvas)
+        return;
 
-        lv_obj_invalidate_area(_rdesktop_canvas, &dirty);
-    }
+    /* canvas screen coords */
+    lv_area_t cc;
+    lv_obj_get_coords(_rdesktop_canvas, &cc); // cc.x1,y1..cc.x2,y2 (screen space)
+
+    /* build screen-space dirty rect */
+    lv_area_t dirty;
+    dirty.x1 = cc.x1 + x;
+    dirty.y1 = cc.y1 + y;
+    dirty.x2 = dirty.x1 + w - 1;
+    dirty.y2 = dirty.y1 + h - 1;
+
+    /* clip to canvas bounds (screen space) */
+    if (dirty.x1 < cc.x1)
+        dirty.x1 = cc.x1;
+    if (dirty.y1 < cc.y1)
+        dirty.y1 = cc.y1;
+    if (dirty.x2 > cc.x2)
+        dirty.x2 = cc.x2;
+    if (dirty.y2 > cc.y2)
+        dirty.y2 = cc.y2;
+
+    if (dirty.x1 > dirty.x2 || dirty.y1 > dirty.y2)
+        return;
+
+    lv_obj_invalidate_area(_rdesktop_canvas, &dirty);
 }
