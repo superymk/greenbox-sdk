@@ -1,16 +1,5 @@
 *.[oa]
 # *~
-*.exe
-*.bin
-*.mod.c
-*.cmd
-*.ko
-*.bin.gz
-.tmp_versions
-*.symvers
-*.order
-*.cache
-.tags*
 
 libtask/primes
 libtask/tcpproxy
