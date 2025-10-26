@@ -273,9 +273,9 @@ void sslca_curl_set(CURL *easy)
     if (!easy)
         return;
 
-    // // [TODO][Issue 186] Disabled SSL verification temorally. 
-    // sslca_curl_set_no_ssl_verify(easy);
-    // return;
+    // [TODO][Issue 186] Disabled SSL verification temorally. 
+    sslca_curl_set_no_ssl_verify(easy);
+    return;
 
     /* If you want to see which TLS backend you’re using */
     const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
