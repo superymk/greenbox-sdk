@@ -470,7 +470,7 @@ out:
     if (result != -1)
     {
         if (!varbuf_write_data(varbuf, buf, (uint32_t)result))
-            ERR("CMD_SOCK_RECV Response Failed: <buf> buf:0x%lX, len:%u\n", (ulong_t)buf, (uint32_t)len);
+            ERR("CMD_SOCK_RECV Response Failed: <buf> buf:%p, len:%u\n", buf, (uint32_t)len);
     }
 
     msg_data_sz = varbuf_size(varbuf);

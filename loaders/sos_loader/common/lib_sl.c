@@ -208,7 +208,7 @@ SL_STATUS sl_load_and_run_secos_and_secsrvs(void)
 {
     SL_STATUS status = SL_SUCCESS;
     int ret = 0;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     SL_INFO("Starting SecOS and SecServices...\n");
 
@@ -315,7 +315,7 @@ SL_STATUS sl_terminate_and_unload_secos_and_secsrvs(void)
 {
     SL_STATUS status = SL_SUCCESS;
     int ret = 0;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     SL_INFO("Terminating SecOS and SecServices...\n");
 

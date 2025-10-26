@@ -140,7 +140,7 @@ extern int fs_chmod_file_0664(const char *filepath);
 /// caller can actually mute/unmute the OS.
 /// @param out_already_muted
 /// @return 
-extern int os_sound_mute(const void* owner_lock, uint8_t* out_already_muted);
+extern int os_sound_mute(const void* owner_lock, bool* out_already_muted);
 
 /// @brief Unmute the untrusted OS. 
 /// @param owner_lock A pointer that could identify a caller; e.g., a pointer of a local variable or a function pointer. 
@@ -148,7 +148,7 @@ extern int os_sound_mute(const void* owner_lock, uint8_t* out_already_muted);
 /// caller can actually mute/unmute the OS.
 /// @param already_muted
 /// @return 
-extern int os_sound_unmute(const void* owner_lock, uint8_t already_muted);
+extern int os_sound_unmute(const void* owner_lock, bool already_muted);
 
 #endif // __ASSEMBLY__
 #endif // APP_OS_INTERFACE_H

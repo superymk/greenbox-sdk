@@ -12,7 +12,7 @@ extern int _do_os_sound_unmute(uint8_t already_muted);
 
 static void* _owner_lock = NULL;
 
-int os_sound_mute(const void* owner_lock, uint8_t* out_already_muted)
+int os_sound_mute(const void* owner_lock, bool* out_already_muted)
 {
     int ret = 0;
     OSSTATUS sa_status = OS_SUCCESS;
@@ -39,7 +39,7 @@ int os_sound_mute(const void* owner_lock, uint8_t* out_already_muted)
         // Update the owner after acquiring the spin lock.
         _owner_lock = (void*)owner_lock;
 
-        ret = _do_os_sound_mute(out_already_muted);
+        ret = _do_os_sound_mute((uint8_t*)out_already_muted);
 
         sa_status = secagent_nsdom_global_spinlock_release(GLOBAL_SPINLOCK_OS_SOUND);
         if(SA_FAIL(sa_status))
@@ -60,7 +60,7 @@ int os_sound_mute(const void* owner_lock, uint8_t* out_already_muted)
     return 1;
 }
 
-int os_sound_unmute(const void* owner_lock, uint8_t already_muted)
+int os_sound_unmute(const void* owner_lock, bool already_muted)
 {
     int ret = 0;
     OSSTATUS sa_status = OS_SUCCESS;
@@ -86,7 +86,7 @@ int os_sound_unmute(const void* owner_lock, uint8_t already_muted)
     {
         _owner_lock = NULL;
 
-        ret = _do_os_sound_unmute(already_muted);
+        ret = _do_os_sound_unmute((uint8_t)already_muted);
 
         sa_status = secagent_nsdom_global_spinlock_release(GLOBAL_SPINLOCK_OS_SOUND);
         if(SA_FAIL(sa_status))

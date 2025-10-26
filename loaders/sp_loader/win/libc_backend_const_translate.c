@@ -19,6 +19,8 @@ int os_to_newlib_errno(int os_errno)
 
 
 /********* Socket constants translate *********/
+#include <sys/socket.h>
+
 int newlib_to_os_socket_send_recv_flags(int newlib_socket_constant)
 {
     /* Known newlib flag bits we handle */
@@ -65,31 +67,31 @@ int newlib_to_os_socket_addr_family(int newlib_socket_constant)
         [0]  = AF_UNSPEC,    /* PF_UNSPEC  */
         [1]  = AF_LOCAL,     /* PF_LOCAL / PF_UNIX / PF_FILE */
         [2]  = AF_INET,      /* PF_INET    */
-        [3]  = AF_AX25,      /* PF_AX25    */
-        [4]  = AF_IPX,       /* PF_IPX     */
+        [3]  = AF_UNSPEC,      /* PF_AX25 (Unspec in MSYS2-UCRT64)   */
+        [4]  = AF_UNSPEC,       /* PF_IPX (Unspec in MSYS2-UCRT64)    */
         [5]  = AF_APPLETALK, /* PF_APPLETALK */
-        [6]  = AF_NETROM,    /* PF_NETROM  */
-        [7]  = AF_BRIDGE,    /* PF_BRIDGE  */
-        [8]  = AF_ATMPVC,    /* PF_ATMPVC  */
-        [9]  = AF_X25,       /* PF_X25     */
+        [6]  = AF_UNSPEC,    /* PF_NETROM (Unspec in MSYS2-UCRT64) */
+        [7]  = AF_UNSPEC,    /* PF_BRIDGE (Unspec in MSYS2-UCRT64) */
+        [8]  = AF_UNSPEC,    /* PF_ATMPVC (Unspec in MSYS2-UCRT64) */
+        [9]  = AF_UNSPEC,       /* PF_X25 (Unspec in MSYS2-UCRT64) */
         [10] = AF_INET6,     /* PF_INET6   */
-        [11] = AF_ROSE,      /* PF_ROSE    */
+        [11] = AF_UNSPEC,      /* PF_ROSE (Unspec in MSYS2-UCRT64)   */
         [12] = AF_DECnet,    /* PF_DECnet  */
-        [13] = AF_NETBEUI,   /* PF_NETBEUI */
-        [14] = AF_SECURITY,  /* PF_SECURITY */
-        [15] = AF_KEY,       /* PF_KEY     */
-        [16] = AF_NETLINK,   /* PF_NETLINK (AF_ROUTE is alias) */
-        [17] = AF_PACKET,    /* PF_PACKET  */
-        [18] = AF_ASH,       /* PF_ASH     */
-        [19] = AF_ECONET,    /* PF_ECONET  */
-        [20] = AF_ATMSVC,    /* PF_ATMSVC  */
+        [13] = AF_UNSPEC,   /* PF_NETBEUI (Unspec in MSYS2-UCRT64) */
+        [14] = AF_UNSPEC,  /* PF_SECURITY (Unspec in MSYS2-UCRT64) */
+        [15] = AF_UNSPEC,       /* PF_KEY (Unspec in MSYS2-UCRT64) */
+        [16] = AF_UNSPEC,   /* PF_NETLINK (AF_ROUTE is alias) (Unspec in MSYS2-UCRT64) */
+        [17] = AF_UNSPEC,    /* PF_PACKET (Unspec in MSYS2-UCRT64) */
+        [18] = AF_UNSPEC,       /* PF_ASH (Unspec in MSYS2-UCRT64) */
+        [19] = AF_UNSPEC,    /* PF_ECONET (Unspec in MSYS2-UCRT64) */
+        [20] = AF_UNSPEC,    /* PF_ATMSVC (Unspec in MSYS2-UCRT64) */
         /* [21] gap */
         [22] = AF_SNA,       /* PF_SNA     */
-        [23] = AF_IRDA,      /* PF_IRDA    */
-        [24] = AF_PPPOX,     /* PF_PPPOX   */
-        [25] = AF_WANPIPE,   /* PF_WANPIPE */
+        [23] = AF_UNSPEC,      /* PF_IRDA (Unspec in MSYS2-UCRT64) */
+        [24] = AF_UNSPEC,     /* PF_PPPOX (Unspec in MSYS2-UCRT64) */
+        [25] = AF_UNSPEC,   /* PF_WANPIPE (Unspec in MSYS2-UCRT64) */
         /* [26..30] gaps */
-        [31] = AF_BLUETOOTH, /* PF_BLUETOOTH */
+        [31] = AF_UNSPEC, /* PF_BLUETOOTH (Unspec in MSYS2-UCRT64) */
         [32] = AF_MAX        /* PF_MAX (not an actual family; treat as sentinel if ever seen) */
     };
 
@@ -114,6 +116,61 @@ int newlib_to_os_socket_addr_family(int newlib_socket_constant)
 err:
     APP_ERR("[Socket Addr Family] AF (0x%08X) is invalid!\n", (uint32_t)newlib_socket_constant);
     return -1;
+}
+
+/* Reverse: OS AF_*  -> newlib PF/AF number */
+int os_to_newlib_socket_addr_family(int os_af)
+{
+    /* Reuse the same forward map to stay consistent. */
+    static const int map[33] = {
+        [0]  = AF_UNSPEC,    /* PF_UNSPEC  */
+        [1]  = AF_LOCAL,     /* PF_LOCAL / PF_UNIX / PF_FILE */
+        [2]  = AF_INET,      /* PF_INET    */
+        // [3]  = AF_AX25,      /* PF_AX25 (Unspec in MSYS2-UCRT64)   */
+        // [4]  = AF_IPX,       /* PF_IPX (Unspec in MSYS2-UCRT64)    */
+        [5]  = AF_APPLETALK, /* PF_APPLETALK */
+        // [6]  = AF_NETROM,    /* PF_NETROM (Unspec in MSYS2-UCRT64) */
+        // [7]  = AF_BRIDGE,    /* PF_BRIDGE (Unspec in MSYS2-UCRT64) */
+        // [8]  = AF_ATMPVC,    /* PF_ATMPVC (Unspec in MSYS2-UCRT64) */
+        // [9]  = AF_X25,       /* PF_X25 (Unspec in MSYS2-UCRT64)    */
+        [10] = AF_INET6,     /* PF_INET6   */
+        // [11] = AF_ROSE,      /* PF_ROSE (Unspec in MSYS2-UCRT64)   */
+        [12] = AF_DECnet,    /* PF_DECnet  */
+        // [13] = AF_NETBEUI,   /* PF_NETBEUI (Unspec in MSYS2-UCRT64) */
+        // [14] = AF_SECURITY,  /* PF_SECURITY (Unspec in MSYS2-UCRT64) */
+        // [15] = AF_KEY,       /* PF_KEY (Unspec in MSYS2-UCRT64)     */
+        // [16] = AF_NETLINK,   /* PF_NETLINK (AF_ROUTE is alias) (Unspec in MSYS2-UCRT64) */
+        // [17] = AF_PACKET,    /* PF_PACKET (Unspec in MSYS2-UCRT64) */
+        // [18] = AF_ASH,       /* PF_ASH (Unspec in MSYS2-UCRT64)     */
+        // [19] = AF_ECONET,    /* PF_ECONET (Unspec in MSYS2-UCRT64) */
+        // [20] = AF_ATMSVC,    /* PF_ATMSVC (Unspec in MSYS2-UCRT64) */
+        /* [21] gap */
+        [22] = AF_SNA,       /* PF_SNA     */
+        // [23] = AF_IRDA,      /* PF_IRDA (Unspec in MSYS2-UCRT64)   */
+        // [24] = AF_PPPOX,     /* PF_PPPOX (Unspec in MSYS2-UCRT64)  */
+        // [25] = AF_WANPIPE,   /* PF_WANPIPE (Unspec in MSYS2-UCRT64) */
+        /* [26..30] gaps */
+        // [31] = AF_BLUETOOTH, /* PF_BLUETOOTH (Unspec in MSYS2-UCRT64) */
+        [32] = AF_MAX        /* PF_MAX (sentinel; not valid) */
+    };
+
+#ifdef AF_ROUTE
+    /* Normalize well-known alias: treat AF_ROUTE like AF_NETLINK. */
+    if (os_af == AF_ROUTE)
+        os_af = AF_NETLINK;
+#endif
+
+    /* Scan for the first index whose AF matches. Skip gaps and PF_MAX. */
+    for (int i = 0; i < 33; ++i) {
+        if (i == 32)                /* PF_MAX is not a valid family */
+            continue;
+        if (i != 0 && map[i] == 0)  /* holes (e.g., 21, 26..30) */
+            continue;
+        if (map[i] == os_af)
+            return i;               /* return newlib PF/AF number */
+    }
+
+    return -1; /* unknown / unsupported AF */
 }
 
 int newlib_to_os_socket_protocol(int newlib_socket_constant)
@@ -166,10 +223,10 @@ int newlib_to_os_socket_option_flags(int newlib_socket_constant)
             return SO_LINGER; /* linger on close if data present */
         case 0x0100:
             return SO_OOBINLINE; /* leave received OOB data in line */
-        case 0x0200:
-            return SO_REUSEPORT; /* allow local address & port reuse */
-        case 0x0400:
-            return SO_TIMESTAMP; /* timestamp received dgram traffic */
+        // case 0x0200:
+        //     return SO_REUSEPORT; /* allow local address & port reuse */
+        // case 0x0400:
+        //     return SO_TIMESTAMP; /* timestamp received dgram traffic */
         // case 0x1000:
         //     return SO_ACCEPTFILTER; /* there is an accept filter */
         
