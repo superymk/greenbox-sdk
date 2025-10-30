@@ -15,159 +15,184 @@
 // #include <app_sp_hid_bridge_defs.h>
 
 /// @brief Timeout (in milli-seconds) to communication with HID-Bridge backend.
-#define HID_BRIDGE_COMM_TIMEOUT_MS	(300)
+#define HID_BRIDGE_COMM_TIMEOUT_MS (300)
 
-static struct ipc_msg* _hid_bridge_create_msg(bool req_response, uint32_t cmd)
+static struct ipc_msg *_hid_bridge_create_msg(bool req_response, uint32_t cmd)
 {
-	struct ipc_msg* msg = NULL;
+    struct ipc_msg *msg = NULL;
 
-	// Build the request
-	msg = sp_comm_app_create_msg(req_response);
-	msg->header.cmd_type = HID_BRIDGE_OPS;
-	msg->header.cmd = cmd;
+    // Build the request
+    msg = sp_comm_app_create_msg(req_response);
+    msg->header.cmd_type = HID_BRIDGE_OPS;
+    msg->header.cmd = cmd;
 
-	return msg;
+    return msg;
 }
 
-SAP_STATUS hid_bridge_sent_kbd_event(struct kbd_key_event* event)
+SAP_STATUS hid_bridge_sent_kbd_event(struct kbd_key_event *event, bool block_wait)
 {
     struct hid_event hid_event = {0};
-	struct ipc_msg* req_msg = NULL;
-	struct ipc_msg* resp_msg = NULL;
-	varbuf_t* varbuf = NULL;
-	size_t msg_data_sz = 0;
+    struct ipc_msg *req_msg = NULL;
+    struct ipc_msg *resp_msg = NULL;
+    varbuf_t *varbuf = NULL;
+    size_t msg_data_sz = 0;
+    bool req_response = block_wait ? true : false;
 
-	if(!event)
-		return EINVAL;
+    if (!event)
+        return EINVAL;
 
-	// Build the request
-	req_msg = _hid_bridge_create_msg(true, CMD_HID_NEW_EVENT);
-	if(!req_msg)
-		goto err;
+    // Build the request
+    req_msg = _hid_bridge_create_msg(req_response, CMD_HID_NEW_EVENT);
+    if (!req_msg)
+        goto err;
 
-	// Build HID event to sent
-	hid_event.hid_dev = HID_KEYBOARD;
-	memcpy(&hid_event.kbd_event, event, sizeof(struct kbd_key_event));
-	
-	// Serialize params
-	varbuf = varbuf_access_start(req_msg->req_data);
-	if(!varbuf)
-		goto err;
-	if(!varbuf_write_data(varbuf, &hid_event, sizeof(struct hid_event)))
-		goto err;
-	msg_data_sz = varbuf_size(varbuf);
-	varbuf_access_finish(varbuf);
+    // Build HID event to sent
+    hid_event.hid_dev = HID_KEYBOARD;
+    memcpy(&hid_event.kbd_event, event, sizeof(struct kbd_key_event));
 
-	// Send the request, and block waiting on the response
-	resp_msg = sp_comm_app_send_msg_and_wait(req_msg, msg_data_sz, HID_BRIDGE_COMM_TIMEOUT_MS);
-	if(!resp_msg)
-		goto err;
+    // Serialize params
+    varbuf = varbuf_access_start(req_msg->req_data);
+    if (!varbuf)
+        goto err;
+    if (!varbuf_write_data(varbuf, &hid_event, sizeof(struct hid_event)))
+        goto err;
+    msg_data_sz = varbuf_size(varbuf);
+    varbuf_access_finish(varbuf);
 
-	// get result
-	varbuf = varbuf_access_start(resp_msg->req_data);
-	if(!varbuf)
-		goto err;
-	varbuf_access_finish(varbuf);
+    // Send the request
+    if (block_wait)
+    {
+        // Block waiting on the response
+        resp_msg = sp_comm_app_send_msg_and_wait(req_msg, msg_data_sz, HID_BRIDGE_COMM_TIMEOUT_MS);
+        if (!resp_msg)
+            goto err;
 
-	sp_comm_app_free_msg(req_msg, resp_msg);
+        // get result
+        varbuf = varbuf_access_start(resp_msg->req_data);
+        if (!varbuf)
+            goto err;
+        varbuf_access_finish(varbuf);
+    }
+    else
+    {
+        // No block waiting
+        bool ret = false;
 
-	// On success
-	return SUCCESS;
+        ret = sp_comm_app_send_msg_nowait(req_msg, msg_data_sz);
+        if (!ret)
+            goto err;
+    }
 
+    sp_comm_app_free_msg(req_msg, resp_msg);
+
+    // On success
+    return SUCCESS;
 
 err:
-	sp_comm_app_free_msg(req_msg, resp_msg);
-	return EINTERNAL;
+    sp_comm_app_free_msg(req_msg, resp_msg);
+    return EINTERNAL;
 }
 
-SAP_STATUS hid_bridge_sent_mouse_event(struct mouse_event* event)
+SAP_STATUS hid_bridge_sent_mouse_event(struct mouse_event *event, bool block_wait)
 {
     struct hid_event hid_event = {0};
-	struct ipc_msg* req_msg = NULL;
-	struct ipc_msg* resp_msg = NULL;
-	varbuf_t* varbuf = NULL;
-	size_t msg_data_sz = 0;
+    struct ipc_msg *req_msg = NULL;
+    struct ipc_msg *resp_msg = NULL;
+    varbuf_t *varbuf = NULL;
+    size_t msg_data_sz = 0;
+    bool req_response = block_wait ? true : false;
 
-	if(!event)
-		return EINVAL;
+    if (!event)
+        return EINVAL;
 
-	// Build the request
-	req_msg = _hid_bridge_create_msg(true, CMD_HID_NEW_EVENT);
+    // Build the request
+    req_msg = _hid_bridge_create_msg(req_response, CMD_HID_NEW_EVENT);
 
-	// Build HID event to sent
-	hid_event.hid_dev = HID_MOUSE;
-	memcpy(&hid_event.mouse_event, event, sizeof(struct mouse_event));
-	
-	// Serialize params
-	varbuf = varbuf_access_start(req_msg->req_data);
-	if(!varbuf)
-		goto err;
-	if(!varbuf_write_data(varbuf, &hid_event, sizeof(struct hid_event)))
-		goto err;
-	msg_data_sz = varbuf_size(varbuf);
-	varbuf_access_finish(varbuf);
+    // Build HID event to sent
+    hid_event.hid_dev = HID_MOUSE;
+    memcpy(&hid_event.mouse_event, event, sizeof(struct mouse_event));
 
-	// Send the request, and block waiting on the response
-	resp_msg = sp_comm_app_send_msg_and_wait(req_msg, msg_data_sz, HID_BRIDGE_COMM_TIMEOUT_MS);
-	if(!resp_msg)
-		goto err;
+    // Serialize params
+    varbuf = varbuf_access_start(req_msg->req_data);
+    if (!varbuf)
+        goto err;
+    if (!varbuf_write_data(varbuf, &hid_event, sizeof(struct hid_event)))
+        goto err;
+    msg_data_sz = varbuf_size(varbuf);
+    varbuf_access_finish(varbuf);
 
-	// get result
-	varbuf = varbuf_access_start(resp_msg->req_data);
-	if(!varbuf)
-		goto err;
-	varbuf_access_finish(varbuf);
+    // Send the request
+    if (block_wait)
+    {
+        // Block waiting on the response
+        resp_msg = sp_comm_app_send_msg_and_wait(req_msg, msg_data_sz, HID_BRIDGE_COMM_TIMEOUT_MS);
+        if (!resp_msg)
+            goto err;
 
-	sp_comm_app_free_msg(req_msg, resp_msg);
+        // get result
+        varbuf = varbuf_access_start(resp_msg->req_data);
+        if (!varbuf)
+            goto err;
+        varbuf_access_finish(varbuf);
+    }
+    else
+    {
+        // No block waiting
+        bool ret = false;
 
-	// On success
-	return SUCCESS;
+        ret = sp_comm_app_send_msg_nowait(req_msg, msg_data_sz);
+        if (!ret)
+            goto err;
+    }
 
+    sp_comm_app_free_msg(req_msg, resp_msg);
+
+    // On success
+    return SUCCESS;
 
 err:
-	sp_comm_app_free_msg(req_msg, resp_msg);
-	return EINTERNAL;
+    sp_comm_app_free_msg(req_msg, resp_msg);
+    return EINTERNAL;
 }
 
 /// @brief [Private Function][For DesktopMgr] Invoke DesktopMgr backend thread to set its priority to high.
-/// @param  
-/// @return 
+/// @param
+/// @return
 SAP_STATUS hid_bridge_dtm_set_high_priority(void)
 {
-	struct ipc_msg* req_msg = NULL;
-	struct ipc_msg* resp_msg = NULL;
-	varbuf_t* varbuf = NULL;
-	uint64_t result = -1;
+    struct ipc_msg *req_msg = NULL;
+    struct ipc_msg *resp_msg = NULL;
+    varbuf_t *varbuf = NULL;
+    uint64_t result = -1;
 
-	// Build the request
-	req_msg = _hid_bridge_create_msg(true, CMD_HID_DTM_REQ_HIGH_PRIORITY);
+    // Build the request
+    req_msg = _hid_bridge_create_msg(true, CMD_HID_DTM_REQ_HIGH_PRIORITY);
 
-	// Send the request, and block waiting on the response
-	resp_msg = sp_comm_app_send_msg_and_wait(req_msg, 0, HID_BRIDGE_COMM_TIMEOUT_MS);
-	if(!resp_msg)
-		goto err;
+    // Send the request, and block waiting on the response
+    resp_msg = sp_comm_app_send_msg_and_wait(req_msg, 0, HID_BRIDGE_COMM_TIMEOUT_MS);
+    if (!resp_msg)
+        goto err;
 
-	// get result
-	varbuf = varbuf_access_start(resp_msg->req_data);
-	if(!varbuf)
-		goto err;
-	if (!varbuf_read_fixdata(varbuf, &result, sizeof(result)))
+    // get result
+    varbuf = varbuf_access_start(resp_msg->req_data);
+    if (!varbuf)
+        goto err;
+    if (!varbuf_read_fixdata(varbuf, &result, sizeof(result)))
     {
         BRIDGE_HID_ERR("Failed to get status!\n");
         goto err;
     }
-	varbuf_access_finish(varbuf);
+    varbuf_access_finish(varbuf);
 
-	sp_comm_app_free_msg(req_msg, resp_msg);
+    sp_comm_app_free_msg(req_msg, resp_msg);
 
-	if (result)
+    if (result)
         return EINTERNAL;
 
-	// On success
-	return SUCCESS;
-
+    // On success
+    return SUCCESS;
 
 err:
-	sp_comm_app_free_msg(req_msg, resp_msg);
-	return EINTERNAL;
+    sp_comm_app_free_msg(req_msg, resp_msg);
+    return EINTERNAL;
 }

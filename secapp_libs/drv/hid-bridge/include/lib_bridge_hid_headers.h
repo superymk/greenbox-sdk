@@ -51,9 +51,11 @@ struct hid_event
 	};
 };
 
-extern SAP_STATUS hid_bridge_sent_kbd_event(struct kbd_key_event* event);
+///
+extern SAP_STATUS hid_bridge_sent_kbd_event(struct kbd_key_event* event, bool block_wait);
 
-extern SAP_STATUS hid_bridge_sent_mouse_event(struct mouse_event* event);
+///
+extern SAP_STATUS hid_bridge_sent_mouse_event(struct mouse_event* event, bool block_wait);
 
 #endif // __ASSEMBLY__
 #endif // LIBBRIDGE_HEADERS_H
