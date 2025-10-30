@@ -59,6 +59,10 @@ typedef u8 uint8_t;
 typedef u32 sp_id_t;
 typedef uint32_t lapic_id_t;
 
+/// @brief both i386 and amd64 uses 32-bit int for <lock_t>.
+/// [NOTE] <lock_t> must have the same definition with it defined in SecOS.
+typedef int lock_t;
+
 #ifndef _PROCESS_ID_T
 #define _PROCESS_ID_T
 	typedef ulong_t process_id;

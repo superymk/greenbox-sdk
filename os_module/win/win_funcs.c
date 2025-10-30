@@ -60,10 +60,10 @@ void os_init(void)
 	os->write_msr = win_write_msr;
 	os->atomic_increase = win_atomic_increase;
     os->atomic_decrease = win_atomic_decrease;
-    os->spinlock_init = win_spin_lock_init;
-	os->spinlock_lock = win_spin_lock;
-    os->spinlock_trylock = win_spin_trylock;
-	os->spinlock_unlock = win_spin_unlock;
+    os->spinlock_init = win_sos_spin_lock_init;
+	os->spinlock_lock = win_sos_spin_lock;
+    os->spinlock_trylock = win_sos_spin_trylock;
+	os->spinlock_unlock = win_sos_spin_unlock;
 	os->udelay = win_udelay;
 	os->inb = win_inb;
 	os->inw = win_inw;

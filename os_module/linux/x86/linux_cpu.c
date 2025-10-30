@@ -38,30 +38,72 @@ void linux_atomic_decrease(uint32_t *var)
     os->cache_flush_range((vaddr_t)var, sizeof(uint32_t));
 }
 
-void linux_spin_lock_init(volatile lock_t *lock)
+// void linux_native_spin_lock_init(volatile os_native_lock_t *lock)
+// {
+//     spin_lock_init((os_native_lock_t *)lock);
+// }
+
+// void linux_native_spin_lock(volatile os_native_lock_t *lock)
+// {
+//     spin_lock_irq((os_native_lock_t *)lock);
+// }
+
+// bool linux_native_spin_trylock(volatile os_native_lock_t *lock)
+// {
+//     if (spin_trylock((os_native_lock_t *)lock))
+//         return true;
+//     else
+//         return false;
+// }
+
+// void linux_native_spin_unlock(volatile os_native_lock_t *lock)
+// {
+//     spin_unlock_irq((os_native_lock_t *)lock);
+// }
+
+void linux_sos_spin_lock_init(volatile lock_t *lock)
 {
-    spin_lock_init((lock_t *)lock);
+    *lock = 1;
 }
 
-void linux_spin_lock(volatile lock_t *lock)
+bool linux_sos_spin_trylock(volatile lock_t* lock)
 {
-    spin_lock_irq((lock_t *)lock);
+    unsigned char prev;
+    asm volatile("lock; btrl $0, %1\n\t"
+                 "setc %0"
+                 : "=r"(prev), "+m"(*lock)
+                 :
+                 : "cc", "memory");
+    return prev; /* prev==1 → we cleared 1→0 and acquired */
 }
 
-bool linux_spin_trylock(volatile lock_t *lock)
+void linux_sos_spin_lock(volatile lock_t* lock)
 {
-    if (spin_trylock((lock_t *)lock))
-        return true;
-    else
-        return false;
+    for (;;) {
+        /* Cheap test before issuing a locked RMW */
+        if (READ_ONCE(*lock) & 1u) {
+            if (linux_sos_spin_trylock(lock))
+                return;
+        }
+        /* Contended: spin politely until it looks free again */
+        do {
+            cpu_relax();
+        } while (!(READ_ONCE(*lock) & 1u));
+    }
 }
 
-void linux_spin_unlock(volatile lock_t *lock)
+void linux_sos_spin_unlock(volatile lock_t* lock)
 {
-    spin_unlock_irq((lock_t *)lock);
+    asm volatile (""); // acts as a memory barrier.
+
+    // locked RMW provides release semantics on x86
+    asm volatile("lock; btsl $0, %0"
+                 : "+m"(*lock)
+                 :
+                 : "cc", "memory");
 }
 
-// void linux_spin_lock(volatile lock_t* lock)
+// void linux_sos_spin_lock(volatile lock_t* lock)
 // {
 // 	asm volatile(
 // 		"xorl %%ecx, %%ecx;"

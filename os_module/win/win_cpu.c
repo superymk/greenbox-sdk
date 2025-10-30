@@ -51,53 +51,84 @@ void win_atomic_decrease(uint32_t *var)
     os->cache_flush_range((vaddr_t)var, sizeof(uint32_t));
 }
 
-void win_spin_lock_init(volatile lock_t *lock)
-{
-    if (!lock)
-    {
-        DRV_ERR("Invalid spin lock to init\n");
-        return;
-    }
+// void win_native_spin_lock_init(volatile os_native_lock_t *lock)
+// {
+//     if (!lock)
+//     {
+//         DRV_ERR("Invalid spin lock to init\n");
+//         return;
+//     }
 
-    KeInitializeSpinLock(&((lock_t *)lock)->lock);
+//     KeInitializeSpinLock(&((os_native_lock_t *)lock)->lock);
+// }
+
+// void win_native_spin_lock(volatile os_native_lock_t *lock)
+// {
+//     if (!lock)
+//     {
+//         DRV_ERR("Invalid spin lock to acquire\n");
+//         return;
+//     }
+
+//     KeAcquireSpinLock(&((os_native_lock_t *)lock)->lock, &lock->irql);
+// }
+
+// bool win_native_spin_trylock(volatile os_native_lock_t *lock)
+// {
+//     if (!lock)
+//     {
+//         return false;
+//     }
+
+//     if (!KeTestSpinLock(&((os_native_lock_t *)lock)->lock))
+//     {
+//         return false;
+//     }
+
+//     KeAcquireSpinLock(&((os_native_lock_t *)lock)->lock, &lock->irql);
+//     return true;
+// }
+
+// void win_native_spin_unlock(volatile os_native_lock_t *lock)
+// {
+//     if (!lock)
+//     {
+//         DRV_ERR("Invalid spin lock to release\n");
+//         return;
+//     }
+
+//     KeReleaseSpinLock(&((os_native_lock_t *)lock)->lock, lock->irql);
+// }
+
+void win_sos_spin_lock_init(volatile lock_t *lock)
+{
+    *lock = 1;
 }
 
-void win_spin_lock(volatile lock_t *lock)
+bool win_sos_spin_trylock(volatile lock_t* lock)
 {
-    if (!lock)
-    {
-        DRV_ERR("Invalid spin lock to acquire\n");
-        return;
-    }
-
-    KeAcquireSpinLock(&((lock_t *)lock)->lock, &lock->irql);
+    /* Returns previous bit value and clears it */
+    return _interlockedbittestandreset(l, 0) ? 1 : 0;
 }
 
-bool win_spin_trylock(volatile lock_t *lock)
+void win_sos_spin_lock(volatile lock_t* lock)
 {
-    if (!lock)
-    {
-        return false;
+    for (;;) {
+        if (_bittest((const long*)lock, 0)) {           /* looks free */
+            if (win_sos_spin_trylock(lock))
+                break;
+        }
+        do {
+            YieldProcessor();                        /* PAUSE */
+        } while (!_bittest((const long*)lock, 0));
     }
-
-    if (!KeTestSpinLock(&((lock_t *)lock)->lock))
-    {
-        return false;
-    }
-
-    KeAcquireSpinLock(&((lock_t *)lock)->lock, &lock->irql);
-    return true;
+    KeMemoryBarrier(); /* pair with subsequent critical-section loads */
 }
 
-void win_spin_unlock(volatile lock_t *lock)
+void win_sos_spin_unlock(volatile lock_t* lock)
 {
-    if (!lock)
-    {
-        DRV_ERR("Invalid spin lock to release\n");
-        return;
-    }
-
-    KeReleaseSpinLock(&((lock_t *)lock)->lock, lock->irql);
+    KeMemoryBarrier();                 /* publish writes before unlock */
+    (void)_interlockedbittestandset(l, 0); /* set bit0 back to 1 */
 }
 
 uint8_t win_inb(uint16_t port)

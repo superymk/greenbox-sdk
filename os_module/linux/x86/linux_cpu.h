@@ -20,10 +20,10 @@ extern void linux_write_msr(uint32_t reg, uint32_t low, uint32_t high);
 extern void linux_atomic_increase(uint32_t *var);
 extern void linux_atomic_decrease(uint32_t *var);
 
-extern void linux_spin_lock_init(volatile lock_t* lock);
-extern void linux_spin_lock(volatile lock_t* lock);
-extern bool linux_spin_trylock(volatile lock_t* lock);
-extern void linux_spin_unlock(volatile lock_t* lock);
+extern void linux_sos_spin_lock_init(volatile lock_t* lock);
+extern void linux_sos_spin_lock(volatile lock_t* lock);
+extern bool linux_sos_spin_trylock(volatile lock_t* lock);
+extern void linux_sos_spin_unlock(volatile lock_t* lock);
 
 extern void linux_udelay(uint32_t usec);
 extern void linux_msleep(uint32_t msec);

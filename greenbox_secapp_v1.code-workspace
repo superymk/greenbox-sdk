@@ -58,7 +58,8 @@
             "*.c_temp": "c",
             "xlocmon": "c",
             "rfiles_header.h": "c",
-            "app_sp_intfs.h": "c"
+            "app_sp_intfs.h": "c",
+            "app_comm.h": "c"
         }
     }
 }

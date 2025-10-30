@@ -52,7 +52,7 @@ struct s_mem_info_entry
 };
 
 /// @brief Use spinlock to ensure that reads and writes to <s_mem_info> must be serialized
-static lock_t s_mem_info_lock;
+DECL_ALIGN(4) static lock_t s_mem_info_lock;
 static struct s_mem_info_entry s_mem_info[S_MEM_INFO_ENTRIES] = {0};
 
 static void _clean_entry(struct s_mem_info_entry* entry)

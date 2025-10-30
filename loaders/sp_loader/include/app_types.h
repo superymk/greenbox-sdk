@@ -43,7 +43,7 @@ typedef ulong_t spaddr_t;
 typedef ulong_t irq_t;
 typedef ulong_t offset_t; // [NOTE] offset_t must be of the same length with vaddr_t, because
 							// it is used in address offset calculation
-typedef ulong_t lock_t;	// [NOTE] lock_t must have the same definition with it defined in <vk_lock.h>
+typedef int lock_t;	// [NOTE] lock_t must have the same definition with it defined in <vk_lock.h>
 
 #define INVALID_PADDR	0
 #define INVALID_VADDR	0

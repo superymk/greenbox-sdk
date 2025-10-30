@@ -88,7 +88,7 @@ typedef struct
 {
 	KSPIN_LOCK lock;
 	KIRQL irql;
-} lock_t;
+} os_native_lock_t;
 
 typedef struct _DEVICE_EXTENSION {
     PDEVICE_OBJECT DeviceObject;
