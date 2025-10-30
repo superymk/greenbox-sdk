@@ -26,7 +26,7 @@ struct msg_wait_info
 static List* wait_msg_cache = NULL;
 
 //! The lock is for manipulate both <wait_msg_cache>
-DECL_ALIGN(4) static lock_t wait_cache_lock;
+static lock_t wait_cache_lock;
 
 //! Get and remove the waiting message
 static struct comm_os_msg* _handler_pop_waitmsg(msg_id_t req_id);

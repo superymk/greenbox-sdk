@@ -16,7 +16,6 @@
 #include <ipc/app_comm.h>
 #include <ipc/app_comm_ops.h>
 #include "app_event_handler.h"
-#include "lock.h"
 
 #pragma GCC diagnostic ignored "-Waddress-of-packed-member"
 
@@ -89,7 +88,8 @@ static bool _copy_from_comm_buf(volatile struct ipc_msg *comm_buf, uint32_t c_sl
 
 static bool _try_rb_enqueue(struct comm_secapp *comm_sp, struct ipc_msg *in_msg)
 {
-    bool status = false;
+    // OSSTATUS sa_sts = OS_SUCCESS;
+    bool sa_sts = true;
     volatile struct ipc_msg *comm_buf = NULL;
     volatile struct ipc_ctl *comm_ctl = NULL;
     struct comm_ipc_channel *chan = &comm_sp->send_chan;
@@ -102,7 +102,6 @@ static bool _try_rb_enqueue(struct comm_secapp *comm_sp, struct ipc_msg *in_msg)
     comm_buf = CHAN_SAP_BUF(chan);
 
     // Get current producer counter
-    os_sos_spin_lock(&chan->chan_lock);
     p_slot = _comm_ctl_get_p_slot(comm_ctl);
 	next_p_slot = _rb_increment(p_slot);
 	c_slot = _comm_ctl_get_c_slot(comm_ctl);
@@ -114,8 +113,8 @@ static bool _try_rb_enqueue(struct comm_secapp *comm_sp, struct ipc_msg *in_msg)
         msg_size = min(msg_size, IPC_MSG_SIZE);
 
         // Commit message
-        status = _copy_to_comm_buf(comm_buf, p_slot, in_msg, msg_size); // [TODO][Ticket 120] We do not need to copy it here.
-        if (!status)
+        sa_sts = _copy_to_comm_buf(comm_buf, p_slot, in_msg, msg_size); // [TODO][Ticket 120] We do not need to copy it here.
+        if (!sa_sts)
             goto out;
 
         // Increase the producer counter
@@ -125,22 +124,28 @@ static bool _try_rb_enqueue(struct comm_secapp *comm_sp, struct ipc_msg *in_msg)
         // Update perf counters
         atomic_increase(&chan->counter_msgs);
 
-        APPCOMM_DEBUG("<_try_rb_enqueue> c_slot:%u p_slot:%u\n", comm_ctl->c_slot, comm_ctl->p_slot);
+        // // Flush the memory cache of the application side to make sure the data is written to memory
+        // sa_sts = cache_flush_range((vaddr_t)comm_ctl, sizeof(struct ipc_ctl));
+        // if (!sa_sts)
+        //     APPCOMM_ERR("<_try_rb_enqueue> Failed to flush cache of comm_ctl!\n");
+        // sa_sts = cache_flush_range((vaddr_t)comm_buf, sizeof(struct ipc_msg));
+        // if (!sa_sts)
+        //     APPCOMM_ERR("<_try_rb_enqueue> Failed to flush cache of comm_buf!\n");
 
-        status = true;
-        goto out;
+        APPCOMM_DEBUG("<_try_rb_enqueue> c_slot:%u p_slot:%u\n",
+                      comm_ctl->c_slot, comm_ctl->p_slot);
+
+        return true;
     }
 
-    status = false;
-
 out:
-    os_sos_spin_unlock(&chan->chan_lock);
     return false;
 }
 
 static bool _try_rb_dequeue(struct comm_secapp *comm_sp, struct ipc_msg *out_msg)
 {
-    bool status = false;
+    // OSSTATUS sa_sts = OS_SUCCESS;
+    bool sa_sts = true;
     volatile struct ipc_msg *comm_buf = NULL;
     volatile struct ipc_ctl *comm_ctl = NULL;
     struct comm_ipc_channel *chan = &comm_sp->recv_chan;
@@ -150,8 +155,15 @@ static bool _try_rb_dequeue(struct comm_secapp *comm_sp, struct ipc_msg *out_msg
     comm_ctl = CHAN_SAP_CTL(chan);
     comm_buf = CHAN_SAP_BUF(chan);
 
+    // // Flush the memory cache of the application side to make sure the data is freshly read from memory
+    // sa_sts = cache_flush_range((vaddr_t)comm_ctl, sizeof(struct ipc_ctl));
+    // if (!sa_sts)
+    //     APPCOMM_ERR("<_try_rb_dequeue> Failed to flush cache of comm_ctl!\n");
+    // sa_sts = cache_flush_range((vaddr_t)comm_buf, sizeof(struct ipc_msg));
+    // if (!sa_sts)
+    //     APPCOMM_ERR("<_try_rb_dequeue> Failed to flush cache of comm_buf!\n");
+
     // Get current consumer counter
-    os_sos_spin_lock(&chan->chan_lock);
     p_slot = _comm_ctl_get_p_slot(comm_ctl);
 	c_slot = _comm_ctl_get_c_slot(comm_ctl);
 
@@ -164,16 +176,16 @@ static bool _try_rb_dequeue(struct comm_secapp *comm_sp, struct ipc_msg *out_msg
         memset(&msg_header, 0, sizeof(msg_header)); // [NOTE] Use memset to initialize <msg_header> instead of initializing
                                                     // it in the local variable, as gcc may allocate non 16-byte aligned space for <msg_header> and use
                                                     // <movaps> instruction.
-        status = _copy_from_comm_buf(comm_buf, c_slot, &msg_header, IPC_MSG_HEADER_SIZE);
-        if (!status)
+        sa_sts = _copy_from_comm_buf(comm_buf, c_slot, &msg_header, IPC_MSG_HEADER_SIZE);
+        if (!sa_sts)
             goto out;
 
         msg_size = IPC_MSG_HEADER_SIZE + msg_header.data_size;
         msg_size = min(msg_size, IPC_MSG_SIZE); // [TODO] need to implement message split later
 
         // Step 2. Read the whole message (w/ the header)
-        status = _copy_from_comm_buf(comm_buf, c_slot, out_msg, msg_size); // [TODO][Ticket 120] We do not need to copy it here.
-        if (!status)
+        sa_sts = _copy_from_comm_buf(comm_buf, c_slot, out_msg, msg_size); // [TODO][Ticket 120] We do not need to copy it here.
+        if (!sa_sts)
             goto out;
 
         // Increase the consumer counter
@@ -187,14 +199,10 @@ static bool _try_rb_dequeue(struct comm_secapp *comm_sp, struct ipc_msg *out_msg
                       "msg_size:%u\n",
                       TO_PTR((vaddr_t)&comm_buf[c_slot]), c_slot, msg_size);
 
-        status = true;
-        goto out;
+        return true;
     }
 
-    status = false;
-
 out:
-    os_sos_spin_unlock(&chan->chan_lock);
     return false;
 }
 
@@ -368,13 +376,11 @@ static void _do_comm_app_sp_init(SP_USTRUCT *params, COMM_SP_APP *out_comm)
     comm_sp->send_chan.comm_buf_vaddr = comm_sp->send_chan.comm_ctl_vaddr + PAGE_SIZE_4K;
     comm_sp->send_chan.counter_msgs = 0;
     comm_sp->send_chan.next_msg_id = 0;
-    os_sos_spin_lock_init(&comm_sp->send_chan.chan_lock);
 
     comm_sp->recv_chan.comm_ctl_vaddr = out_comm->app_comm_vaddr + IPC_CHAN_SIZE;
     comm_sp->recv_chan.comm_buf_vaddr = comm_sp->recv_chan.comm_ctl_vaddr + PAGE_SIZE_4K;
     comm_sp->recv_chan.counter_msgs = 0;
     comm_sp->recv_chan.next_msg_id = 0;
-    os_sos_spin_lock_init(&comm_sp->recv_chan.chan_lock);
 
     pthread_create(&event_thread, NULL, _comm_app_sp_on_msg_arrival, out_comm);
 }

@@ -20,10 +20,10 @@ extern void win_write_msr(uint32_t reg, uint32_t low, uint32_t high);
 extern void win_atomic_increase(uint32_t *var);
 extern void win_atomic_decrease(uint32_t* var);
 
-extern void win_sos_spin_lock_init(volatile lock_t* lock);
-extern void win_sos_spin_lock(volatile lock_t* lock);
-extern bool win_sos_spin_trylock(volatile lock_t* lock);
-extern void win_sos_spin_unlock(volatile lock_t* lock);
+extern void win_spin_lock_init(volatile lock_t* lock);
+extern void win_spin_lock(volatile lock_t* lock);
+extern bool win_spin_trylock(volatile lock_t* lock);
+extern void win_spin_unlock(volatile lock_t* lock);
 
 extern void win_udelay(uint32_t usec);
 extern void win_msleep(uint32_t ms);

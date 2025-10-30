@@ -59,7 +59,7 @@ static inline void PRINT(const char *fmt, ...)
 
 typedef unsigned long ulong_t;
 
-typedef spinlock_t os_native_lock_t;
+typedef spinlock_t lock_t;
 
 
 #endif // __ASSEMBLY__

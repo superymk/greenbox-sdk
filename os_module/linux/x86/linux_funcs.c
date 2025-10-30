@@ -65,10 +65,10 @@ void os_init(void)
     os->write_msr = linux_write_msr;
     os->atomic_increase = linux_atomic_increase;
     os->atomic_decrease = linux_atomic_decrease;
-    os->spinlock_init = linux_sos_spin_lock_init;
-    os->spinlock_lock = linux_sos_spin_lock;
-    os->spinlock_trylock = linux_sos_spin_trylock;
-    os->spinlock_unlock = linux_sos_spin_unlock;
+    os->spinlock_init = linux_spin_lock_init;
+    os->spinlock_lock = linux_spin_lock;
+    os->spinlock_trylock = linux_spin_trylock;
+    os->spinlock_unlock = linux_spin_unlock;
     os->udelay = linux_udelay;
     os->inb = linux_inb;
     os->inw = linux_inw;

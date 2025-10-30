@@ -5,7 +5,7 @@
 #include <sa_headers.h>
 
 static struct sa_siginfo infos[NUM_SIGINFO_SLOTS];
-DECL_ALIGN(4) static lock_t infos_lock; // Lock to update <infos>
+static lock_t infos_lock; // Lock to update <infos>
 
 static bool find_free_siginfo_slot(uint32_t *out_idx)
 {

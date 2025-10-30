@@ -5,9 +5,5 @@
 			"path": "os_module"
 		}
 	],
-	"settings": {
-		"files.associations": {
-			"compilers.h": "c"
-		}
-	}
+    "settings": {}
 }

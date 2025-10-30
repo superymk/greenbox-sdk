@@ -2,6 +2,10 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 #ifndef APP_EVENT_HANDLER_H
 #define APP_EVENT_HANDLER_H
 #include <ipc/app_comm.h>

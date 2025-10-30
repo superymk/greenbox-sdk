@@ -56,9 +56,7 @@
 #ifndef __ASSEMBLY__
 
 #if defined (_WIN32) || defined (_WIN64)
-    #define DECL_ALIGN(x)               __declspec(align(x))
-    #define DECL_ALIGN_4K            __declspec(align(4096))
-    #define DECL_UNUSED
+    #define DECL_UNUSED 
 
     #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
     #define PACKED_STRUCT_END __pragma(pack(pop))
@@ -66,8 +64,6 @@
 
 #elif defined(__linux)
 
-    #define DECL_ALIGN(x)               __attribute__ ((aligned(x)))
-    #define DECL_ALIGN_4K               DECL_ALIGN(4096)
     #define DECL_UNUSED                 __attribute__((unused))
 
     #define PACKED_STRUCT_BEGIN
