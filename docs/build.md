@@ -20,10 +20,10 @@ Steps:
     - ```os_module/win/SecAgent.sln```
         - Need to copy ```win_config_xmhf_log.h.example``` to ```win_config_xmhf_log.h``` in the ```os_module/include/os_funcs/os/``` folder.
     - ```code/tools_dist/tpm/sub_tools/efi_tpm2_event_logs/efi_tpm2_event_logs.sln```
-4. Run Qt Creator to build ```secapp_demos/rdesktop/app/ui/RDesktop/CMakeLists.txt```. Build the x64 release version for all these projects.
+4. Run Qt Creator to build ```secapp_demos/rdesktop/app/ui/RDesktop/CMakeLists.txt``` and ```secapp_demos/rdesktop/app/ui/RFiles/CMakeLists.txt```. Build the x64 release version for all these projects.
     - Configure projects to Enable "Debug" and "Release", and set output folder to be "Debug" and "Release", not "Desktop_Qt_X_Y_Z_MSVC2022_64bit-*".
 5. Open a MSYS2-ucrt64 terminal, go to the ```code/``` folder, run the build command ```make win``` to build loaders for Windows.
-6. Open a "Qt 6.10.0 (MSVC 2022 64-bit)" terminal, go to the ```code/``` folder and run ```post_build_win_qt.bat``` command.
+6. Open a "Qt 6.10.0 (MSVC 2022 64-bit)" terminal, go to the root folder and run ```post_build_win_qt.bat``` command.
 
 ## For Ubuntu 24.04.3
 Pre-requisites:

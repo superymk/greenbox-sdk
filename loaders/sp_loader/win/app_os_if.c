@@ -259,15 +259,62 @@ uint32_t app_cpus_get_procs_num(void)
 void press_continue(const char *prompt)
 {
     APP_ERR("%s", prompt);
-    while (true)
-    {
-        char c = getchar();
-        if (c == '\n' || c == EOF)
-            break;
 
-        // Put a sleep in order to yield CPU
-        // [NOTE] sched_yield() does not reduce CPU usage somehow...
-        msleep(100);
+    if (isatty(fileno(stdin)))
+    {
+        // Interactive console: your original loop
+        for (;;)
+        {
+            int ch = getchar();
+            if (ch == '\n' || ch == EOF)
+                break;
+
+            // Put a sleep in order to yield CPU
+            // [NOTE] sched_yield() does not reduce CPU usage somehow...
+            msleep(100);
+        }
+        return;
+    }
+    else
+    {
+        // Non-interactive (QProcess pipe or no console):
+        // Block until the parent writes something OR closes the pipe.
+        // Use a single blocking getchar(); we don't need a loop.
+        (void)getchar(); // returns when parent writes "\r\n" or closes write-end
+    }
+}
+
+static int _eventfd_from_env(void)
+{
+    const char *s = getenv("GB_APPLOADER_EXIT_FD");
+    if (!s)
+        return -1;
+    return atoi(s); // fd inherited across exec
+}
+
+static void _wait_for_exit_noninteractive(void)
+{
+    int fd = _eventfd_from_env();
+    if (fd < 0)
+    {
+        // Fallback: block forever
+        for (;;)
+            msleep(100);
+    }
+
+    char buf[1];
+    (void)read(fd, buf, 1); // blocks until parent writes 1 byte or closes
+}
+
+void app_wait_for_exit(void)
+{
+    if (isatty(fileno(stdin)))
+    {
+        press_continue("Press to exit SecApp");
+    }
+    else
+    {
+        _wait_for_exit_noninteractive();
     }
 }
 
@@ -331,7 +378,7 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
     if (hDevice == INVALID_HANDLE_VALUE)
     {
         APP_ERR("<os_ioctl> Access SecAgent Error (Error: #%d)\n",
-        (err_status = (int)GetLastError()));
+                (err_status = (int)GetLastError()));
         goto out;
     }
 

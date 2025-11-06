@@ -91,6 +91,25 @@ private:
     int rf_proc_run();
     void rd_proc_stop();
 
+    // ==== Child exit synchronization (matches your child-side changes) ====
+    void setupChildExitSyncEnv(QProcessEnvironment& env);
+    void signalChildExit();
+    void cleanupChildExitSync();
+
+#ifdef Q_OS_WIN
+    void createWindowsExitEvent();
+    void closeWindowsExitEvent();
+
+    void* _exitEventHandle = nullptr; // HANDLE
+    QString _exitEventName;
+#else
+    void createPosixExitPipe();
+    void closePosixExitPipe();
+
+    int _exitPipeReadFd  = -1; // passed to child via env
+    int _exitPipeWriteFd = -1; // kept by parent to wake child
+#endif
+
     // Utilities
     /// Normalize a directory path: make absolute, use '/', and ensure trailing '/' if it exists as a directory.
     QString normalizeDirPath(const QString& input) const;

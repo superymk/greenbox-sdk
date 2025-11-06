@@ -127,7 +127,8 @@ int main(int argc, char * argv[])
 	}
 
 	// Wait to exit
-	press_continue("Press to exit SecApp");
+	app_wait_for_exit();
+
 	secapp_exit();
 
 	secapp_unload();

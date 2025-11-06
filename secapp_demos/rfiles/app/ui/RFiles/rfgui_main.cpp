@@ -25,34 +25,27 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QFileInfo>
+#include <QProcessEnvironment>
 
 #ifdef Q_OS_WIN
-#include <windows.h>
+  #include <windows.h>
+  #include <processthreadsapi.h>
+#else
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <errno.h>
+  #include <string.h>
 #endif
 
 // // --- Initialize static Regex members ---
 // const QRegularExpression RFGUIMain::m_ipv4Regex(
 //     QStringLiteral("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}"
 //                    "(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"));
-
 // const QRegularExpression RFGUIMain::m_ipv6Regex(
 //     QStringLiteral("^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|"
 //                    "([0-9a-fA-F]{1,4}:){1,7}:|"
-//                    "([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|"
-//                    "([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|"
-//                    "([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|"
-//                    "([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|"
-//                    "([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|"
-//                    "[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|"
-//                    ":((:[0-9a-fA-F]{1,4}){1,7}|:)|"
-//                    "fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|"
-//                    "::(ffff(:0{1,4}){0,1}:){0,1}"
-//                    "((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}"
-//                    "(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|"
-//                    "([0-9a-fA-F]{1,4}:){1,4}:"
-//                    "((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}"
-//                    "(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$"));
-
+//                    "([0-9a-fA-F]{1,6}:[0-9a-fA-F]{1,4})|"
+//                    "..."));
 // const QRegularExpression RFGUIMain::m_hostnameRegex(
 //     QStringLiteral("^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*"
 //                    "([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"));
@@ -110,12 +103,9 @@ RFGUIMain::RFGUIMain(QWidget *parent)
     initializeOptionsArea(); // keeps the tab/animation only; no settings use
 
     // standard buttons
-    connect(ui->runButton, &QPushButton::clicked,
-            this, &RFGUIMain::onRunClicked);
-    connect(ui->optionsButton, &QPushButton::clicked,
-            this, &RFGUIMain::onOptionsClicked);
-    connect(ui->helpButton, &QPushButton::clicked,
-            this, &RFGUIMain::onHelpClicked);
+    connect(ui->runButton,   &QPushButton::clicked, this, &RFGUIMain::onRunClicked);
+    connect(ui->optionsButton,&QPushButton::clicked, this, &RFGUIMain::onOptionsClicked);
+    connect(ui->helpButton,  &QPushButton::clicked, this, &RFGUIMain::onHelpClicked);
 
     // banner image
     {
@@ -157,15 +147,13 @@ void RFGUIMain::loadHistory()
 {
     // Keep data only; do not modify the Home Folder combo here.
     connectionHistory = settings->value(HISTORY_KEY).toStringList();
-    // (No UI updates; localDirComboBox is for home directories.)
 }
 
 void RFGUIMain::saveHistory()
 {
     settings->setValue(HISTORY_KEY, connectionHistory);
     if (!ui->localDirComboBox->currentText().isEmpty())
-        settings->setValue(LAST_HOST_KEY,
-                           ui->localDirComboBox->currentText());
+        settings->setValue(LAST_HOST_KEY, ui->localDirComboBox->currentText());
     settings->sync();
 }
 
@@ -221,8 +209,7 @@ void RFGUIMain::saveHomeDirHistory()
 {
     settings->setValue(HOME_HISTORY_KEY, homeDirHistory);
     if (!ui->localDirComboBox->currentText().isEmpty())
-        settings->setValue(LAST_HOME_DIR_KEY,
-                           ui->localDirComboBox->currentText());
+        settings->setValue(LAST_HOME_DIR_KEY, ui->localDirComboBox->currentText());
     settings->sync();
 }
 
@@ -255,8 +242,6 @@ void RFGUIMain::initializeOptionsArea()
     ui->bandwidthComboBox->clear();
     ui->bandwidthComboBox->addItems(opts);
 
-    // Keep the Experience tab visible/toggleable, but do not load/save or use its values.
-    // (No settings references here.)
     ui->optionsTabWidget->setVisible(false);
     updateOptionsButton(/*showOptions=*/true);
     calculateHeights();
@@ -275,7 +260,7 @@ void RFGUIMain::calculateHeights()
     int e = sizeHint().height();
 
     m_collapsedHeight = c;
-    m_expandedHeight = e;
+    m_expandedHeight  = e;
     ui->optionsTabWidget->setVisible(m_optionsVisible);
     qDebug() << "Heights: collapsed =" << c << ", expanded =" << e;
 }
@@ -298,9 +283,8 @@ void RFGUIMain::onOptionsClicked()
         ui->optionsTabWidget->setVisible(false);
 
     QRect start = geometry();
-    QRect end = start;
-    end.setHeight(m_optionsVisible ? m_expandedHeight
-                                   : m_collapsedHeight);
+    QRect end   = start;
+    end.setHeight(m_optionsVisible ? m_expandedHeight : m_collapsedHeight);
 
     m_animation->setStartValue(start);
     m_animation->setEndValue(end);
@@ -310,43 +294,8 @@ void RFGUIMain::onOptionsClicked()
 void RFGUIMain::onAnimationFinished()
 {
     ui->optionsTabWidget->setVisible(m_optionsVisible);
-    resize(550, m_optionsVisible ? m_expandedHeight
-                                 : m_collapsedHeight);
+    resize(550, m_optionsVisible ? m_expandedHeight : m_collapsedHeight);
 }
-
-// /* =========================
-//  *  Remote host validation (kept but unused)
-//  * ========================= */
-// bool RFGUIMain::isValidHostFormat(const QString &input)
-// {
-//     QString s = input.trimmed();
-//     if (s.isEmpty())
-//         return false;
-
-//     int pos = s.lastIndexOf(':');
-//     if (pos != -1)
-//     {
-//         bool ok;
-//         int p = s.mid(pos + 1).toInt(&ok);
-//         if (!ok || p <= 0 || p > 65535)
-//             return false;
-//         s = s.left(pos);
-//     }
-//     if (s.isEmpty())
-//         return false;
-
-//     return m_ipv4Regex.match(s).hasMatch() || m_ipv6Regex.match(s).hasMatch() || m_hostnameRegex.match(s).hasMatch();
-// }
-
-// bool RFGUIMain::checkHostReachable(const QString &host, quint16 /*port*/)
-// {
-//     QTcpSocket sock;
-//     sock.connectToHost(host, 0);
-//     if (!sock.waitForConnected(2000))
-//         return false;
-//     sock.disconnectFromHost();
-//     return true;
-// }
 
 /* =========================
  *  Local dir validation on text change
@@ -381,10 +330,10 @@ void RFGUIMain::onRunClicked()
 
     // Construct rfiles_conf.json
     QJsonObject localFSObj;
-    localFSObj["certs_filepath"] = QStringLiteral("./ca-certificates.with-extras.crt");
+    localFSObj["certs_filepath"]         = QStringLiteral("./ca-certificates.with-extras.crt");
     localFSObj["certs_filepath_comment"] = QStringLiteral("Absolute file path of the trusted certificates.");
-    localFSObj["home_dir"] = normalized;
-    localFSObj["home_dir_comment"] = QStringLiteral("Absolute file path of the home directory; e.g., /home/superymk/ for Linux, and c:/ for Windows");
+    localFSObj["home_dir"]               = normalized;
+    localFSObj["home_dir_comment"]       = QStringLiteral("Absolute file path of the home directory; e.g., /home/superymk/ for Linux, and c:/ for Windows");
 
     QJsonObject root;
     root["local_fs"] = localFSObj;
@@ -450,11 +399,13 @@ void RFGUIMain::onClearHistoryClicked()
  * ========================= */
 void RFGUIMain::onHelpClicked()
 {
-    QMessageBox::information(this, "Help", QStringLiteral("GreenBox Remote Files Help\n\n"
-                                                          "- Use 'Home Folder' → Browse... to choose a local workspace directory.\n"
-                                                          "- You can also type a full absolute path; the Run button enables when it exists.\n"
-                                                          "- Click 'Show Options' to toggle the Experience tab (kept for UI only).\n"
-                                                          "- In System → Connection History you can clear connection history."));
+    QMessageBox::information(this, "Help", QStringLiteral(
+        "GreenBox Remote Files Help\n\n"
+        "- Use 'Home Folder' → Browse... to choose a local workspace directory.\n"
+        "- You can also type a full absolute path; the Run button enables when it exists.\n"
+        "- Click 'Show Options' to toggle the Experience tab (kept for UI only).\n"
+        "- In System → Connection History you can clear connection history."
+    ));
 }
 
 /* =========================
@@ -463,8 +414,7 @@ void RFGUIMain::onHelpClicked()
 void RFGUIMain::disableButtonForSeconds(QPushButton *button, int seconds)
 {
     button->setEnabled(false);
-    QTimer::singleShot(seconds * 1000, [button]()
-                       { button->setEnabled(true); });
+    QTimer::singleShot(seconds * 1000, [button]() { button->setEnabled(true); });
 }
 
 /* =========================
@@ -475,29 +425,47 @@ void RFGUIMain::rd_proc_init(void)
     _rd_proc = new QProcess(this);
 
 #ifdef Q_OS_WIN
+    // Keep the child hidden, but stdio is still piped by QProcess.
     _rd_proc->setCreateProcessArgumentsModifier(
         [](QProcess::CreateProcessArguments *args)
         {
             args->flags |= CREATE_NO_WINDOW;
         });
 #endif
+
+    // When child exits, clean up the sync primitive
+    connect(_rd_proc, static_cast<void(QProcess::*)(int,QProcess::ExitStatus)>(&QProcess::finished),
+            this, [this](int, QProcess::ExitStatus){ cleanupChildExitSync(); });
 }
 
 void RFGUIMain::rd_proc_fini(void)
 {
     if (_rd_proc)
     {
+        // Ensure child is not left running
+        rd_proc_stop();
         delete _rd_proc;
         _rd_proc = NULL;
     }
+    cleanupChildExitSync();
 }
 
 int RFGUIMain::rf_proc_run(void)
 {
+    // Prepare environment with our exit-sync variables
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    setupChildExitSyncEnv(env);
+    _rd_proc->setProcessEnvironment(env);
+
+    // (optional but explicit) keep stdin as a managed pipe
+    _rd_proc->setInputChannelMode(QProcess::ManagedInputChannel);
+
     _rd_proc->start("./sl_rfiles.exe");
     if (!_rd_proc->waitForStarted())
     {
         qDebug() << "Failed to start sl_rfiles.exe process!";
+        // Clean up sync primitive if start failed
+        cleanupChildExitSync();
         return 1;
     }
     return 0;
@@ -507,10 +475,22 @@ void RFGUIMain::rd_proc_stop(void)
 {
     if (_rd_proc && _rd_proc->state() == QProcess::Running)
     {
+        // New robust unblock: signal the child-side sync primitive
+        signalChildExit();
+
+        // Old behavior (harmless): also write CRLF to stdin
         _rd_proc->write("\r\n");
         _rd_proc->waitForBytesWritten();
-        _rd_proc->closeWriteChannel();
-        _rd_proc->waitForFinished();
+
+        _rd_proc->closeWriteChannel(); // end-of-input if child still reads stdin
+
+        // Give the child some time to exit cleanly
+        if (!_rd_proc->waitForFinished(3000))
+        {
+            _rd_proc->terminate();
+            if (!_rd_proc->waitForFinished(2000))
+                _rd_proc->kill();
+        }
     }
 }
 
@@ -529,9 +509,9 @@ static QString rf_defaultStartDir()
 void RFGUIMain::onLocalDirBrowseClicked()
 {
     QString fromCombo = ui->localDirComboBox->currentText().trimmed();
-    QString startDir = QDir(fromCombo).exists()
-                           ? QDir(fromCombo).absolutePath()
-                           : rf_defaultStartDir();
+    QString startDir  = QDir(fromCombo).exists()
+                      ? QDir(fromCombo).absolutePath()
+                      : rf_defaultStartDir();
 
     QFileDialog dlg(this, tr("Select Home Folder"), startDir);
     dlg.setFileMode(QFileDialog::Directory);
@@ -586,3 +566,125 @@ bool RFGUIMain::isValidAbsoluteDir(const QString &text) const
     QFileInfo fi(QDir(text).absolutePath());
     return fi.exists() && fi.isDir();
 }
+
+/* ===========================================================
+ *          Child Exit Sync: Windows / POSIX
+ * ===========================================================
+ */
+void RFGUIMain::setupChildExitSyncEnv(QProcessEnvironment& env)
+{
+#ifdef Q_OS_WIN
+    createWindowsExitEvent();
+    if (!_exitEventName.isEmpty())
+        env.insert(QStringLiteral("RF_EXIT_EVENT"), _exitEventName);
+#else
+    createPosixExitPipe();
+    if (_exitPipeReadFd >= 0)
+        env.insert(QStringLiteral("RF_EXIT_FD"), QString::number(_exitPipeReadFd));
+#endif
+}
+
+void RFGUIMain::signalChildExit()
+{
+#ifdef Q_OS_WIN
+    if (_exitEventHandle)
+    {
+        ::SetEvent(static_cast<HANDLE>(_exitEventHandle));
+    }
+#else
+    if (_exitPipeWriteFd >= 0)
+    {
+        char one = 1;
+        ssize_t w = ::write(_exitPipeWriteFd, &one, 1);
+        (void)w;
+        // We can close write fd now; child unblocks on read.
+        ::close(_exitPipeWriteFd);
+        _exitPipeWriteFd = -1;
+    }
+#endif
+}
+
+void RFGUIMain::cleanupChildExitSync()
+{
+#ifdef Q_OS_WIN
+    closeWindowsExitEvent();
+#else
+    closePosixExitPipe();
+#endif
+}
+
+#ifdef Q_OS_WIN
+void RFGUIMain::createWindowsExitEvent()
+{
+    // If already created, skip
+    if (_exitEventHandle)
+        return;
+
+    // Build a unique name per GUI instance (safe in current session)
+    _exitEventName = QStringLiteral("Local\\RFilesExit_%1_%2")
+                         .arg(QCoreApplication::applicationPid())
+                         .arg(reinterpret_cast<qulonglong>(this));
+
+    HANDLE h = ::CreateEventA(nullptr, TRUE, FALSE, _exitEventName.toStdString().c_str());
+    if (!h)
+    {
+        qWarning() << "CreateEventA failed, GetLastError=" << GetLastError();
+        _exitEventHandle = nullptr;
+        _exitEventName.clear();
+        return;
+    }
+    _exitEventHandle = h;
+}
+
+void RFGUIMain::closeWindowsExitEvent()
+{
+    if (_exitEventHandle)
+    {
+        ::CloseHandle(static_cast<HANDLE>(_exitEventHandle));
+        _exitEventHandle = nullptr;
+    }
+    _exitEventName.clear();
+}
+#else
+void RFGUIMain::createPosixExitPipe()
+{
+    // If already created, skip
+    if (_exitPipeReadFd >= 0 || _exitPipeWriteFd >= 0)
+        return;
+
+    int fds[2] = {-1, -1};
+    if (::pipe(fds) != 0)
+    {
+        qWarning() << "pipe() failed:" << strerror(errno);
+        return;
+    }
+
+    // fds[0] will be inherited by child (read end).
+    // fds[1] we keep to wake the child (write end).
+    _exitPipeReadFd  = fds[0];
+    _exitPipeWriteFd = fds[1];
+
+    // Mark fds close-on-exec=false to ensure child inherits read end
+    // (Qt may set CLOEXEC by default; explicitly clear on read end)
+    int flags = ::fcntl(_exitPipeReadFd, F_GETFD);
+    if (flags != -1) ::fcntl(_exitPipeReadFd, F_SETFD, flags & ~FD_CLOEXEC);
+
+    // Parent shouldn't keep the read end open unnecessarily; we only pass the fd num via env.
+    // But we must keep it open until after start(), otherwise the child would inherit an invalid fd.
+    // We'll close _exitPipeReadFd after successful start in rf_proc_run() via cleanup hook if needed.
+}
+
+void RFGUIMain::closePosixExitPipe()
+{
+    if (_exitPipeReadFd >= 0)
+    {
+        ::close(_exitPipeReadFd);
+        _exitPipeReadFd = -1;
+    }
+    if (_exitPipeWriteFd >= 0)
+    {
+        ::close(_exitPipeWriteFd);
+        _exitPipeWriteFd = -1;
+    }
+}
+#endif

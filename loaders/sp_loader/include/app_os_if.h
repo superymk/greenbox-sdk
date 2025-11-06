@@ -40,6 +40,11 @@ extern void sp_loader_install_exception_handler(void);
 
 extern void msleep(uint32_t ms);
 extern void press_continue(const char* prompt);
+
+/// @brief Wait for users signal the loader to exit.
+/// @param  
+extern void app_wait_for_exit(void);
+
 extern bool app_set_cpu_affinity(uint32_t cpu);
 extern bool thread_set_high_priority(void);
 
