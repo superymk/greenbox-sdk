@@ -28,7 +28,7 @@ static OSSTATUS _sp_get_id_name_batch(offset_t* out_offset)
 	status = comm_sos_send_msg_and_wait(&request, &response, SP_COMM_SOS_TIMEOUT);
 	if(SA_FAIL(status))
 	{
-		DRV_ERR("SecProcess batch get IDs and names error! Send msg to SecOS error!\n");
+		DRV_ERR("SecProcess batch get IDs and names error! Send msg to SecOS error! status:%lu\n", status);
 		return E_COMM_ERR;
 	}
 
