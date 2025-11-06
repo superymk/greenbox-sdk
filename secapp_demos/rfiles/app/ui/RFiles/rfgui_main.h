@@ -2,8 +2,8 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
-#ifndef RDGUI_MAIN_H
-#define RDGUI_MAIN_H
+#ifndef RFGUI_MAIN_H
+#define RFGUI_MAIN_H
 
 #include <QMainWindow>
 #include <QStringList>
@@ -17,17 +17,17 @@ class QRegularExpression;
 QT_BEGIN_NAMESPACE
 namespace Ui
 {
-    class RDGUIMain;
+    class RFGUIMain;
 }
 QT_END_NAMESPACE
 
-class RDGUIMain : public QMainWindow
+class RFGUIMain : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    explicit RDGUIMain(QWidget *parent = nullptr);
-    ~RDGUIMain() override;
+    explicit RFGUIMain(QWidget *parent = nullptr);
+    ~RFGUIMain() override;
 
 private slots:
     void onConnectClicked();
@@ -38,7 +38,7 @@ private slots:
     void onClearHistoryClicked(); // <-- new slot
 
 private:
-    Ui::RDGUIMain *ui;
+    Ui::RFGUIMain *ui;
 
     // History & settings
     void loadHistory();
@@ -85,4 +85,4 @@ private:
     void rd_proc_stop();
 };
 
-#endif // RDGUI_MAIN_H
+#endif // RFGUI_MAIN_H

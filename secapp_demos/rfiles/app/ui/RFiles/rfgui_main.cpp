@@ -2,8 +2,8 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
-#include "rdgui_main.h"
-#include "ui_rdgui_main.h"
+#include "rfgui_main.h"
+#include "ui_rfgui_main.h"
 
 #include <QSettings>
 #include <QMessageBox>
@@ -28,11 +28,11 @@
 #endif
 
 // --- Initialize static Regex members ---
-const QRegularExpression RDGUIMain::m_ipv4Regex(
+const QRegularExpression RFGUIMain::m_ipv4Regex(
     QStringLiteral("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}"
                    "(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"));
 
-const QRegularExpression RDGUIMain::m_ipv6Regex(
+const QRegularExpression RFGUIMain::m_ipv6Regex(
     QStringLiteral("^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|"
                    "([0-9a-fA-F]{1,4}:){1,7}:|"
                    "([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|"
@@ -50,12 +50,12 @@ const QRegularExpression RDGUIMain::m_ipv6Regex(
                    "((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}"
                    "(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$"));
 
-const QRegularExpression RDGUIMain::m_hostnameRegex(
+const QRegularExpression RFGUIMain::m_hostnameRegex(
     QStringLiteral("^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*"
                    "([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"));
 
-RDGUIMain::RDGUIMain(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::RDGUIMain)
+RFGUIMain::RFGUIMain(QWidget *parent)
+    : QMainWindow(parent), ui(new Ui::RFGUIMain)
 {
     ui->setupUi(this);
     setFixedWidth(550);
@@ -74,12 +74,12 @@ RDGUIMain::RDGUIMain(QWidget *parent)
     if (le)
     {
         connect(le, &QLineEdit::textChanged,
-                this, &RDGUIMain::onRemoteHostTextChanged);
+                this, &RFGUIMain::onRemoteHostTextChanged);
         connect(ui->remoteHostComboBox,
                 &QComboBox::currentTextChanged,
-                this, &RDGUIMain::onRemoteHostTextChanged);
+                this, &RFGUIMain::onRemoteHostTextChanged);
         connect(le, &QLineEdit::returnPressed,
-                this, &RDGUIMain::onConnectClicked);
+                this, &RFGUIMain::onConnectClicked);
         onRemoteHostTextChanged(ui->remoteHostComboBox->currentText());
     }
     else
@@ -89,17 +89,17 @@ RDGUIMain::RDGUIMain(QWidget *parent)
 
     // New: clear history button
     connect(ui->clearHistoryButton, &QPushButton::clicked,
-            this, &RDGUIMain::onClearHistoryClicked);
+            this, &RFGUIMain::onClearHistoryClicked);
 
     initializeOptionsArea();
 
     // standard buttons
     connect(ui->connectButton, &QPushButton::clicked,
-            this, &RDGUIMain::onConnectClicked);
+            this, &RFGUIMain::onConnectClicked);
     connect(ui->optionsButton, &QPushButton::clicked,
-            this, &RDGUIMain::onOptionsClicked);
+            this, &RFGUIMain::onOptionsClicked);
     connect(ui->helpButton, &QPushButton::clicked,
-            this, &RDGUIMain::onHelpClicked);
+            this, &RFGUIMain::onHelpClicked);
 
     // banner image
     {
@@ -119,7 +119,7 @@ RDGUIMain::RDGUIMain(QWidget *parent)
     m_animation->setDuration(300);
     m_animation->setEasingCurve(QEasingCurve::InOutQuad);
     connect(m_animation, &QPropertyAnimation::finished,
-            this, &RDGUIMain::onAnimationFinished);
+            this, &RFGUIMain::onAnimationFinished);
 
     ui->remoteHostComboBox->setFocus();
 
@@ -127,7 +127,7 @@ RDGUIMain::RDGUIMain(QWidget *parent)
     rd_proc_init();
 }
 
-RDGUIMain::~RDGUIMain()
+RFGUIMain::~RFGUIMain()
 {
     // Stop running RFiles console process, if any.
     rd_proc_stop();
@@ -138,7 +138,7 @@ RDGUIMain::~RDGUIMain()
     delete ui;
 }
 
-void RDGUIMain::loadHistory()
+void RFGUIMain::loadHistory()
 {
     connectionHistory = settings->value(HISTORY_KEY).toStringList();
     ui->remoteHostComboBox->clear();
@@ -154,7 +154,7 @@ void RDGUIMain::loadHistory()
     }
 }
 
-void RDGUIMain::saveHistory()
+void RFGUIMain::saveHistory()
 {
     settings->setValue(HISTORY_KEY, connectionHistory);
     if (!ui->remoteHostComboBox->currentText().isEmpty())
@@ -163,7 +163,7 @@ void RDGUIMain::saveHistory()
     settings->sync();
 }
 
-void RDGUIMain::updateHistory(const QString &host)
+void RFGUIMain::updateHistory(const QString &host)
 {
     if (host.isEmpty())
         return;
@@ -181,7 +181,7 @@ void RDGUIMain::updateHistory(const QString &host)
     saveHistory();
 }
 
-void RDGUIMain::initializeOptionsArea()
+void RFGUIMain::initializeOptionsArea()
 {
     QStringList opts = {
         "Low-speed network (<1 Mbps)",
@@ -200,7 +200,7 @@ void RDGUIMain::initializeOptionsArea()
     resize(550, m_collapsedHeight);
 }
 
-void RDGUIMain::calculateHeights()
+void RFGUIMain::calculateHeights()
 {
     ui->centralwidget->layout()->invalidate();
     ui->centralwidget->layout()->activate();
@@ -217,14 +217,14 @@ void RDGUIMain::calculateHeights()
     qDebug() << "Heights: collapsed =" << c << ", expanded =" << e;
 }
 
-void RDGUIMain::updateOptionsButton(bool showOptions)
+void RFGUIMain::updateOptionsButton(bool showOptions)
 {
     ui->optionsButton->setText(showOptions ? "Show Options" : "Hide Options");
     auto icon = showOptions ? QStyle::SP_ArrowDown : QStyle::SP_ArrowUp;
     ui->optionsButton->setIcon(style()->standardIcon(icon));
 }
 
-void RDGUIMain::onOptionsClicked()
+void RFGUIMain::onOptionsClicked()
 {
     m_optionsVisible = !m_optionsVisible;
     m_animation->stop();
@@ -245,7 +245,7 @@ void RDGUIMain::onOptionsClicked()
     m_animation->start();
 }
 
-void RDGUIMain::onAnimationFinished()
+void RFGUIMain::onAnimationFinished()
 {
     // once the animation completes, show or hide the tab
     ui->optionsTabWidget->setVisible(m_optionsVisible);
@@ -254,7 +254,7 @@ void RDGUIMain::onAnimationFinished()
                                  : m_collapsedHeight);
 }
 
-bool RDGUIMain::isValidHostFormat(const QString &input)
+bool RFGUIMain::isValidHostFormat(const QString &input)
 {
     QString s = input.trimmed();
     if (s.isEmpty())
@@ -275,7 +275,7 @@ bool RDGUIMain::isValidHostFormat(const QString &input)
     return m_ipv4Regex.match(s).hasMatch() || m_ipv6Regex.match(s).hasMatch() || m_hostnameRegex.match(s).hasMatch();
 }
 
-bool RDGUIMain::checkHostReachable(const QString &host, quint16 port)
+bool RFGUIMain::checkHostReachable(const QString &host, quint16 port)
 {
     QTcpSocket sock;
     sock.connectToHost(host, port);
@@ -285,7 +285,7 @@ bool RDGUIMain::checkHostReachable(const QString &host, quint16 port)
     return true;
 }
 
-void RDGUIMain::onRemoteHostTextChanged(const QString &text)
+void RFGUIMain::onRemoteHostTextChanged(const QString &text)
 {
     bool valid = isValidHostFormat(text);
     ui->connectButton->setEnabled(valid);
@@ -311,7 +311,7 @@ void RDGUIMain::onRemoteHostTextChanged(const QString &text)
     }
 }
 
-void RDGUIMain::onConnectClicked()
+void RFGUIMain::onConnectClicked()
 {
     int ret = 0;
     bool result = false;
@@ -419,7 +419,7 @@ void RDGUIMain::onConnectClicked()
     this->showMinimized();
 }
 
-void RDGUIMain::onClearHistoryClicked()
+void RFGUIMain::onClearHistoryClicked()
 {
     connectionHistory.clear();
     ui->remoteHostComboBox->clear();
@@ -432,7 +432,7 @@ void RDGUIMain::onClearHistoryClicked()
     settings->sync();
 }
 
-void RDGUIMain::onHelpClicked()
+void RFGUIMain::onHelpClicked()
 {
     QMessageBox::information(this, "Help", QStringLiteral("GreenBox RFiles Help\n\n"
                                                           "- Enter a valid hostname or IP (e.g., server.domain.com or 192.168.1.100).\n"
@@ -442,14 +442,14 @@ void RDGUIMain::onHelpClicked()
                                                           "- In System → Connection History you can clear connection history."));
 }
 
-void RDGUIMain::disableButtonForSeconds(QPushButton *button, int seconds)
+void RFGUIMain::disableButtonForSeconds(QPushButton *button, int seconds)
 {
     button->setEnabled(false);
     QTimer::singleShot(seconds * 1000, [button]()
                        { button->setEnabled(true); });
 }
 
-void RDGUIMain::rd_proc_init(void)
+void RFGUIMain::rd_proc_init(void)
 {
     // set up the process
     _rd_proc = new QProcess(this);
@@ -467,7 +467,7 @@ void RDGUIMain::rd_proc_init(void)
         });
 }
 
-void RDGUIMain::rd_proc_fini(void)
+void RFGUIMain::rd_proc_fini(void)
 {
     if (_rd_proc)
     {
@@ -476,7 +476,7 @@ void RDGUIMain::rd_proc_fini(void)
     }
 }
 
-int RDGUIMain::rd_proc_run(void)
+int RFGUIMain::rd_proc_run(void)
 {
     _rd_proc->start("./sl_rfiles.exe");
     if (!_rd_proc->waitForStarted())
@@ -489,7 +489,7 @@ int RDGUIMain::rd_proc_run(void)
     return 0;
 }
 
-void RDGUIMain::rd_proc_stop(void)
+void RFGUIMain::rd_proc_stop(void)
 {
     if (_rd_proc->state() == QProcess::Running)
     {

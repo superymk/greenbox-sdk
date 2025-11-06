@@ -2,7 +2,7 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
-#include "rdgui_main.h"
+#include "rfgui_main.h"
 
 #include <QApplication>
 #include <QLocale>
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
             break;
         }
     }
-    RDGUIMain w;
+    RFGUIMain w;
     w.show();
     return a.exec();
 }
