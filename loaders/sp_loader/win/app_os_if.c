@@ -284,26 +284,25 @@ void press_continue(const char *prompt)
     }
 }
 
-static int _eventfd_from_env(void)
+static HANDLE _eventfd_from_env(void)
 {
-    const char *s = getenv("GB_APPLOADER_EXIT_FD");
-    if (!s)
-        return -1;
-    return atoi(s); // fd inherited across exec
+    char name[256] = {0};
+    DWORD got = GetEnvironmentVariableA("GB_APPLOADER_EXIT_FD", name, sizeof(name));
+    if (got == 0 || got >= sizeof(name))
+        return NULL;
+    return OpenEventA(SYNCHRONIZE, FALSE, name);
 }
 
 static void _wait_for_exit_noninteractive(void)
 {
-    int fd = _eventfd_from_env();
-    if (fd < 0)
+    HANDLE h = _eventfd_from_env();
+    if (!h)
     {
-        // Fallback: block forever
+        // Fallback: just sleep forever until process is killed
         for (;;)
             msleep(100);
     }
-
-    char buf[1];
-    (void)read(fd, buf, 1); // blocks until parent writes 1 byte or closes
+    WaitForSingleObject(h, INFINITE);
 }
 
 void app_wait_for_exit(void)

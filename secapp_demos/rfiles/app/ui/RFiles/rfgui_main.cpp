@@ -576,11 +576,11 @@ void RFGUIMain::setupChildExitSyncEnv(QProcessEnvironment& env)
 #ifdef Q_OS_WIN
     createWindowsExitEvent();
     if (!_exitEventName.isEmpty())
-        env.insert(QStringLiteral("RF_EXIT_EVENT"), _exitEventName);
+        env.insert(QStringLiteral("GB_APPLOADER_EXIT_FD"), _exitEventName);
 #else
     createPosixExitPipe();
     if (_exitPipeReadFd >= 0)
-        env.insert(QStringLiteral("RF_EXIT_FD"), QString::number(_exitPipeReadFd));
+        env.insert(QStringLiteral("GB_APPLOADER_EXIT_FD"), QString::number(_exitPipeReadFd));
 #endif
 }
 

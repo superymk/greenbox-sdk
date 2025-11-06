@@ -225,25 +225,27 @@ void press_continue(const char *prompt)
     }
 }
 
-static HANDLE _eventfd_from_env(void)
+static int _eventfd_from_env(void)
 {
-    char name[256] = {0};
-    DWORD got = GetEnvironmentVariableA("GB_APPLOADER_EXIT_FD", name, sizeof(name));
-    if (got == 0 || got >= sizeof(name))
-        return NULL;
-    return OpenEventA(SYNCHRONIZE, FALSE, name);
+    const char *s = getenv("GB_APPLOADER_EXIT_FD");
+    if (!s)
+        return -1;
+    return atoi(s); // fd inherited across exec
 }
 
 static void _wait_for_exit_noninteractive(void)
 {
-    HANDLE h = _eventfd_from_env();
-    if (!h)
+    int fd = _eventfd_from_env();
+    if (fd < 0)
     {
-        // Fallback: just sleep forever until process is killed
+        // Fallback: block forever
         for (;;)
             msleep(100);
     }
-    WaitForSingleObject(h, INFINITE);
+
+    char buf[1];
+    ssize_t n = read(fd, buf, 1); // blocks until parent writes 1 byte or closes
+    (void)n;
 }
 
 void app_wait_for_exit(void)
@@ -257,7 +259,6 @@ void app_wait_for_exit(void)
         _wait_for_exit_noninteractive();
     }
 }
-
 void sp_loader_os_init()
 {
 }

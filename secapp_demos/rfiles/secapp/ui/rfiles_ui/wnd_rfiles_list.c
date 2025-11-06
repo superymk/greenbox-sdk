@@ -830,13 +830,15 @@ static void on_download_clicked(lv_event_t *e)
     }
 
     const gdrive_entry_t *einfo = &w->cache[w->sel_row - 2];
-    set_status(w, "Downloading %s ...", einfo->name ? einfo->name : "(item)");
+    char* rfile_name = einfo->name ? einfo->name : "(item)";
+
+    set_status(w, "Downloading %s ...", rfile_name);
     lv_bar_set_value(w->status_bar, 10, LV_ANIM_OFF);
 
     if (gdrive_download_to(einfo->id, local_dir) == 0)
     {
         lv_bar_set_value(w->status_bar, 100, LV_ANIM_OFF);
-        set_status(w, "Saved to %s", local_dir);
+        set_status(w, "Saved %s to %s", rfile_name, local_dir);
 
         // Refresh file explorer of the local files.
         refresh_local_fe(w);
