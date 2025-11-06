@@ -64,7 +64,7 @@
           <widget class="QComboBox" name="localDirComboBox">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
+             <horstretch>1</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
@@ -72,7 +72,20 @@
             <bool>true</bool>
            </property>
            <property name="currentText">
-            <string>C:\</string>
+            <string>C:/</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="localDirBrowseButton">
+           <property name="toolTip">
+            <string>Select a local folder</string>
+           </property>
+           <property name="text">
+            <string>Browse...</string>
+           </property>
+           <property name="autoDefault">
+            <bool>false</bool>
            </property>
           </widget>
          </item>
@@ -185,7 +198,7 @@
       <item>
        <widget class="QPushButton" name="optionsButton">
         <property name="enabled">
-         <bool>false</bool>
+         <bool>true</bool>
         </property>
         <property name="text">
          <string>Show Options</string>
@@ -206,12 +219,12 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="connectButton">
+       <widget class="QPushButton" name="runButton">
         <property name="enabled">
          <bool>false</bool>
         </property>
         <property name="text">
-         <string>Connect</string>
+         <string>Run</string>
         </property>
         <property name="default">
          <bool>true</bool>
@@ -235,7 +248,7 @@
      <x>0</x>
      <y>0</y>
      <width>550</width>
-     <height>18</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>
