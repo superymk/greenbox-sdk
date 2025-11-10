@@ -1,0 +1,106 @@
+#include <ntddk.h>
+#include <wdf.h>
+// #include <wdmsec.h> // SDDL_DEVOBJ_* constants
+
+#include "driver_entry.h"
+#include "win_intr.h"
+#include <sa_headers.h>
+
+
+// Globals
+static WDFTIMER gPollTimer = NULL;
+
+// Timer callback
+EVT_WDF_TIMER EvtPollTimer;
+_Use_decl_annotations_
+VOID EvtPollTimer(WDFTIMER Timer)
+{
+    // If you need the driver object:
+    WDFOBJECT parent = WdfTimerGetParentObject(Timer);
+    UNREFERENCED_PARAMETER(parent);
+
+    // TODO: poll your events/work here
+}
+
+
+
+// Optional: cleanup to make sure timer is stopped on unload
+EVT_WDF_OBJECT_CONTEXT_CLEANUP EvtDriverCleanup;
+_Use_decl_annotations_
+VOID EvtDriverCleanup(WDFOBJECT DriverObject)
+{
+    UNREFERENCED_PARAMETER(DriverObject);
+    if (gPollTimer) {
+        WdfTimerStop(gPollTimer, TRUE);   // wait for any running callback
+        gPollTimer = NULL;
+    }
+}
+
+NTSTATUS
+DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
+{
+    NTSTATUS status;
+    WDFDRIVER driver;
+    WDF_DRIVER_CONFIG drvCfg;
+    WDF_OBJECT_ATTRIBUTES drvAttrs;
+
+    WDF_DRIVER_CONFIG_INIT(&drvCfg, NULL);
+    WDF_OBJECT_ATTRIBUTES_INIT(&drvAttrs);
+	drvAttrs.EvtCleanupCallback = EvtDriverCleanup;
+
+    status = WdfDriverCreate(DriverObject, RegistryPath, &drvAttrs, &drvCfg, &driver);
+    if (!NT_SUCCESS(status)) 
+	{
+		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 0.1 status:0x%08X\n", status);
+		return status;
+	}
+
+    // --- Create a KMDF control device so we have a WDFDEVICE parent ---
+    PWDFDEVICE_INIT pInit = WdfControlDeviceInitAllocate(driver, &SDDL_DEVOBJ_SYS_ALL_ADM_ALL);
+    if (!pInit)
+	{
+		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 0.2 \n");
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+    UNICODE_STRING devName = RTL_CONSTANT_STRING(L"\\Device\\GreenBoxSecAgent");
+    status = WdfDeviceInitAssignName(pInit, &devName);
+    if (!NT_SUCCESS(status)) 
+	{
+		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 1 status:0x%08X\n", status);
+		WdfDeviceInitFree(pInit); 
+		return status; 
+	}
+
+    WDFDEVICE device;
+    // Optional: set device type/characteristics here if you expose a DOS link, etc.
+    status = WdfDeviceCreate(&pInit, WDF_NO_OBJECT_ATTRIBUTES, &device);
+    if (!NT_SUCCESS(status))
+	{
+		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 2 status:0x%08X\n", status);
+		return status;
+	}
+
+    // Required for control devices
+    WdfControlFinishInitializing(device);
+
+    // --- Create a periodic timer parented to the DEVICE (not the driver) ---
+    WDF_TIMER_CONFIG tcfg;
+    WDF_TIMER_CONFIG_INIT_PERIODIC(&tcfg, EvtPollTimer, 1000); // 1s
+    tcfg.AutomaticSerialization = FALSE;
+
+    WDF_OBJECT_ATTRIBUTES tattrs;
+    WDF_OBJECT_ATTRIBUTES_INIT(&tattrs);
+    tattrs.ParentObject   = device;                 // << valid parent
+    // tattrs.ExecutionLevel = WdfExecutionLevelPassive; // PASSIVE_LEVEL callback (KMDF 1.9+). :contentReference[oaicite:1]{index=1}
+
+    status = WdfTimerCreate(&tcfg, &tattrs, &gPollTimer);
+    if (!NT_SUCCESS(status)) 
+	{
+		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 3 status:0x%08X\n", status);
+		return status;
+	}
+
+    WdfTimerStart(gPollTimer, WDF_REL_TIMEOUT_IN_MS(200));
+    return STATUS_SUCCESS;
+}

@@ -1423,7 +1423,7 @@ static void irqhandler_bh(struct work_struct *taskp)
            *((char *)scancode) & 0x80 ? "Released" : "Pressed");*/
 
     SACOMM_DEBUG("<comm_sos_handle_queued_msgs> start!\n");
-    comm_sos_handle_queued_msgs();
+    comm_sos_handle_queued_msgs(NULL);
     SACOMM_DEBUG("<comm_sos_handle_queued_msgs> finished!\n");
 }
 
@@ -1630,6 +1630,30 @@ void linux_sos_os_intr_unregister(void)
     {
         _linux_intr_unregister(sos_os_irq);
         sos_os_irq = INVALID_IRQ;
+    }
+}
+
+void linux_sos_os_intr_start(void)
+{
+    if (SA_CONFIG_ENABLE_ALLOC_COMM_INTR)
+    {
+        // Do nothing to enable the IPI interrupt
+    }
+    else
+    {
+        // Do nothing. Linux always uses IPI interrupts instead of poll timers.
+    }
+}
+
+void linux_sos_os_intr_stop(void)
+{
+    if (SA_CONFIG_ENABLE_ALLOC_COMM_INTR)
+    {
+        // Do nothing to enable the IPI interrupt
+    }
+    else
+    {
+        // Do nothing. Linux always uses IPI interrupts instead of poll timers.
     }
 }
 

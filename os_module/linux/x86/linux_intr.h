@@ -23,6 +23,9 @@ extern OSSTATUS linux_sos_os_intr_probe_and_register(void);
 /// @param  
 extern void linux_sos_os_intr_unregister(void);
 
+extern void linux_sos_os_intr_start(void);
+extern void linux_sos_os_intr_stop(void);
+
 /// @brief Return the interrupt vector for SecOS-OS notifications.
 /// @param  
 /// @return 

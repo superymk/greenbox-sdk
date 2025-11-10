@@ -19,7 +19,7 @@ extern NTSTATUS InterruptCreateDispatch(
     IN PIRP Irp
 );
 
-extern void win_intr_init(PDRIVER_OBJECT in_DriverObject, PDEVICE_OBJECT in_DeviceObject);
+extern void win_intr_init(PDRIVER_OBJECT in_DriverObject, PDEVICE_OBJECT in_DeviceObject, WDFDEVICE* in_WDFDevice);
 extern void win_intr_fini(void);
 
 /// @brief Probe and register an interrupt handler for SecOS-OS notifications. 
@@ -30,6 +30,9 @@ extern OSSTATUS win_sos_os_intr_probe_and_register(void);
 /// @brief Unregister the interrupt handler for SecOS-OS notifications.
 /// @param  
 extern void win_sos_os_intr_unregister(void);
+
+extern void win_sos_os_intr_start(void);
+extern void win_sos_os_intr_stop(void);
 
 /// @brief Return the interrupt vector for SecOS-OS notifications.
 /// @param  

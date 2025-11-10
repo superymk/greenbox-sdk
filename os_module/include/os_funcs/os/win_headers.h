@@ -14,7 +14,7 @@
 #include <secbase_fn_flags.h>
 
 // Configuration file that defines XMHF_LOG_BUF_SIZE
-#include "win_config_xmhf_log.h"
+#include "os_configs.h"
 
 // Detect SecBase implemented functions
 #undef GREENBOX_USE_UXMHF64_V1

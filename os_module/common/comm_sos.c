@@ -241,11 +241,14 @@ out:
 }
 
 /// Triggered on a message arrival via SecOS-SecBase/OS communication channel
-OSSTATUS comm_sos_handle_queued_msgs(void)
+OSSTATUS comm_sos_handle_queued_msgs(bool* out_has_reqs)
 {
     OSSTATUS status = OS_SUCCESS;
     struct comm_os_msg *msg;
     bool msg_ready = false;
+
+    if (out_has_reqs)
+        *out_has_reqs = false;
 
     msg = (struct comm_os_msg *)os->mm_malloc_zeroed(sizeof(struct comm_os_msg));
     if (!msg)
@@ -262,6 +265,9 @@ OSSTATUS comm_sos_handle_queued_msgs(void)
 
         if (msg_ready)
         {
+            if (out_has_reqs)
+                *out_has_reqs = true;
+
             status = comm_sos_handle_msg(msg);
             if (SA_FAIL(status))
             {
@@ -366,7 +372,7 @@ OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_
             return E_TIMEOUT; // Time out
         }
 
-        status = comm_sos_handle_queued_msgs();
+        status = comm_sos_handle_queued_msgs(NULL);
         if (SA_FAIL(status))
         {
             DRV_ERR("Failed to process the response of the message (req_id:%u)! status:%lu\n", request_id, status);

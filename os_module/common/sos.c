@@ -313,7 +313,6 @@ OSSTATUS do_CMD_REGISTER_SECOS_PREPARE(struct tz_cmd_packet *cmd_packet)
     // On success
     return OS_SUCCESS;
 
-
 sos_init_err:
 	sos_comm_resc_return();
 mm_resc_provision_err:

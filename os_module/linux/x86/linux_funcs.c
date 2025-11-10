@@ -124,6 +124,8 @@ void os_init(void)
     os->intr_trigger_interrupt = linux_intr_trigger_interrupt;
     os->sos_os_intr_probe_and_register = linux_sos_os_intr_probe_and_register;
     os->sos_os_intr_unregister = linux_sos_os_intr_unregister;
+    os->sos_os_intr_start = linux_sos_os_intr_start;
+	os->sos_os_intr_stop = linux_sos_os_intr_stop;
     os->sos_os_intr_get_vector = linux_sos_os_intr_get_vector;
     os->intr_timer = linux_intr_timer;
     os->sos_os_intr_get_os_lapic_id = linux_sos_os_intr_get_os_lapic_id;

@@ -5,5 +5,13 @@
 			"path": "os_module"
 		}
 	],
-    "settings": {}
+	"settings": {
+		"files.associations": {
+			"win_intr.h": "c",
+			"win_cpu.h": "c",
+			"sa_headers.h": "c",
+			"compilers.h": "c",
+			"*.c_old": "c"
+		}
+	}
 }

@@ -119,7 +119,10 @@ void os_init(void)
 	os->intr_trigger_interrupt = win_intr_trigger_interrupt;
 	os->sos_os_intr_probe_and_register = win_sos_os_intr_probe_and_register;
 	os->sos_os_intr_unregister = win_sos_os_intr_unregister;
+	os->sos_os_intr_start = win_sos_os_intr_start;
+	os->sos_os_intr_stop = win_sos_os_intr_stop;
 	os->sos_os_intr_get_vector = win_sos_os_intr_get_vector;
+
 	os->intr_timer = win_intr_timer;
 	os->sos_os_intr_get_os_lapic_id = win_sos_os_intr_get_os_lapic_id;
 
