@@ -10,6 +10,7 @@
 #include <sa_headers.h>
 
 static WCHAR NameBuffer[] = L"\\Device\\SecAgent";
+static WCHAR WDFNameBuffer[] = L"\\Device\\SecAgentWDF";
 static WCHAR DOSNameBuffer[] = L"\\DosDevices\\SecAgent";
 
 static NTSTATUS HandleIOCTL(
@@ -311,6 +312,7 @@ static OSSTATUS _wdf_dev_create(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 {
     NTSTATUS status;
     WDFDRIVER driver;
+    UNICODE_STRING uniWDFDevName;
     WDF_DRIVER_CONFIG drvCfg;
     WDF_OBJECT_ATTRIBUTES drvAttrs;
 
@@ -321,7 +323,7 @@ static OSSTATUS _wdf_dev_create(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
     status = WdfDriverCreate(DriverObject, RegistryPath, &drvAttrs, &drvCfg, &driver);
     if (!NT_SUCCESS(status)) 
 	{
-		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 0.1 status:0x%08X\n", status);
+		PRINT_ERR_FORCE_OS("[INIT] Create WDF driver error! status:0x%08X\n", status);
 		return E_INTERNAL_ERROR;
 	}
 
@@ -329,15 +331,16 @@ static OSSTATUS _wdf_dev_create(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
     PWDFDEVICE_INIT pInit = WdfControlDeviceInitAllocate(driver, &SDDL_DEVOBJ_SYS_ALL_ADM_ALL);
     if (!pInit)
 	{
-		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 0.2 \n");
+		PRINT_ERR_FORCE_OS("[INIT] Allocate WDF device error! \n");
 		return E_INTERNAL_ERROR;
 	}
 
-    UNICODE_STRING devName = RTL_CONSTANT_STRING(L"\\Device\\GreenBoxSecAgent");
-    status = WdfDeviceInitAssignName(pInit, &devName);
+    RtlInitUnicodeString(&uniWDFDevName, WDFNameBuffer);
+    status = WdfDeviceInitAssignName(pInit, &uniWDFDevName);
     if (!NT_SUCCESS(status)) 
 	{
-		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 1 status:0x%08X\n", status);
+		PRINT_ERR_FORCE_OS("[INIT] WDF device assign name error! status:0x%08X\n", status);
+        
 		WdfDeviceInitFree(pInit); 
 		return E_INTERNAL_ERROR; 
 	}
@@ -346,7 +349,7 @@ static OSSTATUS _wdf_dev_create(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
     status = WdfDeviceCreate(&pInit, WDF_NO_OBJECT_ATTRIBUTES, &sa_wdf_device);
     if (!NT_SUCCESS(status))
 	{
-		PRINT_ERR_FORCE_OS("[Superymk] DriverEntry 2 status:0x%08X\n", status);
+		PRINT_ERR_FORCE_OS("[INIT] Create WDF device error! status:0x%08X\n", status);
 		return E_INTERNAL_ERROR;
 	}
 
@@ -373,6 +376,7 @@ NTSTATUS DriverEntry(
         goto err;
 
     // Create WDF Device
+    // [TODO][Issue 188] WDF driver cannot be unloaded on-demand at current. This must be fixed to improve GreenBox update.
     status = _wdf_dev_create(DriverObject, RegistryPath);
     if (SA_FAIL(status))
         goto err;
