@@ -14,7 +14,7 @@ Pre-requisites:
 
 Steps:
 1. After building GreenBox-SDK for Linux, copy Linux build files to the GreenBox folder for the Windows build. Copy the folders ```output/dist/sap``` and ```output/dist/sos``` of the Linux build output to the ```win/imgs/sap``` and ```win/imgs/sos``` folders.
-2. Copy ```config.mk.example``` to ```config.mk```, check ```config.mk``` to ensure that only "CURRENT_PLATFORM", "TARGET_PLATFORM", and "OS" are updated for the windows build. Other configurations should be the same with the ones for the Linux build.
+2. Copy ```config.mk.example``` to ```config.mk```, check ```config.mk``` to ensure that only "CURRENT_PLATFORM", "TARGET_PLATFORM", and "OS" are updated for the windows build. Other configurations should be the same with the ones for the Linux build. Also copy ```os_module/include/sa_configs.h.example``` to ```os_module/include/sa_configs.h``` and edit the .h file to enable configs for SecAgent.
 3. Run Visual Studio 2022 to open and build projects for Windows. Build the x64 release version for all following projects:
     - ```loaders/sos_loader_gui_client/win/SOSLoader_GUI/SOSLoader_GUI.sln```
     - ```os_module/win/SecAgent.sln```
@@ -39,7 +39,7 @@ Pre-requisites:
     ```
 
 Steps:
-1. In the project root folder, copy ```config.mk.example``` to ```config.mk```. Modify config.mk if needed; e.g., setting "export DEBUG = y" to compile the debug version. 
+1. In the project root folder, copy ```config.mk.example``` to ```config.mk```. Modify config.mk if needed; e.g., setting "export DEBUG = y" to compile the debug version. Also copy ```os_module/include/sa_configs.h.example``` to ```os_module/include/sa_configs.h``` and edit the .h file to enable configs for SecAgent.
 2. Build 3rd party libraries (e.g., ported libraries lke newlib/openssl/libssh2) with ```make first_build```. Run this command only after modifying libraries. 
 3. Build the entire project with ```make clean;make```. 
 
