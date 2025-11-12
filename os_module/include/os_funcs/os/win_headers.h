@@ -13,9 +13,6 @@
 #include "compilers.h"
 #include <secbase_fn_flags.h>
 
-// Configuration file that defines XMHF_LOG_BUF_SIZE
-#include "os_configs.h"
-
 // Detect SecBase implemented functions
 #undef GREENBOX_USE_UXMHF64_V1
 #if (SECBASE_FUNC_SECOS_RICH_OS_SHARE_CPU == 1)

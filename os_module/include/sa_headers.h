@@ -5,6 +5,8 @@
 #ifndef SECAGENT_H
 #define SECAGENT_H
 
+#include <sa_configs.h>
+
 #ifdef __linux__
 	#include <os_funcs/os/linux_headers.h>
 #elif defined (_WIN32) || defined (_WIN64)

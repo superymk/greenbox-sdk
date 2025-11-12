@@ -172,11 +172,11 @@ void sp_main(SP_UTASK *params)
     }
 
 out:
-    sp_exit(params);
+    sp_on_exit(params);
     return;
 }
 
-void sp_exit(SP_UTASK *sp_params)
+void sp_on_exit(SP_UTASK *sp_params)
 {
     libdtm_hid_unregister_kbd_listener(libgui_kbd_listener);
 	libdtm_hid_unregister_mouse_listener(libgui_mouse_listener);
@@ -262,7 +262,7 @@ bool sp_handle_app_request(struct ipc_msg *msg)
 
 void sp_handle_exception(void)
 {
-    sp_exit(current_sp);
+    sp_on_exit(current_sp);
 }
 
 
@@ -290,11 +290,11 @@ void sp_handle_exception(void)
 //         sp_yield();
 //     }
 
-//     sp_exit(params);
+//     sp_on_exit(params);
 //     return;
 // }
 
-// void sp_exit(SP_UTASK *sp_params)
+// void sp_on_exit(SP_UTASK *sp_params)
 // {
 //     SAP_INFO("Demo - Remote Files Exited!\n");
 // }

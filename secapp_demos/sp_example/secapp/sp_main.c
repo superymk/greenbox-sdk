@@ -74,7 +74,7 @@ void sp_main(SP_UTASK* params)
 	printf("Total Pass: %u\n", total_pass);
 }
 
-void sp_exit(SP_UTASK* sp_params)
+void sp_on_exit(SP_UTASK* sp_params)
 {
 
 }
@@ -101,5 +101,5 @@ bool sp_handle_app_request(struct ipc_msg* msg)
 
 void sp_handle_exception(void)
 {
-	sp_exit(current_sp);
+	sp_on_exit(current_sp);
 }

@@ -11,7 +11,8 @@
 			"win_cpu.h": "c",
 			"sa_headers.h": "c",
 			"compilers.h": "c",
-			"*.c_old": "c"
+			"*.c_old": "c",
+			"os_types.h": "c"
 		}
 	}
 }

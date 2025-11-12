@@ -23,7 +23,7 @@ void sp_main(void* params)
 
 }
 
-void sp_exit(void* sp_params)
+void sp_on_exit(void* sp_params)
 {
 
 }

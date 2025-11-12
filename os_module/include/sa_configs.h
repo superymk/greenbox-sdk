@@ -3,8 +3,8 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
-#ifndef __OS_CONFIG_H__
-#define __OS_CONFIG_H__
+#ifndef __SECAGENT_CONFIG_H__
+#define __SECAGENT_CONFIG_H__
 
 // This macro must be the same as secbase/hypapps/whitevisor/config.mk .
 // If secbase/hypapps/whitevisor/config.mk defines XMHF_LOG_BUF_SIZE variable,
@@ -18,4 +18,4 @@
 /// @brief Set to 1 to enable SecAgent to allocate OS interrupts to receive IPI from SecOS.
 #define SA_CONFIG_ENABLE_ALLOC_COMM_INTR (0)
 
-#endif /* !__OS_CONFIG_H__ */
+#endif /* !__SECAGENT_CONFIG_H__ */

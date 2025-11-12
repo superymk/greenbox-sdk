@@ -24,6 +24,6 @@
 
 #ifndef __ASSEMBLY__
 
-extern void sp_exit(SP_UTASK* sp_params);
+extern void sp_on_exit(SP_UTASK* sp_params);
 #endif // __ASSEMBLY__
 #endif // SECAPP_HEADERS_H

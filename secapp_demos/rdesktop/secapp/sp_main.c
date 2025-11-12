@@ -240,11 +240,11 @@ void sp_main(SP_UTASK *params)
     }
 
 out:
-    sp_exit(params);
+    sp_on_exit(params);
     return;
 }
 
-void sp_exit(SP_UTASK *sp_params)
+void sp_on_exit(SP_UTASK *sp_params)
 {
     libdtm_hid_unregister_kbd_listener(sp_kbd_listener);
     libdtm_hid_unregister_mouse_listener(sp_mouse_listener);
@@ -394,5 +394,5 @@ err:
 
 void sp_handle_exception(void)
 {
-    sp_exit(current_sp);
+    sp_on_exit(current_sp);
 }
