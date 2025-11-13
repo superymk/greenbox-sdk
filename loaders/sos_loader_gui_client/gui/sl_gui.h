@@ -141,6 +141,7 @@ class Frm_DevConfig : public wxFrame
 		wxStaticText* m_staticText8;
 		wxStaticText* t_disp_resolution_selector;
 		wxChoice* m_disp_resolution_selector;
+		wxStaticText* m_staticText9;
 		wxButton* btn_reset_users_profiles;
 		wxStaticText* t_staticText6;
 		wxStaticText* t_staticText5;

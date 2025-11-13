@@ -36,6 +36,11 @@
 		if((DRV_LOG >= LOG_INFO) && (DRV_LOG != LOG_NONE)) {  \
 		PRINT(format, ## __VA_ARGS__); } }while(0)
 
+#define DRV_WARN(format, ...) \
+	do{	\
+		if((DRV_LOG >= LOG_WARNING) && (DRV_LOG != LOG_NONE)) {  \
+		PRINT_ERR("[CPU:%u][SecAgent-WARN] "format, os->processor_id(), ## __VA_ARGS__); } }while(0)
+
 #define DRV_ERR(format, ...) \
 	do{	\
 		if((DRV_LOG >= LOG_ERR) && (DRV_LOG != LOG_NONE)) {  \

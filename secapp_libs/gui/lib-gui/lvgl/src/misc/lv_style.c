@@ -160,6 +160,7 @@ const uint8_t lv_style_builtin_prop_flag_lookup_table[LV_STYLE_NUM_BUILT_IN_PROP
     [LV_STYLE_GRID_CELL_X_ALIGN] =          LV_STYLE_PROP_FLAG_LAYOUT_UPDATE,
     [LV_STYLE_GRID_CELL_Y_ALIGN] =          LV_STYLE_PROP_FLAG_LAYOUT_UPDATE,
 #endif
+    [LV_STYLE_IMAGE_COLORKEY]         = 0,
 
 };
 
@@ -253,11 +254,6 @@ lv_style_prop_t lv_style_register_prop(uint8_t flag)
         lv_style_custom_prop_flag_lookup_table_size = 0;
         last_custom_prop_id = (uint16_t)LV_STYLE_LAST_BUILT_IN_PROP;
     }
-
-    //    if((last_custom_prop_id + 1) != 0) {
-    //        LV_LOG_ERROR("No more custom property IDs available");
-    //        return LV_STYLE_PROP_INV;
-    //    }
 
     /*
      * Allocate the lookup table if it's not yet available.

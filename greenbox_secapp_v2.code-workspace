@@ -51,7 +51,10 @@
 			"libc_backend.h": "c",
 			"format": "c",
 			"thread": "c",
-			"vector": "c"
+			"vector": "c",
+			"version": "c",
+			"sl_rpc_protocol.h": "c",
+			"tpmtool_header.h": "c"
 		}
     }
 }

@@ -189,6 +189,9 @@
     <ClCompile Include="..\common\untrusted_loader_utils.c">
       <Filter>Source Files\common</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\tos.c">
+      <Filter>Source Files\common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="driver_entry.h">
@@ -309,6 +312,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\untrusted_loader_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\tos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

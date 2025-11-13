@@ -2,13 +2,13 @@
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
 
-#include <fcntl.h>
+// #include <fcntl.h>
  
-extern void exit(int code);
-extern int main ();
+// extern void exit(int code);
+// extern int main ();
 
-void _start() 
-{
-    int ex = main();
-    exit(ex);
-}
+// void _start() 
+// {
+//     int ex = main();
+//     exit(ex);
+// }

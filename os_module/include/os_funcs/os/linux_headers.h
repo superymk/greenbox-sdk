@@ -9,6 +9,15 @@
 #include <linux/kernel.h>  /* Needed for KERN_ALERT */
 #include "compilers.h"
 
+#include <secbase_fn_flags.h>
+
+// Detect SecBase implemented functions
+#undef GREENBOX_USE_UXMHF64_V1
+#if (SECBASE_FUNC_SECOS_RICH_OS_SHARE_CPU == 1)
+#define GREENBOX_USE_UXMHF64_V1 1
+#else
+#endif // (SECBASE_FUNC_SECOS_RICH_OS_SHARE_CPU == 1)
+
 #ifndef __ASSEMBLY__
 
 #ifdef XMHF_LOG_BUF_SIZE

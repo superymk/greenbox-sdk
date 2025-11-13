@@ -51,7 +51,10 @@ extern OSSTATUS comm_sos_init(vaddr_t os_send_ctl, vaddr_t os_send_buf, vaddr_t 
 
 extern void comm_sos_fini(void);
 
-extern OSSTATUS comm_sos_handle_queued_msgs(void);
+/// @brief 
+/// @param out_has_reqs [Optional] Set to true if received SecOS requests.
+/// @return 
+extern OSSTATUS comm_sos_handle_queued_msgs(bool* out_has_reqs);
 
 typedef enum 
 {

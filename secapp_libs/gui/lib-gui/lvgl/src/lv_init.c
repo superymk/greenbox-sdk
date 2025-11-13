@@ -49,16 +49,15 @@
 #if LV_USE_NEMA_GFX
     #include "draw/nema_gfx/lv_draw_nema_gfx.h"
 #endif
-#if LV_USE_DRAW_VGLITE
-    #include "draw/nxp/vglite/lv_draw_vglite.h"
-#endif
 #if LV_USE_PXP
     #if LV_USE_DRAW_PXP || LV_USE_ROTATE_PXP
         #include "draw/nxp/pxp/lv_draw_pxp.h"
     #endif
 #endif
-#if LV_USE_DRAW_G2D
-    #include "draw/nxp/g2d/lv_draw_g2d.h"
+#if LV_USE_G2D
+    #if LV_USE_DRAW_G2D || LV_USE_ROTATE_G2D
+        #include "draw/nxp/g2d/lv_draw_g2d.h"
+    #endif
 #endif
 #if LV_USE_DRAW_DAVE2D
     #include "draw/renesas/dave2d/lv_draw_dave2d.h"
@@ -241,18 +240,16 @@ void lv_init(void)
     lv_draw_nema_gfx_init();
 #endif
 
-#if LV_USE_DRAW_VGLITE
-    lv_draw_vglite_init();
-#endif
-
 #if LV_USE_PXP
 #if LV_USE_DRAW_PXP || LV_USE_ROTATE_PXP
     lv_draw_pxp_init();
 #endif
 #endif
 
-#if LV_USE_DRAW_G2D
+#if LV_USE_G2D
+#if LV_USE_DRAW_G2D || LV_USE_ROTATE_G2D
     lv_draw_g2d_init();
+#endif
 #endif
 
 #if LV_USE_DRAW_DAVE2D
@@ -376,6 +373,10 @@ void lv_init(void)
     lv_fs_uefi_init();
 #endif
 
+#if LV_USE_FS_FROGFS
+    lv_fs_frogfs_init();
+#endif
+
     /*Use the earlier initialized position of FFmpeg decoder as a fallback decoder*/
 #if LV_USE_FFMPEG
     lv_ffmpeg_init();
@@ -478,12 +479,10 @@ void lv_deinit(void)
 #endif
 #endif
 
-#if LV_USE_DRAW_VGLITE
-    lv_draw_vglite_deinit();
-#endif
-
-#if LV_USE_DRAW_G2D
+#if LV_USE_G2D
+#if LV_USE_DRAW_G2D || LV_USE_ROTATE_G2D
     lv_draw_g2d_deinit();
+#endif
 #endif
 
 #if LV_USE_DRAW_VG_LITE
@@ -510,8 +509,6 @@ void lv_deinit(void)
 
     lv_layout_deinit();
 
-    lv_fs_deinit();
-
     lv_timer_core_deinit();
 
 #if LV_USE_PROFILER && LV_USE_PROFILER_BUILTIN
@@ -529,6 +526,12 @@ void lv_deinit(void)
 #if LV_USE_TRANSLATION
     lv_translation_deinit();
 #endif
+
+#if LV_USE_FS_FROGFS
+    lv_fs_frogfs_deinit();
+#endif
+
+    lv_fs_deinit();
 
     lv_mem_deinit();
 

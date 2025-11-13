@@ -28,15 +28,21 @@ ifeq ($(DEBUG),y)
 endif
  
 .PHONY: all
-all: $(OBJECTS) static copy_cfg
+all: certs_gen $(OBJECTS) static copy_files
 	
 %.o: %.S Makefile FORCE
 	$(CC) -c $(APP_INCLUDE) $(CFLAGS) -D__ASSEMBLY__ -o $@ $<
 %.o: %.c Makefile FORCE
 	$(CC) -c $(APP_INCLUDE) $(CFLAGS) -o $@ $<
 
-.PHONY: copy_cfg
-copy_cfg:
+.PHONY: certs_gen
+certs_gen:
+	@$(MAKE) -C ./certs_gen all
+	@$(CP) -f ./certs_gen/ca-certificates.with-extras.crt $(DIST_SAP_PATH)/
+	@$(CP) -f ./certs_gen/ca-certificates.with-extras.crt $(DIST_PRIV_SAP_PATH)/
+
+.PHONY: copy_files
+copy_files:
 	@$(CP) -f ./*.json $(DIST_SAP_PATH)/
 	@$(CP) -f ./*.json $(DIST_PRIV_SAP_PATH)/
 
@@ -53,6 +59,7 @@ shared:
 	$(CC) -o $(DIST_PRIV_SAP_PATH)/sl_rfiles $(OBJECTS) $(APP_LFLAGS) -L$(DIST_PRIV_SAP_PATH) -l:app-libs.so
 	
 clean:
+	@$(MAKE) -C ./certs_gen clean
 	$(RM) *.o
 
 # Define a phony target that always runs

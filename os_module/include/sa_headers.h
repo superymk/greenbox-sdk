@@ -5,6 +5,8 @@
 #ifndef SECAGENT_H
 #define SECAGENT_H
 
+#include <sa_configs.h>
+
 #ifdef __linux__
 	#include <os_funcs/os/linux_headers.h>
 #elif defined (_WIN32) || defined (_WIN64)
@@ -61,5 +63,6 @@
 #include <secagent_ops.h>
 #include <sos_sp_params.h>
 #include <sos.h>
+#include <tos.h>
 
 #endif // SECAGENT_H

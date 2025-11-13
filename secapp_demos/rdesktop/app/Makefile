@@ -35,8 +35,9 @@ ifeq ($(OS), windows_msys2)
 	@$(CP) -rf $(QT_APP_DIRS)/RDesktop.exe $(DIST_SAP_PATH)/
 	@$(CP) -rf $(QT_APP_DIRS)/RDesktop.exe $(DIST_PRIV_SAP_PATH)/
 else
-	@$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_SAP_PATH)/
-	@$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_PRIV_SAP_PATH)/
+	# Temporally enable for windows only.
+	#@$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_SAP_PATH)/
+	#@$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_PRIV_SAP_PATH)/
 endif
 	
 clean:

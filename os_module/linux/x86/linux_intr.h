@@ -23,6 +23,9 @@ extern OSSTATUS linux_sos_os_intr_probe_and_register(void);
 /// @param  
 extern void linux_sos_os_intr_unregister(void);
 
+extern void linux_sos_os_intr_start(void);
+extern void linux_sos_os_intr_stop(void);
+
 /// @brief Return the interrupt vector for SecOS-OS notifications.
 /// @param  
 /// @return 
@@ -31,9 +34,11 @@ extern intr_t linux_intr_timer(void);
 extern lapic_id_t linux_sos_os_intr_get_os_lapic_id(void);
 
 extern void linux_os_intr_read_affinity(void);
+
+#ifdef GREENBOX_USE_UXMHF64_V1
 extern void linux_os_intr_remove_affinity(void);
 extern void linux_os_intr_restore_affinity(void);
-
+#endif // GREENBOX_USE_UXMHF64_V1
 
 
 /********* Signal Functions *********/

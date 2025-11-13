@@ -36,7 +36,13 @@
 			"system_error": "c",
 			"xlocale": "c",
 			"dirent.h": "c",
-			"chrono": "c"
+			"chrono": "c",
+			"array": "c",
+			"span": "c",
+			"vector": "c",
+			"xstring": "c",
+			"xutility": "c",
+			"version": "c"
 		}
     }
 }

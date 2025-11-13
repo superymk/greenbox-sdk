@@ -22,7 +22,9 @@ export TARGET_PLATFORM                  = amd64
 # The target running OS: linux, windows_msys2
 # Note: MSYS2 UCRT is needed to build under "windows"
 export OS                               = linux
-export DEVELOP                          = y
+
+## Force use UXMHF64 v1
+export CONFIG_USE_LEGACY_UXMHF64_V1     = n
 
 export CONFIG_SOSLOADER_GUI             = y
 export CONFIG_SOSLOADER_GUI_DEBUG       = n

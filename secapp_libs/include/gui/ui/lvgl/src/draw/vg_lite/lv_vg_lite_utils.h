@@ -24,7 +24,11 @@ extern "C" {
 #if LV_USE_VG_LITE_THORVG
 #include "../../others/vg_lite_tvg/vg_lite.h"
 #else
+#if LV_USE_VG_LITE_DRIVER
+#include "../../libs/vg_lite_driver/inc/vg_lite.h"
+#else
 #include <vg_lite.h>
+#endif
 #endif
 
 /*********************
@@ -288,6 +292,7 @@ static inline void lv_vg_lite_blit_rect(vg_lite_buffer_t * target,
     });
     LV_PROFILER_DRAW_END_TAG("vg_lite_blit_rect");
 }
+void lv_vg_lite_set_color_key(const lv_image_colorkey_t * colorkey);
 
 static inline void lv_vg_lite_clear(vg_lite_buffer_t * target, const lv_area_t * area, vg_lite_color_t color)
 {

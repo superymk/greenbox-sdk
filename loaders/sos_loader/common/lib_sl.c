@@ -36,6 +36,15 @@ __attribute__((unused)) static void _secagent_init_secbase(void)
     uint32_t i = 0;
     uint32_t num_cpus = app_cpus_get_procs_num();
 
+#ifndef GREENBOX_USE_UXMHF64_V1
+    // Invoke SecBase to boot TinyOS
+    secagent_secbase_boot_tinyos();
+
+    // Sleep for 100ms so TinyOS finishes booting.
+    usleep(100 * 1000); 
+
+#endif // !GREENBOX_USE_UXMHF64_V1
+
     for (i = 0; i < num_cpus; i++)
     {
         app_set_cpu_affinity(i);
@@ -199,7 +208,7 @@ SL_STATUS sl_load_and_run_secos_and_secsrvs(void)
 {
     SL_STATUS status = SL_SUCCESS;
     int ret = 0;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     SL_INFO("Starting SecOS and SecServices...\n");
 
@@ -306,7 +315,7 @@ SL_STATUS sl_terminate_and_unload_secos_and_secsrvs(void)
 {
     SL_STATUS status = SL_SUCCESS;
     int ret = 0;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     SL_INFO("Terminating SecOS and SecServices...\n");
 

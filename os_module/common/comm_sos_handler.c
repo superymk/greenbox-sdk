@@ -137,10 +137,16 @@ void comm_sos_handler_init(void)
 
 	if(!wait_msg_cache)
 		wait_msg_cache = list_create();
+
+	// Start the SecOS-OS channel interrupt
+    os->sos_os_intr_start();
 }
 
 void comm_sos_handler_fini(void)
 {
+	// Stop the SecOS-OS channel interrupt
+    os->sos_os_intr_stop();
+
 	if(wait_msg_cache)
 	{
 		list_destroy(wait_msg_cache);

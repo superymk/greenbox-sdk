@@ -37,6 +37,7 @@ secagent-objs := \
 ../common/sos_sp_params.o \
 ../common/sos.o \
 ../common/stl_dlist.o \
+../common/tos.o \
 ../common/untrusted_loader_info.o \
 ../common/untrusted_loader_utils.o \
 ../common/debug.o \

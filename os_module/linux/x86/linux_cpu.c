@@ -143,7 +143,7 @@ void linux_outl(uint32_t value, uint16_t port)
 
 static uint32_t cpu_vendor = CPU_VENDOR_UNKNOWN;
 
-static inline uint32_t _get_cpu_vendor(void)
+static uint32_t _get_cpu_vendor(void)
 {
     uint32_t dummy;
     uint32_t vendor_dword1, vendor_dword2, vendor_dword3;
@@ -159,7 +159,7 @@ static inline uint32_t _get_cpu_vendor(void)
     return 0; /* never reached */
 }
 
-static inline ulong_t linux_hypercall(ulong_t eax,
+static ulong_t linux_hypercall(ulong_t eax,
                                       ulong_t ecx, ulong_t edx, ulong_t esi, ulong_t edi,
                                       ulong_t *out_esi, ulong_t *out_edi)
 {
@@ -196,7 +196,7 @@ static inline ulong_t linux_hypercall(ulong_t eax,
     return eax;
 }
 
-static inline ulong_t linux_hypercall_ret4(ulong_t arg_ax, ulong_t *arg_cx, ulong_t *arg_dx,
+static ulong_t _linux_hypercall_ret4(ulong_t arg_ax, ulong_t *arg_cx, ulong_t *arg_dx,
                                            ulong_t *arg_si, ulong_t *arg_di)
 {
     // Flush cache first to ensure parameters to SecBase are flushed to memory
@@ -278,5 +278,24 @@ ulong_t linux_hypercall_ret1(ulong_t fn, ulong_t *arg1)
 {
     ulong_t reserved = 0;
 
-    return linux_hypercall_ret4(fn, arg1, &reserved, &reserved, &reserved);
+    return _linux_hypercall_ret4(fn, arg1, &reserved, &reserved, &reserved);
+}
+
+ulong_t linux_hypercall_ret2(ulong_t fn, ulong_t *arg1, ulong_t *arg2)
+{
+    ulong_t reserved = 0;
+
+    return _linux_hypercall_ret4(fn, arg1, arg2, &reserved, &reserved);
+}
+
+ulong_t linux_hypercall_ret3(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t* arg3)
+{
+    ulong_t reserved = 0;
+
+    return _linux_hypercall_ret4(fn, arg1, arg2, arg3, &reserved);
+}
+
+ulong_t linux_hypercall_ret4(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t* arg3, ulong_t* arg4)
+{
+    return _linux_hypercall_ret4(fn, arg1, arg2, arg3, arg4);
 }

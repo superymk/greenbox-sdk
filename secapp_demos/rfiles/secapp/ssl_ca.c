@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <curl/curl.h>
 
+#include "utils_fs.h"
+
 #ifdef _WIN32
 /* If libcurl was built with Schannel, Windows System Store is used automatically. */
 #endif
@@ -43,6 +45,7 @@ static bool dir_exists(const char *p)
     struct stat st;
     return (p && *p && stat(p, &st) == 0 && (st.st_mode & S_IFDIR));
 }
+
 static char *dup_str(const char *s)
 {
     if (!s)
@@ -97,73 +100,95 @@ static int read_file_all(const char *path, unsigned char **out_buf, size_t *out_
     return 0;
 }
 
-/* Common Linux/Unix locations (order matters) */
-static const char *const CAFILE_CANDIDATES[] = {
-    "/etc/ssl/certs/ca-certificates.crt", /* Debian/Ubuntu */
-    "/etc/pki/tls/certs/ca-bundle.crt",   /* RHEL/CentOS/Fedora */
-    "/etc/ssl/cert.pem",                  /* Alpine/musl, macOS Homebrew */
-    "/etc/ssl/ca-bundle.pem",             /* SUSE/openSUSE */
-    NULL};
-static const char *const CAPATH_CANDIDATES[] = {
-    "/etc/ssl/certs",
-    "/etc/pki/tls/certs",
-    NULL};
+// /* Common Linux/Unix locations (order matters) */
+// static const char *const CAFILE_CANDIDATES[] = {
+//     "/etc/ssl/certs/ca-certificates.crt", /* Debian/Ubuntu */
+//     "/etc/pki/tls/certs/ca-bundle.crt",   /* RHEL/CentOS/Fedora */
+//     "/etc/ssl/cert.pem",                  /* Alpine/musl, macOS Homebrew */
+//     "/etc/ssl/ca-bundle.pem",             /* SUSE/openSUSE */
+//     NULL};
+// static const char *const CAPATH_CANDIDATES[] = {
+//     "/etc/ssl/certs",
+//     "/etc/pki/tls/certs",
+//     NULL};
 
-/* Detect Unix-ish CA file & dir; Windows Schannel is handled by curl itself. */
-static void detect_unix_ca(void)
+// /* Detect Unix-ish CA file & dir; Windows Schannel is handled by curl itself. */
+// static void detect_unix_ca(void)
+// {
+//     if (!g_cafile)
+//     {
+//         for (int i = 0; CAFILE_CANDIDATES[i]; i++)
+//         {
+//             if (file_exists(CAFILE_CANDIDATES[i]))
+//             {
+//                 g_cafile = dup_str(CAFILE_CANDIDATES[i]);
+//                 break;
+//             }
+//         }
+//     }
+//     if (!g_capath)
+//     {
+//         for (int i = 0; CAPATH_CANDIDATES[i]; i++)
+//         {
+//             if (dir_exists(CAPATH_CANDIDATES[i]))
+//             {
+//                 g_capath = dup_str(CAPATH_CANDIDATES[i]);
+//                 break;
+//             }
+//         }
+//     }
+// }
+
+// /* If curl is built with Schannel on Windows, CAINFO options are typically ignored. */
+// __attribute__((unused)) static int curl_uses_schannel(void)
+// {
+// #ifdef _WIN32
+//     const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
+//     if (vi && vi->ssl_version && strstr(vi->ssl_version, "Schannel"))
+//         return 1;
+// #endif
+//     return 0;
+// }
+
+/********* Public Functions *********/
+SAP_STATUS sslca_init(const char *certs_filepath)
 {
-    if (!g_cafile)
-    {
-        for (int i = 0; CAFILE_CANDIDATES[i]; i++)
-        {
-            if (file_exists(CAFILE_CANDIDATES[i]))
-            {
-                g_cafile = dup_str(CAFILE_CANDIDATES[i]);
-                break;
-            }
-        }
-    }
-    if (!g_capath)
-    {
-        for (int i = 0; CAPATH_CANDIDATES[i]; i++)
-        {
-            if (dir_exists(CAPATH_CANDIDATES[i]))
-            {
-                g_capath = dup_str(CAPATH_CANDIDATES[i]);
-                break;
-            }
-        }
-    }
-}
+    SAP_STATUS status = SUCCESS;
 
-/* If curl is built with Schannel on Windows, CAINFO options are typically ignored. */
-__attribute__((unused)) static int curl_uses_schannel(void)
-{
-#ifdef _WIN32
-    const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
-    if (vi && vi->ssl_version && strstr(vi->ssl_version, "Schannel"))
-        return 1;
-#endif
-    return 0;
-}
+    // Check: params must be valid
+    if (!certs_filepath)
+        return EINVAL;
 
-/* ---------- Public API ---------- */
-
-void sslca_init(void)
-{
     if (g_inited)
-        return;
+        return EINVAL;
     g_inited = 1;
 
-#ifndef _WIN32
-    /* Autodetect on Unix-like systems */
-    detect_unix_ca();
-#else
-    /* On Windows: if not Schannel (e.g., OpenSSL build), user may still have a CA file
-       in a common path (e.g., Git for Windows bundle). We can try typical Unix paths
-       too in case of MSYS2/MinGW environments. */
-    detect_unix_ca();
-#endif
+    // #ifndef _WIN32
+    //     /* Autodetect on Unix-like systems */
+    //     detect_unix_ca();
+    // #else
+    //     /* On Windows: if not Schannel (e.g., OpenSSL build), user may still have a CA file
+    //        in a common path (e.g., Git for Windows bundle). We can try typical Unix paths
+    //        too in case of MSYS2/MinGW environments. */
+    //     detect_unix_ca();
+    // #endif
+
+    // Check: <certs_filepath> must be good.
+    g_cafile = dup_str(certs_filepath);
+    if (!file_exists(g_cafile))
+    {
+        SAP_ERR("SSL-CA Init Error: Invalid CA file (%s)!\n", g_cafile);
+        status = EINVAL;
+        goto cafile_err;
+    }
+
+    g_capath = path_dirname(certs_filepath);
+    if (!dir_exists(g_capath))
+    {
+        SAP_ERR("SSL-CA Init Error: Invalid CA Directory (%s)!\n", g_capath);
+        status = EINVAL;
+        goto capath_err;
+    }
 
     /* Load the CA file into memory if we have a path */
     if (g_cafile)
@@ -174,6 +199,7 @@ void sslca_init(void)
             memset(&g_cablob, 0, sizeof(g_cablob));
             g_cablob.data = g_cabuf;
             g_cablob.len = g_cabuf_len;
+            g_cablob.flags = CURL_BLOB_COPY;
             /* We keep ownership of g_cabuf and free it on process exit if needed.
                libcurl does not free this memory. */
         }
@@ -188,6 +214,58 @@ void sslca_init(void)
             }
         }
     }
+
+    // On success
+    return SUCCESS;
+
+capath_err:
+    if (g_capath)
+    {
+        free(g_capath);
+        g_capath = NULL;
+    }
+
+cafile_err:
+    if (g_cafile)
+    {
+        free(g_cafile);
+        g_cafile = NULL;
+    }
+
+    return status;
+}
+
+void sslca_fini(void)
+{
+    // Clear <g_cablob>
+    memset(&g_cablob, 0, sizeof(g_cablob));
+    g_cabuf_len = 0;
+    if (g_cabuf)
+    {
+        free(g_cabuf);
+        g_cabuf = NULL;
+    }
+
+    // Clear <g_cafile> and <g_capath>
+    if (g_cafile)
+    {
+        free(g_cafile);
+        g_cafile = NULL;
+    }
+
+    if (g_capath)
+    {
+        free(g_capath);
+        g_capath = NULL;
+    }
+}
+
+__attribute__((unused)) static void sslca_curl_set_no_ssl_verify(CURL *easy)
+{
+    SAP_ERR("!!! Warning: Disabled SSL verification !!!\n");
+
+    curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 0L);
 }
 
 void sslca_curl_set(CURL *easy)
@@ -195,38 +273,44 @@ void sslca_curl_set(CURL *easy)
     if (!easy)
         return;
 
-#ifdef _WIN32
-    if (curl_uses_schannel())
-    {
-        /* Schannel uses Windows System Store automatically—no CAINFO/CA blob needed. */
-        return;
-    }
-#endif
+    // [TODO][Issue 186] Disabled SSL verification temorally. 
+    sslca_curl_set_no_ssl_verify(easy);
+    return;
 
-    /* Prefer in-memory CA bundle if available and libcurl supports it. */
-// #if defined(CURLOPT_CAINFO_BLOB)
+    /* If you want to see which TLS backend you’re using */
+    const curl_version_info_data *vi = curl_version_info(CURLVERSION_NOW);
+    SAP_INFO("SSL backend: %s\n", vi && vi->ssl_version ? vi->ssl_version : "(unknown)");
+
+    /* Prefer in-memory bundle */
     if (g_cabuf && g_cabuf_len > 0)
     {
-        curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
-        /* Strong verification by default */
+        CURLcode rc = curl_easy_setopt(easy, CURLOPT_CAINFO_BLOB, &g_cablob);
+        if (rc != CURLE_OK)
+        {
+            SAP_ERR("CURLOPT_CAINFO_BLOB failed: %s\n", curl_easy_strerror(rc));
+        }
+        else
+        {
+            SAP_INFO("SSL-CA: Using CAINFO_BLOB (%lu bytes)\n", g_cabuf_len);
+        }
+
+        /* Strong verification */
         curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-        SAP_DEBUG("<sslca_curl_set> Used CA blob for the connection.\n");
         return;
     }
-// #endif
 
-    /* Fallback: point to the CA file path if present */
+    /* Fallback: file path */
     if (g_cafile && *g_cafile)
     {
         curl_easy_setopt(easy, CURLOPT_CAINFO, g_cafile);
         curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
+        SAP_INFO("SSL-CA: Using CAINFO path: %s\n", g_cafile);
     }
 
-    /* Optional extra: CAPATH is useful on some distros if CAINFO was not found/read. */
-    if (g_capath && *g_capath)
-    {
+    /* CAPATH only helps on Unix when directory is c_rehash-hashed */
+    if (g_capath && *g_capath) {
         curl_easy_setopt(easy, CURLOPT_CAPATH, g_capath);
     }
 }

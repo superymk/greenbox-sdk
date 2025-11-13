@@ -259,15 +259,61 @@ uint32_t app_cpus_get_procs_num(void)
 void press_continue(const char *prompt)
 {
     APP_ERR("%s", prompt);
-    while (true)
-    {
-        char c = getchar();
-        if (c == '\n' || c == EOF)
-            break;
 
-        // Put a sleep in order to yield CPU
-        // [NOTE] sched_yield() does not reduce CPU usage somehow...
-        msleep(100);
+    if (isatty(fileno(stdin)))
+    {
+        // Interactive console: your original loop
+        for (;;)
+        {
+            int ch = getchar();
+            if (ch == '\n' || ch == EOF)
+                break;
+
+            // Put a sleep in order to yield CPU
+            // [NOTE] sched_yield() does not reduce CPU usage somehow...
+            msleep(100);
+        }
+        return;
+    }
+    else
+    {
+        // Non-interactive (QProcess pipe or no console):
+        // Block until the parent writes something OR closes the pipe.
+        // Use a single blocking getchar(); we don't need a loop.
+        (void)getchar(); // returns when parent writes "\r\n" or closes write-end
+    }
+}
+
+static HANDLE _eventfd_from_env(void)
+{
+    char name[256] = {0};
+    DWORD got = GetEnvironmentVariableA("GB_APPLOADER_EXIT_FD", name, sizeof(name));
+    if (got == 0 || got >= sizeof(name))
+        return NULL;
+    return OpenEventA(SYNCHRONIZE, FALSE, name);
+}
+
+static void _wait_for_exit_noninteractive(void)
+{
+    HANDLE h = _eventfd_from_env();
+    if (!h)
+    {
+        // Fallback: just sleep forever until process is killed
+        for (;;)
+            msleep(100);
+    }
+    WaitForSingleObject(h, INFINITE);
+}
+
+void app_wait_for_exit(void)
+{
+    if (isatty(fileno(stdin)))
+    {
+        press_continue("Press to exit SecApp");
+    }
+    else
+    {
+        _wait_for_exit_noninteractive();
     }
 }
 
@@ -331,7 +377,7 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
     if (hDevice == INVALID_HANDLE_VALUE)
     {
         APP_ERR("<os_ioctl> Access SecAgent Error (Error: #%d)\n",
-        (err_status = (int)GetLastError()));
+                (err_status = (int)GetLastError()));
         goto out;
     }
 

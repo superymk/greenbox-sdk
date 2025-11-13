@@ -41,6 +41,10 @@ extern uint32_t secagent_sps_get_ids_and_names(struct sp_info_id_name_resp* resp
 
 
 /********* Other Functions in SecAgent*********/
+#ifndef GREENBOX_USE_UXMHF64_V1
+uint32_t secagent_secbase_boot_tinyos(void);
+#endif // !GREENBOX_USE_UXMHF64_V1
+
 extern uint32_t secagent_init_secbase_ondemand_percpu(void);
 extern uint32_t secagent_fini_secbase_ondemand_percpu(void);
 extern uint32_t secagent_x86_init_collect_lapic_id_percpu(void);

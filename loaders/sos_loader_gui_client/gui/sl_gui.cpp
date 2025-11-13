@@ -311,6 +311,12 @@ Frm_DevConfig::Frm_DevConfig( wxWindow* parent, wxWindowID id, const wxString& t
 
 	bSizer4->Add( fgSizer8, 1, wxEXPAND, 5 );
 
+	m_staticText9 = new wxStaticText( this, wxID_ANY, wxT("Key Bindings:\nRelease keyboard/mouse: left CTRL + Right CTRL\nForce terminate GreenBox: left CTRL + Right CTRL + Delete"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_staticText9->Wrap( -1 );
+	m_staticText9->SetFont( wxFont( 12, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxT("Arial") ) );
+
+	bSizer4->Add( m_staticText9, 0, wxALL, 5 );
+
 
 	fgSizer6->Add( bSizer4, 1, wxALL|wxEXPAND, 5 );
 

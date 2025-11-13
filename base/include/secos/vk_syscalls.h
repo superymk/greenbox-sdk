@@ -64,24 +64,6 @@
 // #define SYS_MEMOBJ_MEDIATE_ACCESS						13 // [TODO] need it?
 #define SYS_SP_YIELD_CPU								12
 
-/// @brief Enable SecProcess scheduling on the current CPU
-/// [NOTE] All SecProcesses are allowed to invoke this system call, because even SecApps (not just SecServices) could have
-/// critical sections. For example, when SecApp A calls SecApp B, B needs to disable scheduling first, or A may be 
-/// scheduled before B finishes its service and causes B or A crashes.
-///
-/// @return Return SUCCESS on success. 
-///         Return EINVAL if the current CPU structure cannot be found
-#define SYS_SP_SCHEDULING_ENABLE						14
-
-/// @brief Disable SecProcess scheduling on the current CPU
-/// [NOTE] All SecProcesses are allowed to invoke this system call, because even SecApps (not just SecServices) could have
-/// critical sections. For example, when SecApp A calls SecApp B, B needs to disable scheduling first, or A may be 
-/// scheduled before B finishes its service and causes B or A crashes.
-///
-/// @return Return SUCCESS on success. 
-///         Return EINVAL if the current CPU structure cannot be found
-#define SYS_SP_SCHEDULING_DISABLE						15
-
 /// @brief Notify SecOS about the SECSRV-INIT's initialization status.
 /// @param arg1 TRUE if SECSRV-INIT is intialized successfully. Otherwise false.
 /// @return Always return SUCCESS
@@ -590,9 +572,10 @@
 
 
 /********* Syscalls - System quirks *********/
+#ifdef GREENBOX_USE_UXMHF64_V1
 //// [TODO] These quirks should be fixed in the future
 #define SYS_QUIRKS_GET_INFO								4800
-
+#endif // GREENBOX_USE_UXMHF64_V1
 
 
 

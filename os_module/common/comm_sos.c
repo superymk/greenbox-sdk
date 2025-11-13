@@ -241,11 +241,14 @@ out:
 }
 
 /// Triggered on a message arrival via SecOS-SecBase/OS communication channel
-OSSTATUS comm_sos_handle_queued_msgs(void)
+OSSTATUS comm_sos_handle_queued_msgs(bool* out_has_reqs)
 {
     OSSTATUS status = OS_SUCCESS;
     struct comm_os_msg *msg;
     bool msg_ready = false;
+
+    if (out_has_reqs)
+        *out_has_reqs = false;
 
     msg = (struct comm_os_msg *)os->mm_malloc_zeroed(sizeof(struct comm_os_msg));
     if (!msg)
@@ -262,6 +265,9 @@ OSSTATUS comm_sos_handle_queued_msgs(void)
 
         if (msg_ready)
         {
+            if (out_has_reqs)
+                *out_has_reqs = true;
+
             status = comm_sos_handle_msg(msg);
             if (SA_FAIL(status))
             {
@@ -328,10 +334,13 @@ OSSTATUS comm_sos_send_msg_nowait(struct comm_os_msg *msg)
 
 OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_msg *response, uint32_t ms)
 {
+    const ulong_t count_per_millisecond = 100; // 100 wait loops per 1ms wait time.
+    const ulong_t ping_interval_cnt = 200 * count_per_millisecond; // re-ping SecOS for every 200ms.
+
     OSSTATUS status = OS_SUCCESS;
     ListNode *wait_msg_node = NULL;
     volatile msg_id_t *response_id = NULL;
-    unsigned long cnt = ms * 100;
+    ulong_t cnt = ms * count_per_millisecond;
     msg_id_t request_id = 0;
 
     if (!request || !response)
@@ -363,7 +372,7 @@ OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_
             return E_TIMEOUT; // Time out
         }
 
-        status = comm_sos_handle_queued_msgs();
+        status = comm_sos_handle_queued_msgs(NULL);
         if (SA_FAIL(status))
         {
             DRV_ERR("Failed to process the response of the message (req_id:%u)! status:%lu\n", request_id, status);
@@ -372,6 +381,12 @@ OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_
         }
 
         os->udelay(10);
+
+        if (!(cnt % ping_interval_cnt))
+        {
+            // Re-ping SecOS after every 200ms to make sure SecOS receive the SecOS-OS IPI interrupt.
+            notify_secos();
+        }
     }
 
     // On success

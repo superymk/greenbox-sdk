@@ -100,23 +100,23 @@
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
     <OutDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\include;..\..\base\include\secbase;..\..\base\include\secos</IncludePath>
     <IntDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\include;..\..\base\include\secbase;..\..\base\include\secos</IncludePath>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\include;..\..\base\include\secbase;..\..\base\include\secos</IncludePath>
     <OutDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</OutDir>
     <IntDir>$(SolutionDir)output\$(Platform)\$(ConfigurationName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\..\uxmhf64\mhv\hypapps\secbase\include\public;..\..\secos\include\public;..\include</IncludePath>
+    <IncludePath>$(IncludePath);$(KMDF_INC_PATH)$(KMDF_VER_PATH);..\include;..\..\base\include\secbase;..\..\base\include\secos</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
@@ -132,6 +132,9 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <DriverSign>
@@ -140,6 +143,9 @@
     <ClCompile>
       <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfLdr.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfDriverEntry.lib</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DriverSign>
@@ -149,6 +155,9 @@
       <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <DriverSign>
@@ -157,6 +166,9 @@
     <ClCompile>
       <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;%(AdditionalDependencies);$(KernelBufferOverflowLib);$(DDK_LIB_PATH)ntoskrnl.lib;$(DDK_LIB_PATH)hal.lib;$(DDK_LIB_PATH)wmilib.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfLdr.lib;$(KMDF_LIB_PATH)$(KMDF_VER_PATH)\WdfDriverEntry.lib</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DriverSign>
@@ -194,6 +206,7 @@
     <ClCompile Include="..\common\sos_mm_mgr.c" />
     <ClCompile Include="..\common\sos_sp_params.c" />
     <ClCompile Include="..\common\stl_dlist.c" />
+    <ClCompile Include="..\common\tos.c" />
     <ClCompile Include="..\common\untrusted_loader_info.c" />
     <ClCompile Include="..\common\untrusted_loader_utils.c" />
     <ClCompile Include="..\devs\ehci.c" />
@@ -246,6 +259,7 @@
     <ClInclude Include="..\include\sos_mm_mgr.h" />
     <ClInclude Include="..\include\sos_sp_params.h" />
     <ClInclude Include="..\include\stl_dlist.h" />
+    <ClInclude Include="..\include\tos.h" />
     <ClInclude Include="..\include\untrusted_loader_info.h" />
     <ClInclude Include="..\include\untrusted_loader_utils.h" />
     <ClInclude Include="..\include\utils.h" />

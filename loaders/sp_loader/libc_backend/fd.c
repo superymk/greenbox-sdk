@@ -1074,11 +1074,25 @@ static bool _serialize_dirent(varbuf_t *varbuf, struct dirent *dirent)
         if (!varbuf_write_data(varbuf, &dirent->d_ino, sizeof(uint64_t)))
             goto err;
 
+#ifdef __WINDOWS__
+        // Cygwin does not have <d_off> and <d_reclen>. So the function always serializes them as 0.
+        {
+            uint64_t d_off = 0;
+            uint16_t d_reclen = 0;
+
+            if (!varbuf_write_data(varbuf, &d_off, sizeof(uint64_t)))
+                goto err;
+
+            if (!varbuf_write_data(varbuf, &d_reclen, sizeof(uint16_t)))
+                goto err;
+        }
+#else
         if (!varbuf_write_data(varbuf, &dirent->d_off, sizeof(uint64_t)))
             goto err;
 
         if (!varbuf_write_data(varbuf, &dirent->d_reclen, sizeof(uint16_t)))
             goto err;
+#endif // __WINDOWS__
 
         if (!varbuf_write_data(varbuf, &dirent->d_type, sizeof(uint8_t)))
             goto err;

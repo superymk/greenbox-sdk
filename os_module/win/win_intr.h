@@ -19,7 +19,7 @@ extern NTSTATUS InterruptCreateDispatch(
     IN PIRP Irp
 );
 
-extern void win_intr_init(PDRIVER_OBJECT in_DriverObject, PDEVICE_OBJECT in_DeviceObject);
+extern void win_intr_init(PDRIVER_OBJECT in_DriverObject, PDEVICE_OBJECT in_DeviceObject, WDFDEVICE* in_WDFDevice);
 extern void win_intr_fini(void);
 
 /// @brief Probe and register an interrupt handler for SecOS-OS notifications. 
@@ -31,6 +31,9 @@ extern OSSTATUS win_sos_os_intr_probe_and_register(void);
 /// @param  
 extern void win_sos_os_intr_unregister(void);
 
+extern void win_sos_os_intr_start(void);
+extern void win_sos_os_intr_stop(void);
+
 /// @brief Return the interrupt vector for SecOS-OS notifications.
 /// @param  
 /// @return 
@@ -40,9 +43,10 @@ extern intr_t win_intr_timer(void);
 
 extern lapic_id_t win_sos_os_intr_get_os_lapic_id(void);
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 extern void win_os_intr_remove_affinity(void);
 extern void win_os_intr_restore_affinity(void);
-
+#endif // GREENBOX_USE_UXMHF64_V1
 
 
 extern void win_debug_intr_get_current_irq_priority(void);

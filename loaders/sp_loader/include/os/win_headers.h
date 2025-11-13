@@ -32,13 +32,13 @@ typedef unsigned char uint8_t;
 #ifdef _MSC_VER
 	#include <stdbool.h>
 #elif defined (__MSYS2__)
-	#ifndef __GNUG__
-	#ifndef bool
-		typedef uint8_t bool;
-		#define true 1
-		#define false 0
-	#endif
-	#endif
+	// #ifndef __GNUG__
+	// #ifndef bool
+	// 	typedef uint8_t bool;
+	// 	#define true 1
+	// 	#define false 0
+	// #endif
+	// #endif
 #endif // __MSYS2__
 
 #ifdef _MSC_VER

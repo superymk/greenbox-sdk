@@ -33,4 +33,4 @@ void wnd_rfiles_login_close(lv_obj_t *login_root);
 /* (Optional) Helper to query if an object is a login root. */
 bool wnd_rfiles_login_is_root(lv_obj_t *obj);
 
-
+extern SAP_STATUS wnd_rfiles_login_init_cfgs(SAP_CONFIG *in_sap_cfg);

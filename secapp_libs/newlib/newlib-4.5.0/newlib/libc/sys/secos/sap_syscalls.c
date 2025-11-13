@@ -64,16 +64,6 @@ VKSTATUS sos_sys_utpm_get_quote(char *nonce_str, size_t nonce_str_len, uint64_t 
     return (VKSTATUS)sp_sysenter(SYS_uTPM_GET_QUOTE, (ulong_t)&req, (ulong_t)out_result, 0);
 }
 
-// VKSTATUS sos_sys_sp_scheduling_enable(void)
-// {
-// 	return (VKSTATUS)sp_sysenter(SYS_SP_SCHEDULING_ENABLE, 0, 0, 0);
-// }
-
-// VKSTATUS sos_sys_sp_scheduling_disable(void)
-// {
-// 	return (VKSTATUS)sp_sysenter(SYS_SP_SCHEDULING_DISABLE, 0, 0, 0);
-// }
-
 void sos_sys_sp_yield(spid_t switch_to)
 {
     sp_sysenter(SYS_SP_YIELD_CPU, (ulong_t)switch_to, 0, 0);
@@ -291,8 +281,10 @@ VKSTATUS sos_sys_platform_get_nonsensitive_info(SECBASE_PLATFORM_NONSENSITIVE_IN
 }
 
 /********* Syscalls - System quirks *********/
+#ifdef GREENBOX_USE_UXMHF64_V1
 //// [TODO] These quirks should be fixed in the future
 VKSTATUS sos_sys_quirks_get_info(SECOS_QUIRKS_INFO *out_info)
 {
     return (VKSTATUS)sp_sysenter(SYS_QUIRKS_GET_INFO, (ulong_t)out_info, 0, 0);
 }
+#endif // GREENBOX_USE_UXMHF64_V1

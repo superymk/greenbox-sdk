@@ -5,6 +5,8 @@
 #ifndef SECAGENT_INTFS
 #define SECAGENT_INTFS
 
+#include <secbase_fn_flags.h>
+
 #define TZ_CLIENT_FULL_PATH_DEV_NAME "/dev/tz_client"
 #define TZ_CLIENT_DEV "tz_client"
 
@@ -15,6 +17,11 @@
 #define CMD_SECAGENT_PRESENCE_REQ				1
 #define CMD_SECBASE_INIT_ONDEMAND_PER_CPU		2
 #define CMD_SECBASE_FINI_ONDEMAND_PER_CPU		3
+
+#ifndef GREENBOX_USE_UXMHF64_V1
+#define CMD_SECBASE_BOOT_TINYOS					4
+#endif // !GREENBOX_USE_UXMHF64_V1
+
 #define CMD_KERNEL_PRINT						6
 #define CMD_TEST_HYPERCALL						10
 #define CMD_SECAGENT_TEST1						11
