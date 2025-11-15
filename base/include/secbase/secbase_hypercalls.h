@@ -377,6 +377,10 @@ typedef struct _sos_hc_params_hash_secprocess
 typedef struct
 {
     ulong_t    pcie_cfg_space_mmio_base_spaddr;
+
+    // Insecure configurations of UXMHF64-runtime
+    uint32_t config_insecure_disable_iommu:1,
+             __reserved1:31;
 } SOS_HC_PLATFORM_SENSITIVE_INFO;
 
 #define SECBASE_MACHINE_ID_MAX_LENGTH (32) // Must be <= UXMHF64_MACHINE_ID_MAX_LENGTH because SecBase cannot report 
@@ -681,6 +685,10 @@ typedef struct PACKED_STRUCT
     uint32_t mhv_init_bsp_vendor;
     uint32_t mhv_init_bsp_model;
     uint32_t mhv_init_bsp_ucode_rev;
+
+    // Insecure configurations of UXMHF64-runtime
+    uint32_t config_insecure_disable_iommu:1,
+             __reserved2:31;
 } NS_HC_PARAMS_GET_SECBASE_BOOT_STATE_SENSITIVE;
 
 /// @brief 
