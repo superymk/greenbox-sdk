@@ -379,7 +379,7 @@ typedef struct
     ulong_t    pcie_cfg_space_mmio_base_spaddr;
 
     // Insecure configurations of UXMHF64-runtime
-    uint32_t config_insecure_disable_iommu:1,
+    uint32_t config_insecure_iommu_passthru_to_ns:1,
              __reserved1:31;
 } SOS_HC_PLATFORM_SENSITIVE_INFO;
 
@@ -687,7 +687,7 @@ typedef struct PACKED_STRUCT
     uint32_t mhv_init_bsp_ucode_rev;
 
     // Insecure configurations of UXMHF64-runtime
-    uint32_t config_insecure_disable_iommu:1,
+    uint32_t config_insecure_iommu_passthru_to_ns:1,
              __reserved2:31;
 } NS_HC_PARAMS_GET_SECBASE_BOOT_STATE_SENSITIVE;
 
