@@ -1175,7 +1175,7 @@ void win_intr_fini(void)
 {
     DriverObject = NULL;
     DeviceObject = NULL;
-    memset(WDF_Device, 0, sizeof(WDFDEVICE));
+    memset(&WDF_Device, 0, sizeof(WDFDEVICE));
 }
 
 // int win_find_sos_os_irq(void)

@@ -78,109 +78,144 @@ static VOID CALLBACK IoCompletionRoutine(
 
 bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
 {
-	PIO_OPERATION pIoOperation = NULL;
-	PTP_IO pIo = NULL;
-	HANDLE hDevice;
-	struct tz_cmd_packet *resp = NULL;
-	DWORD ret_data_sz;
+    PIO_OPERATION pIoOperation = NULL;
+    PTP_IO pIo = NULL;
+    HANDLE hDevice;
+    struct tz_cmd_packet *resp = NULL;
+    DWORD ret_data_sz;
 
-	/* call kernel module to allocate a physically-contiguous
-	 * non-cacheable physical memory pool */
-	int ret = 0, err_status = 0;
-	bool status = false;
+    /* call kernel module to allocate a physically-contiguous
+     * non-cacheable physical memory pool */
+    int ret = 0, err_status = 0;
+    bool status = false;
 
-	// Open Device
-	hDevice = CreateFile(L"\\\\.\\SecAgent",
-						 (GENERIC_READ | GENERIC_WRITE),
-						 (FILE_SHARE_READ | FILE_SHARE_WRITE),
-						 NULL,
-						 OPEN_EXISTING,
-						 FILE_FLAG_OVERLAPPED,
-						 NULL);
-	if (hDevice == INVALID_HANDLE_VALUE)
-	{
-		// APP_ERR("<os_ioctl> Access SecAgent Error (Error: #%d)\n",
-		// (err_status = (int)GetLastError()));
-		goto out;
-	}
+    // Open Device
+    hDevice = CreateFile(L"\\\\.\\SecAgent",
+                         (GENERIC_READ | GENERIC_WRITE),
+                         (FILE_SHARE_READ | FILE_SHARE_WRITE),
+                         NULL,
+                         OPEN_EXISTING,
+                         FILE_FLAG_OVERLAPPED,
+                         NULL);
+    if (hDevice == INVALID_HANDLE_VALUE)
+    {
+        // APP_ERR("<os_ioctl> Access SecAgent Error (Error: #%d)\n",
+        // (err_status = (int)GetLastError()));
+        goto out;
+    }
 
-	// Enable concurrent ioctl
-	pIoOperation = (PIO_OPERATION)app_mm_alloc(sizeof(IO_OPERATION));
-	if (!pIoOperation)
-	{
-		// APP_ERR("<os_ioctl> Failed to create <pIoOperation>!\n");
-		goto out;
-	}
+    // Enable concurrent ioctl
+    pIoOperation = (PIO_OPERATION)app_mm_alloc(sizeof(IO_OPERATION));
+    if (!pIoOperation)
+    {
+        // APP_ERR("<os_ioctl> Failed to create <pIoOperation>!\n");
+        goto out;
+    }
 
-	resp = (struct tz_cmd_packet *)app_mm_alloc(sizeof(struct tz_cmd_packet));
-	if (!resp)
-	{
-		// APP_ERR("<os_ioctl> Failed to create <resp>!\n");
-		goto out;
-	}
+    resp = (struct tz_cmd_packet *)app_mm_alloc(sizeof(struct tz_cmd_packet));
+    if (!resp)
+    {
+        // APP_ERR("<os_ioctl> Failed to create <resp>!\n");
+        goto out;
+    }
 
-	pIoOperation->hDevice = hDevice;
-	pIoOperation->pInputBuffer = cmd;
-	pIoOperation->dwInputBufferLength = sizeof(struct tz_cmd_packet);
-	pIoOperation->pOutputBuffer = resp;
-	pIoOperation->dwOutputBufferLength = sizeof(struct tz_cmd_packet);
+    pIoOperation->hDevice = hDevice;
+    pIoOperation->pInputBuffer = cmd;
+    pIoOperation->dwInputBufferLength = sizeof(struct tz_cmd_packet);
+    pIoOperation->pOutputBuffer = resp;
+    pIoOperation->dwOutputBufferLength = sizeof(struct tz_cmd_packet);
 
-	memset(&pIoOperation->overlapped, 0, sizeof(OVERLAPPED));
-	pIoOperation->overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (pIoOperation->overlapped.hEvent == NULL)
-	{
-		// APP_ERR("<os_ioctl> Failed to create event\n");
-		goto out;
-	}
+    memset(&pIoOperation->overlapped, 0, sizeof(OVERLAPPED));
+    pIoOperation->overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (pIoOperation->overlapped.hEvent == NULL)
+    {
+        // APP_ERR("<os_ioctl> Failed to create event\n");
+        goto out;
+    }
 
-	pIo = CreateThreadpoolIo(hDevice, IoCompletionRoutine, pIoOperation, NULL);
-	if (!pIo)
-	{
-		// APP_ERR("<os_ioctl> Failed to create IO object\n");
-		goto out;
-	}
+    pIo = CreateThreadpoolIo(hDevice, IoCompletionRoutine, pIoOperation, NULL);
+    if (!pIo)
+    {
+        // APP_ERR("<os_ioctl> Failed to create IO object\n");
+        goto out;
+    }
 
-	StartThreadpoolIo(pIo);
+    StartThreadpoolIo(pIo);
 
-	// Send IOCTL
-	ret = DeviceIoControl(hDevice,
-						  IOCTL_SECAGENT,
-						  pIoOperation->pInputBuffer,
-						  pIoOperation->dwInputBufferLength,
-						  pIoOperation->pOutputBuffer,
-						  pIoOperation->dwOutputBufferLength,
-						  &ret_data_sz,
-						  &pIoOperation->overlapped);
-	if (!ret)
-	{
-		//-f--> Oops...
-		// APP_ERR("<os_ioctl> Send IOCTL to SecAgent Error (Error: #%d)\n",
-		// (err_status = GetLastError()));
+    // Send IOCTL
+    ret = DeviceIoControl(hDevice,
+                          IOCTL_SECAGENT,
+                          pIoOperation->pInputBuffer,
+                          pIoOperation->dwInputBufferLength,
+                          pIoOperation->pOutputBuffer,
+                          pIoOperation->dwOutputBufferLength,
+                          &ret_data_sz,
+                          &pIoOperation->overlapped);
+    if (!ret)
+    {
+        err_status = (int)GetLastError();
 
-		status = false;
-	}
-	else
-		status = true;
+        if (err_status == ERROR_IO_PENDING) {
+            // EXPECTED for overlapped I/O. Not an error.
+            status = true;
+        } else {
+            // Real failure: must cancel the TP I/O "started" accounting.
+            CancelThreadpoolIo(pIo);
+            // APP_ERR("<os_ioctl> DeviceIoControl failed (Error: #%d)\n", err_status);
+            status = false;
+            goto out_wait; // still go to wait path carefully (see below)
+        }
+    }
+    else
+    {
+        // Completed synchronously (still may get a TP callback; depends on completion mechanism)
+        status = true;
+    }
 
-	// Wait for all IO operations to complete
-	WaitForThreadpoolIoCallbacks(pIo, false);
+out_wait:
+    // Wait for all IO operations to complete
+    WaitForThreadpoolIoCallbacks(pIo, false);
+
+    // At this point I/O is complete (either callback ran, or synchronous completion).
+    // Validate result if you want:
+    if (status) 
+    {
+        DWORD bytes = 0;
+        BOOL ok = GetOverlappedResult(hDevice, &pIoOperation->overlapped, &bytes, FALSE);
+        if (!ok) 
+        {
+            err_status = (int)GetLastError();
+            // APP_ERR("<os_ioctl> GetOverlappedResult failed (Error: #%d)\n", err_status);
+            status = false;
+        } else 
+        {
+            // Copy output back to caller-visible cmd
+            if (bytes >= sizeof(struct tz_cmd_packet)) {
+                memcpy(cmd, resp, sizeof(struct tz_cmd_packet));
+            } else {
+                // driver returned too few bytes
+                // APP_ERR("<os_ioctl> IOCTL returned %lu bytes (< tz_cmd_packet)\n", bytes);
+                status = false;
+            }
+        }
+    }
 
 out:
-	if (pIo)
-		CloseThreadpoolIo(pIo);
-	if (pIoOperation)
-	{
-		if (pIoOperation->overlapped.hEvent)
-			CloseHandle(pIoOperation->overlapped.hEvent);
+    if (pIo)
+        CloseThreadpoolIo(pIo);
+    if (pIoOperation)
+    {
+        if (pIoOperation->overlapped.hEvent)
+            CloseHandle(pIoOperation->overlapped.hEvent);
 
-		app_mm_free((vaddr_t)pIoOperation);
-	}
-	if (resp)
-		app_mm_free((vaddr_t)resp);
-	CloseHandle(hDevice);
-	if (err_no)
-		*err_no = err_status;
+        app_mm_free((vaddr_t)pIoOperation);
+    }
+    if (resp)
+        app_mm_free((vaddr_t)resp);
+    CloseHandle(hDevice);
+    if (err_no)
+        *err_no = err_status;
 
-	// // APP_ERR("[Superymk] <os_ioctl> Finished cmd:%u\n", cmd->id);
-	return status;
+    // // APP_ERR("[Superymk] <os_ioctl> Finished cmd:%u\n", cmd->id);
+    return status;
 }
