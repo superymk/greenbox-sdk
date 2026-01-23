@@ -129,9 +129,6 @@
     <ClCompile Include="driver_entry.c">
       <Filter>Source Files\win</Filter>
     </ClCompile>
-    <ClCompile Include="main.c">
-      <Filter>Source Files\win</Filter>
-    </ClCompile>
     <ClCompile Include="win_cpu.c">
       <Filter>Source Files\win</Filter>
     </ClCompile>

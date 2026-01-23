@@ -11,7 +11,7 @@
 #include "win_intr.h"
 #include <sa_headers.h>
 
-// // WPP (optional): keep if you already have it wired
+// WPP (optional): keep if you already have it wired
 #include "driver_entry.tmh"
 
 #ifdef ALLOC_PRAGMA
@@ -20,9 +20,9 @@
 
 typedef struct _SA_REQ_CTX
 {
-    WDFMEMORY u_mem; // holds MDL + mapping lifetime
+    WDFMEMORY u_mem;     // holds MDL + mapping lifetime
     PVOID u_mem_kva;     // system-space mapping to user pages
-    SIZE_T u_mem_len;    // bytes locked/mapped
+    size_t u_mem_len;    // bytes locked/mapped
     PVOID u_mem_uva;     // original user VA (for debugging)
 } SA_REQ_CTX, *PSA_REQ_CTX;
 
@@ -31,24 +31,26 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(SA_REQ_CTX, SaGetReqCtx);
 // -----------------------
 // Globals
 // -----------------------
-static WDFDEVICE g_WdfDevice = NULL;
+static WDFDEVICE g_wdf_device = NULL;
 
-static EVT_WDF_IO_IN_CALLER_CONTEXT SaEvtIoInCallerContext;
+static EVT_WDF_IO_IN_CALLER_CONTEXT sa_evt_io_in_caller_context;
 
-static OSSTATUS sa_win_u_map_mem(WDFREQUEST Request, PSA_REQ_CTX ctx, PVOID u_mem_uva, SIZE_T u_mem_len, NTSTATUS* out_nt_status)
+/// @brief Map user buffer into kernel and store mapping in request context
+/// @param Request Pointer to WDF request
+/// @param ctx Request context where mapping info will be stored (must be pre-allocated)
+/// @param u_mem_uva User virtual address to map
+/// @param u_mem_len Length of mapping in bytes
+/// @param out_nt_status Pointer to receive NTSTATUS on failure/success
+/// @return OSSTATUS (OS_SUCCESS on success, E_INV_ARG or E_INTERNAL_ERROR on failure)
+static OSSTATUS sa_win_u_map_mem(WDFREQUEST Request, PSA_REQ_CTX ctx, PVOID u_mem_uva, size_t u_mem_len, NTSTATUS* out_nt_status)
 {
     NTSTATUS nt_status;
 
-    // Allocate request context
-    WDF_OBJECT_ATTRIBUTES attrs;
-
-    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, SA_REQ_CTX);
-
-    nt_status = WdfObjectAllocateContext(Request, &attrs, (PVOID *)&ctx);
-    if (!NT_SUCCESS(nt_status))
+    // Check: ctx must be pre-allocated by caller
+    if (!ctx)
     {
-        *out_nt_status = nt_status;
-        return E_INTERNAL_ERROR;
+        *out_nt_status = STATUS_INVALID_PARAMETER;
+        return E_INV_ARG;
     }
 
     ctx->u_mem_uva = u_mem_uva;
@@ -80,13 +82,16 @@ static OSSTATUS sa_win_u_map_mem(WDFREQUEST Request, PSA_REQ_CTX ctx, PVOID u_me
     return OS_SUCCESS;
 }
 
-static VOID SaEvtIoInCallerContext(WDFDEVICE Device, WDFREQUEST Request)
+/// @brief Preprocess IOCTL requests in caller context (map user memory if required)
+/// @param Device WDF device
+/// @param Request WDF request
+static VOID sa_evt_io_in_caller_context(WDFDEVICE Device, WDFREQUEST Request)
 {
     OSSTATUS status = OS_SUCCESS;
-    NTSTATUS nt_status;
+    NTSTATUS nt_status = STATUS_SUCCESS;
     WDF_REQUEST_PARAMETERS params;
     struct tz_cmd_packet *cmd = NULL;
-    size_t cmdLen = 0;
+    size_t cmd_len = 0;
 
     WDF_REQUEST_PARAMETERS_INIT(&params);
     WdfRequestGetParameters(Request, &params);
@@ -102,7 +107,7 @@ static VOID SaEvtIoInCallerContext(WDFDEVICE Device, WDFREQUEST Request)
     }
 
     // METHOD_BUFFERED: input lives in SystemBuffer; safe to read here
-    nt_status = WdfRequestRetrieveInputBuffer(Request, sizeof(*cmd), (PVOID *)&cmd, &cmdLen);
+    nt_status = WdfRequestRetrieveInputBuffer(Request, sizeof(*cmd), (PVOID *)&cmd, &cmd_len);
     if (!NT_SUCCESS(nt_status))
     {
         WdfRequestComplete(Request, nt_status);
@@ -162,12 +167,16 @@ static VOID SaEvtIoInCallerContext(WDFDEVICE Device, WDFREQUEST Request)
         WdfRequestComplete(Request, nt_status);
 }
 
-// -----------------------
-// Core IOCTL logic (no completion here)
-// METHOD_BUFFERED => use the same in/out buffer
-// -----------------------
+/// @brief Handle METHOD_BUFFERED IOCTL requests (core logic)
+/// @param IoControlCode IO control code
+/// @param Buffer In/out buffer pointer (METHOD_BUFFERED system buffer)
+/// @param InLen Input length in bytes
+/// @param OutLen Output length in bytes
+/// @param BytesWritten Out param for bytes written
+/// @param Ctx Optional request context with mapped user memory (NULL if not needed)
+/// @return NTSTATUS (STATUS_SUCCESS on transport success, actual command status in Buffer->status)
 static NTSTATUS
-SaProcessIoctlBuffered(
+sa_process_ioctl_buffered(
     IN ULONG IoControlCode,
     _Inout_updates_bytes_(BufferLen) PVOID Buffer,
     IN size_t InLen,
@@ -244,16 +253,22 @@ SaProcessIoctlBuffered(
     os->mm_memcpy(Buffer, cmd_packet, sizeof(struct tz_cmd_packet));
 
 finish:
-    // Transport succeeded; command result is in (struct tz_cmd_packet*)Buffer->status
+    // Transport finished (succeed or not); command result is in (struct tz_cmd_packet*)Buffer->status
+    if (cmd_packet)
+        os->mm_free(cmd_packet);
     *BytesWritten = sizeof(struct tz_cmd_packet);
+
+    // Always return STATUS_SUCCESS to indicate transport success. The real status is in cmd_packet->status.
     return STATUS_SUCCESS;
 }
 
-// -----------------------
-// WDF EvtIoDeviceControl => calls SaProcessIoctlBuffered
-// -----------------------
-static VOID
-SaEvtIoDeviceControl(
+/// @brief WDF EvtIoDeviceControl callback wrapper
+/// @param Queue WDF queue
+/// @param Request WDF request
+/// @param OutputBufferLength Output buffer length
+/// @param InputBufferLength Input buffer length
+/// @param IoControlCode IO control code
+static VOID sa_evt_io_device_control(
     IN WDFQUEUE Queue,
     IN WDFREQUEST Request,
     IN size_t OutputBufferLength,
@@ -264,10 +279,10 @@ SaEvtIoDeviceControl(
     PAGED_CODE();
 
     NTSTATUS nt;
-    PVOID outBuf = NULL;
-    size_t outBufLen = 0;
-    PVOID inBuf = NULL;
-    size_t inBufLen = 0;
+    PVOID out_buf = NULL;
+    size_t out_buf_len = 0;
+    PVOID in_buf = NULL;
+    size_t in_buf_len = 0;
 
     // Check: The function must be called at PASSIVE_LEVEL.
     if (PASSIVE_LEVEL != KeGetCurrentIrql())
@@ -277,14 +292,14 @@ SaEvtIoDeviceControl(
     }
 
     // METHOD_BUFFERED: both retrieve calls usually return the same SystemBuffer pointer.
-    nt = WdfRequestRetrieveInputBuffer(Request, 0, &inBuf, &inBufLen);
+    nt = WdfRequestRetrieveInputBuffer(Request, 0, &in_buf, &in_buf_len);
     if (!NT_SUCCESS(nt))
     {
         WdfRequestComplete(Request, nt);
         return;
     }
 
-    nt = WdfRequestRetrieveOutputBuffer(Request, 0, &outBuf, &outBufLen);
+    nt = WdfRequestRetrieveOutputBuffer(Request, 0, &out_buf, &out_buf_len);
     if (!NT_SUCCESS(nt))
     {
         WdfRequestComplete(Request, nt);
@@ -293,10 +308,10 @@ SaEvtIoDeviceControl(
 
     // Use the framework-provided lengths (InputBufferLength/OutputBufferLength),
     // but also clamp to retrieved buffer sizes to be safe.
-    size_t inLen = (size_t)min((ULONG_PTR)InputBufferLength, (ULONG_PTR)inBufLen);
-    size_t outLen = (size_t)min((ULONG_PTR)OutputBufferLength, (ULONG_PTR)outBufLen);
-
+    size_t in_len = (size_t)min((ULONG_PTR)InputBufferLength, (ULONG_PTR)in_buf_len);
+    size_t out_len = (size_t)min((ULONG_PTR)OutputBufferLength, (ULONG_PTR)out_buf_len);
     PSA_REQ_CTX ctx = NULL;
+
     __try {
         ctx = SaGetReqCtx(Request);  // will be NULL if not allocated
     } __except(EXCEPTION_EXECUTE_HANDLER) {
@@ -304,18 +319,16 @@ SaEvtIoDeviceControl(
     }
 
     // For METHOD_BUFFERED we want the single in/out system buffer.
-    // Prefer outBuf (same as inBuf) as the inout buffer.
+    // Prefer out_buf (same as in_buf) as the inout buffer.
     size_t bytes = 0;
-    nt = SaProcessIoctlBuffered(IoControlCode, outBuf, inLen, outLen, &bytes, ctx);
+    nt = sa_process_ioctl_buffered(IoControlCode, out_buf, in_len, out_len, &bytes, ctx);
 
     WdfRequestCompleteWithInformation(Request, nt, bytes);
 }
 
-// -----------------------
-// Unload / Cleanup
-// -----------------------
-static VOID
-SaEvtDriverUnload(IN WDFDRIVER Driver)
+/// @brief Driver unload callback: cleanup resources
+/// @param Driver WDF driver handle
+static VOID sa_evt_driver_unload(IN WDFDRIVER Driver)
 {
     PAGED_CODE();
     UNREFERENCED_PARAMETER(Driver);
@@ -325,15 +338,16 @@ SaEvtDriverUnload(IN WDFDRIVER Driver)
     win_intr_fini();
 
     // For a control device, deleting the device is OK; framework removes symlink too.
-    if (g_WdfDevice != NULL)
+    if (g_wdf_device != NULL)
     {
-        WdfObjectDelete(g_WdfDevice);
-        g_WdfDevice = NULL;
+        WdfObjectDelete(g_wdf_device);
+        g_wdf_device = NULL;
     }
 }
 
-static VOID
-SaEvtDriverContextCleanup(IN WDFOBJECT DriverObject)
+/// @brief Driver context cleanup callback (WDF cleanup)
+/// @param DriverObject WDF driver object
+static VOID sa_evt_driver_context_cleanup(IN WDFOBJECT DriverObject)
 {
     PAGED_CODE();
 
@@ -341,46 +355,46 @@ SaEvtDriverContextCleanup(IN WDFOBJECT DriverObject)
     WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)DriverObject));
 }
 
-// -----------------------
-// Create the control device (Non-PnP)
-// -----------------------
+/// @brief Create the control device for IOCTL handling (Non-PnP)
+/// @param Driver WDF driver handle
+/// @return NTSTATUS (STATUS_SUCCESS on success, error code on failure)
 static NTSTATUS
-SaCreateControlDevice(IN WDFDRIVER Driver)
+sa_create_control_device(IN WDFDRIVER Driver)
 {
-    PAGED_CODE();
+    NTSTATUS nt = STATUS_SUCCESS;
+    PWDFDEVICE_INIT dev_init = NULL;
+    WDF_IO_QUEUE_CONFIG q_cfg;
+    WDF_OBJECT_ATTRIBUTES dev_attrs;
+    WDF_OBJECT_ATTRIBUTES q_attrs;
+    WDFQUEUE queue = NULL;
 
-    NTSTATUS nt;
-    PWDFDEVICE_INIT pInit = NULL;
-    WDF_IO_QUEUE_CONFIG qCfg;
-    WDF_OBJECT_ATTRIBUTES devAttrs;
-    WDF_OBJECT_ATTRIBUTES qAttrs;
-    WDFQUEUE queue;
+    PAGED_CODE();
 
     DECLARE_CONST_UNICODE_STRING(ntDeviceName, SA_NTDEVICE_NAME_STRING);
     DECLARE_CONST_UNICODE_STRING(symLinkName, SA_SYMBOLIC_NAME_STRING);
 
     // Allocate init for a control device
-    pInit = WdfControlDeviceInitAllocate(
+    dev_init = WdfControlDeviceInitAllocate(
         Driver,
         &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RW_RES_R);
-    if (pInit == NULL)
+    if (dev_init == NULL)
     {
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
     // Register IoInCallerContext callback
-    WdfDeviceInitSetIoInCallerContextCallback(pInit, SaEvtIoInCallerContext);
+    WdfDeviceInitSetIoInCallerContextCallback(dev_init, sa_evt_io_in_caller_context);
 
     // Enforce buffered I/O because your IOCTL path expects a SystemBuffer-like buffer.
-    WdfDeviceInitSetIoType(pInit, WdfDeviceIoBuffered);
+    WdfDeviceInitSetIoType(dev_init, WdfDeviceIoBuffered);
 
     // Optional: exclusive open
-    // WdfDeviceInitSetExclusive(pInit, TRUE);
+    // WdfDeviceInitSetExclusive(dev_init, TRUE);
 
-    nt = WdfDeviceInitAssignName(pInit, &ntDeviceName);
+    nt = WdfDeviceInitAssignName(dev_init, &ntDeviceName);
     if (!NT_SUCCESS(nt))
     {
-        WdfDeviceInitFree(pInit);
+        WdfDeviceInitFree(dev_init);
         return nt;
     }
 
@@ -388,43 +402,43 @@ SaCreateControlDevice(IN WDFDRIVER Driver)
     // WDF will default-complete create/close/cleanup successfully.
 
     // Create device
-    WDF_OBJECT_ATTRIBUTES_INIT(&devAttrs);
+    WDF_OBJECT_ATTRIBUTES_INIT(&dev_attrs);
 
-    nt = WdfDeviceCreate(&pInit, &devAttrs, &g_WdfDevice);
+    nt = WdfDeviceCreate(&dev_init, &dev_attrs, &g_wdf_device);
     if (!NT_SUCCESS(nt))
     {
-        if (pInit != NULL)
-            WdfDeviceInitFree(pInit);
+        if (dev_init != NULL)
+            WdfDeviceInitFree(dev_init);
         return nt;
     }
 
     // Create symbolic link for user-mode opens
-    nt = WdfDeviceCreateSymbolicLink(g_WdfDevice, &symLinkName);
+    nt = WdfDeviceCreateSymbolicLink(g_wdf_device, &symLinkName);
     if (!NT_SUCCESS(nt))
     {
         return nt;
     }
 
     // Create default queue (IOCTL-only)
-    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&qCfg, WdfIoQueueDispatchSequential);
-    qCfg.EvtIoDeviceControl = SaEvtIoDeviceControl;
+    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&q_cfg, WdfIoQueueDispatchSequential);
+    q_cfg.EvtIoDeviceControl = sa_evt_io_device_control;
 
     // Control devices are typically not power-managed
-    qCfg.PowerManaged = WdfFalse;
+    q_cfg.PowerManaged = WdfFalse;
 
-    WDF_OBJECT_ATTRIBUTES_INIT(&qAttrs);
+    WDF_OBJECT_ATTRIBUTES_INIT(&q_attrs);
 
     // Ensure IOCTL callback runs at PASSIVE_LEVEL (matches your original assumptions)
-    qAttrs.ExecutionLevel = WdfExecutionLevelPassive;
+    q_attrs.ExecutionLevel = WdfExecutionLevelPassive;
 
-    nt = WdfIoQueueCreate(g_WdfDevice, &qCfg, &qAttrs, &queue);
+    nt = WdfIoQueueCreate(g_wdf_device, &q_cfg, &q_attrs, &queue);
     if (!NT_SUCCESS(nt))
     {
         return nt;
     }
 
     // Finish initialization so I/O is accepted
-    WdfControlFinishInitializing(g_WdfDevice);
+    WdfControlFinishInitializing(g_wdf_device);
     return STATUS_SUCCESS;
 }
 
@@ -434,22 +448,24 @@ SaCreateControlDevice(IN WDFDRIVER Driver)
 NTSTATUS
 DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
-    PAGED_CODE();
-
-    NTSTATUS nt;
+    NTSTATUS nt = STATUS_SUCCESS;
     WDF_DRIVER_CONFIG cfg;
-    WDF_OBJECT_ATTRIBUTES drvAttrs;
-    WDFDRIVER wdfDriver;
+    WDF_OBJECT_ATTRIBUTES drv_attrs;
+    WDFDRIVER wdf_driver = NULL;
+    PDEVICE_OBJECT wdm_dev_obj = NULL;
+    OSSTATUS st = OS_SUCCESS;
+
+    PAGED_CODE();
 
     // Configure as Non-PnP KMDF driver
     WDF_DRIVER_CONFIG_INIT(&cfg, WDF_NO_EVENT_CALLBACK);
     cfg.DriverInitFlags |= WdfDriverInitNonPnpDriver;
-    cfg.EvtDriverUnload = SaEvtDriverUnload;
+    cfg.EvtDriverUnload = sa_evt_driver_unload;
 
-    WDF_OBJECT_ATTRIBUTES_INIT(&drvAttrs);
-    drvAttrs.EvtCleanupCallback = SaEvtDriverContextCleanup;
+    WDF_OBJECT_ATTRIBUTES_INIT(&drv_attrs);
+    drv_attrs.EvtCleanupCallback = sa_evt_driver_context_cleanup;
 
-    nt = WdfDriverCreate(DriverObject, RegistryPath, &drvAttrs, &cfg, &wdfDriver);
+    nt = WdfDriverCreate(DriverObject, RegistryPath, &drv_attrs, &cfg, &wdf_driver);
     if (!NT_SUCCESS(nt))
     {
         secagent_mark_not_running();
@@ -461,7 +477,7 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
     WPP_INIT_TRACING(DriverObject, RegistryPath);
 
     // 1) Create WDF control device
-    nt = SaCreateControlDevice(wdfDriver);
+    nt = sa_create_control_device(wdf_driver);
     if (!NT_SUCCESS(nt))
     {
         secagent_mark_not_running();
@@ -470,22 +486,15 @@ DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 
     // 2) Initialize interrupts + SecAgent core AFTER WDF device exists
     //    (this matches your requirement ordering)
-    {
-        PDEVICE_OBJECT wdmDevObj = WdfDeviceWdmGetDeviceObject(g_WdfDevice);
+    wdm_dev_obj = WdfDeviceWdmGetDeviceObject(g_wdf_device);
+    win_intr_init(DriverObject, wdm_dev_obj, &g_wdf_device);
 
-        // Your latest signature in your code: win_intr_init(DriverObject, DeviceObject, &sa_wdf_device);
-        // Here we pass the WDFDEVICE pointer you want to keep.
-        win_intr_init(DriverObject, wdmDevObj, &g_WdfDevice);
-    }
-
+    st = secagent_init();
+    if (SA_FAIL(st))
     {
-        OSSTATUS st = secagent_init();
-        if (SA_FAIL(st))
-        {
-            // Keep device alive so IOCTLs can still be used (e.g., unload command).
-            secagent_mark_not_running();
-            return STATUS_SUCCESS; // legacy behavior
-        }
+        // Keep device alive so IOCTLs can still be used (e.g., unload command).
+        secagent_mark_not_running();
+        return STATUS_SUCCESS; // legacy behavior
     }
 
     return STATUS_SUCCESS;

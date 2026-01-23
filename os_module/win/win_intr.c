@@ -256,7 +256,12 @@ extern void IntFD(void);
 extern void IntFE(void);
 extern void IntFF(void);
 
+/// @brief Arm poll timers for SecOS request polling
+/// @param nextMs Next poll interval in milliseconds
 static VOID _arm_poll_timer(ULONG nextMs);
+
+/// @brief Get dedicated OS CPU ID (BSP)
+/// @return CPU ID
 static uint32_t _win_os_dedicated_cpu_get_id(void);
 
 static PDRIVER_OBJECT DriverObject = NULL;
@@ -993,6 +998,8 @@ void win_intr_trigger_interrupt(uint32_t vector)
 // 	return STATUS_SUCCESS;
 // }
 
+/// @brief Get LAPIC ID for dedicated OS CPU
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _win_os_dedicated_cpu_get_lapic_id(void)
 {
     uint32_t os_cpu_id = 0;
@@ -1008,6 +1015,8 @@ static OSSTATUS _win_os_dedicated_cpu_get_lapic_id(void)
     return OS_SUCCESS;
 }
 
+/// @brief Probe and handle pending SecOS requests
+/// @param out_has_reqs Output flag indicating pending requests
 static void _probe_and_handle_sos_requests(bool* out_has_reqs)
 {
     SACOMM_DEBUG("<comm_sos_handle_queued_msgs> start!\n");
@@ -1020,9 +1029,11 @@ static void _probe_and_handle_sos_requests(bool* out_has_reqs)
 #define COMM_SOS_POLL_REQ_INTERVAL_MS_MAX (32)
 static ULONG _comm_sos_poll_interval_prev = 1;
 
+/// @brief Timer callback to poll SecOS requests
+/// @param Timer WDF timer handle
 static void _evt_sos_requests_timer(WDFTIMER Timer)
 {
-    ULONG nextMs = 1;
+    ULONG next_ms = 1;
     bool has_sos_reqs = false;
 
     UNREFERENCED_PARAMETER(Timer); // same logic regardless of which fired
@@ -1031,45 +1042,50 @@ static void _evt_sos_requests_timer(WDFTIMER Timer)
     // Simple adaptive policy
     if (has_sos_reqs)
     {
-        nextMs = _comm_sos_poll_interval_prev = 1;
+        next_ms = _comm_sos_poll_interval_prev = 1;
     }
     else
     {
-        nextMs = _comm_sos_poll_interval_prev = min(COMM_SOS_POLL_REQ_INTERVAL_MS_MAX, _comm_sos_poll_interval_prev ? _comm_sos_poll_interval_prev * 2 : 2);
+        next_ms = _comm_sos_poll_interval_prev = min(COMM_SOS_POLL_REQ_INTERVAL_MS_MAX, _comm_sos_poll_interval_prev ? _comm_sos_poll_interval_prev * 2 : 2);
     }
 
-    _arm_poll_timer(nextMs);
+    _arm_poll_timer(next_ms);
 }
 
 _Use_decl_annotations_ BOOLEAN _InterruptIsr(IN PKINTERRUPT Interrupt, IN OUT PVOID Context)
 {
-    PDEVICE_OBJECT t_DeviceObject = Context;
+    PDEVICE_OBJECT t_device_object = Context;
 
     UNREFERENCED_PARAMETER(Interrupt);
 
     // Top half of the ISR
-    IoRequestDpc(t_DeviceObject,
-                 t_DeviceObject->CurrentIrp,
+    IoRequestDpc(t_device_object,
+                 t_device_object->CurrentIrp,
                  NULL);
 
     return TRUE;
 }
 
+/// @brief DPC routine for interrupt handling
+/// @param Dpc DPC object
+/// @param pDeviceObject Device object
+/// @param Irp IRP
+/// @param Context Context pointer
 static VOID _InterruptDpcRoutine(IN PKDPC Dpc, PDEVICE_OBJECT pDeviceObject, IN PIRP Irp, IN PVOID Context)
 {
-    PDEVICE_EXTENSION DeviceExtension;
-    PIRP pIrp;
+    PDEVICE_EXTENSION device_extension = NULL;
+    PIRP p_irp = NULL;
 
     UNREFERENCED_PARAMETER(Dpc);
     UNREFERENCED_PARAMETER(Irp);
     UNREFERENCED_PARAMETER(Context);
 
     // bottom half of the ISR
-    pIrp = pDeviceObject->CurrentIrp;
-    DeviceExtension = pDeviceObject->DeviceExtension;
+    p_irp = pDeviceObject->CurrentIrp;
+    device_extension = pDeviceObject->DeviceExtension;
 
-    UNREFERENCED_PARAMETER(pIrp);
-    UNREFERENCED_PARAMETER(DeviceExtension);
+    UNREFERENCED_PARAMETER(p_irp);
+    UNREFERENCED_PARAMETER(device_extension);
 
     _probe_and_handle_sos_requests(NULL);
     return;
@@ -1080,11 +1096,15 @@ static VOID _InterruptDpcRoutine(IN PKDPC Dpc, PDEVICE_OBJECT pDeviceObject, IN 
 
 static PKINTERRUPT IntrObj = NULL;
 
+/// @brief Register a Windows interrupt vector
+/// @param intr Interrupt vector
+/// @param suppress_err_msg Suppress error logging if true
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _win_intr_register(intr_t intr, bool suppress_err_msg)
 {
-    NTSTATUS status;
-    PDEVICE_EXTENSION DeviceExtension = DeviceObject->DeviceExtension;
-    KAFFINITY Affinity;
+    NTSTATUS status = STATUS_SUCCESS;
+    PDEVICE_EXTENSION device_extension = DeviceObject->DeviceExtension;
+    KAFFINITY affinity = 0;
     // KIRQL Irql;
 
     // Check: No double registration of interrupts
@@ -1121,7 +1141,8 @@ static OSSTATUS _win_intr_register(intr_t intr, bool suppress_err_msg)
         return E_INV_ARG;
     }
 
-    Affinity = KeQueryActiveProcessors();
+    UNREFERENCED_PARAMETER(device_extension);
+    affinity = KeQueryActiveProcessors();
     IoInitializeDpcRequest(DeviceObject, _InterruptDpcRoutine);
 
     status = IoConnectInterrupt(&IntrObj,      // &DeviceExtension->InterruptObject, 	// InterruptObject
@@ -1133,7 +1154,7 @@ static OSSTATUS _win_intr_register(intr_t intr, bool suppress_err_msg)
                                 PASSIVE_LEVEL, // SynchronizeIrql
                                 Latched,       // InterruptMode
                                 FALSE,         // ShareVector
-                                Affinity,      // ProcessorEnableMask
+                                affinity,      // ProcessorEnableMask
                                 FALSE);        // FloatingSave
 
     if (!NT_SUCCESS(status))
@@ -1148,11 +1169,14 @@ static OSSTATUS _win_intr_register(intr_t intr, bool suppress_err_msg)
     return OS_SUCCESS;
 }
 
+/// @brief Unregister a Windows interrupt vector
+/// @param intr Interrupt vector
 void _win_intr_unregister(intr_t intr)
 {
-    PDEVICE_EXTENSION extension = DriverObject->DeviceObject->DeviceExtension;
+    PDEVICE_EXTENSION device_extension = DriverObject->DeviceObject->DeviceExtension;
 
     UNREFERENCED_PARAMETER(intr);
+    UNREFERENCED_PARAMETER(device_extension);
 
     // Disconnect Interrupt
     if (IntrObj)
@@ -1214,12 +1238,16 @@ void win_os_intr_restore_affinity(void)
 }
 #endif // GREENBOX_USE_UXMHF64_V1
 
+/// @brief Get dedicated OS CPU ID (BSP)
+/// @return CPU ID
 static uint32_t _win_os_dedicated_cpu_get_id(void)
 {
     // Return the CPU ID of the BSP.
     return 0;
 }
 
+/// @brief Arm poll timers for SecOS request polling
+/// @param nextMs Next poll interval in milliseconds
 static VOID _arm_poll_timer(ULONG nextMs)
 {
     if (!gTimerHi || !gTimerLo)
