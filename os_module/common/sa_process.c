@@ -535,7 +535,7 @@ OSSTATUS do_CMD_SECPROCESS_GET_IDS_AND_NAMES(struct tz_cmd_packet *cmd_packet)
     status = os->copy_to_user((void*) usr_resp_buf_uvaddr, (void*)resp_vaddr_sharedmem, sizeof(struct sp_info_id_name_resp)); 
     if (SA_FAIL(status))
     {
-        SACOMM_ERR("[IOCTL-CMD_SECPROCESS_GET_IDS_AND_NAMES] Copy to user error! status:%lu\n", status);
+        SACOMM_ERR("[IOCTL-CMD_SECPROCESS_GET_IDS_AND_NAMES] Copy to user error! status:%lu. usr_resp_buf_uvaddr:%p, resp_vaddr_sharedmem:%p\n", status, (void*)usr_resp_buf_uvaddr, (void*)resp_vaddr_sharedmem);
         status = E_INTERNAL_ERROR;
         goto copy_to_usr_err;
     }

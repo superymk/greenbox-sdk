@@ -181,6 +181,7 @@ struct sp_usbpdev_pipe *usb_kbd_init(struct sp_usbpdev_s *usbkbd_dev, struct usb
         SAP_ERR("epdesc is NULL!\n");
         goto get_ep_desc_err;
     }
+    
     if (UGETW(epdesc->wMaxPacketSize) < 8)
     {
         SAP_ERR("Unsupported wMaxPacketSize (%u) of the keyboard!\n", UGETW(epdesc->wMaxPacketSize));

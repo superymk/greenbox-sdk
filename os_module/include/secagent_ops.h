@@ -10,6 +10,7 @@ extern struct os_funcs *os;
 
 extern void secagent_mark_running(void);
 extern void secagent_mark_not_running(void);
+extern bool secagent_is_running(void);
 
 extern OSSTATUS secagent_init(void);
 

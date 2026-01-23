@@ -18,6 +18,11 @@ void secagent_mark_not_running(void)
 	is_sa_running = false;
 }
 
+bool secagent_is_running(void)
+{
+	return is_sa_running;
+}
+
 OSSTATUS secagent_init(void)
 {
 	OSSTATUS status = OS_SUCCESS;
