@@ -7,9 +7,10 @@
 #include <linux/spinlock.h>
 #include "linux_cpu.h"
 
-uint64_t linux_read_msr(u32 msr)
+uint64_t linux_read_msr(uint32_t msr)
 {
-    u32 eax, edx;
+    uint32_t eax = 0;
+    uint32_t edx = 0;
     __asm__("rdmsr"
             : "=a"(eax), "=d"(edx)
             : "c"(msr));
@@ -143,10 +144,14 @@ void linux_outl(uint32_t value, uint16_t port)
 
 static uint32_t cpu_vendor = CPU_VENDOR_UNKNOWN;
 
+/// @brief Get CPU vendor identifier
+/// @return CPU vendor ID
 static uint32_t _get_cpu_vendor(void)
 {
-    uint32_t dummy;
-    uint32_t vendor_dword1, vendor_dword2, vendor_dword3;
+    uint32_t dummy = 0;
+    uint32_t vendor_dword1 = 0;
+    uint32_t vendor_dword2 = 0;
+    uint32_t vendor_dword3 = 0;
 
     cpuid(0, &dummy, &vendor_dword1, &vendor_dword3, &vendor_dword2);
     if (vendor_dword1 == AMD_STRING_DWORD1 && vendor_dword2 == AMD_STRING_DWORD2 && vendor_dword3 == AMD_STRING_DWORD3)
@@ -159,6 +164,15 @@ static uint32_t _get_cpu_vendor(void)
     return 0; /* never reached */
 }
 
+/// @brief Issue SecBase hypercall
+/// @param eax EAX input
+/// @param ecx ECX input
+/// @param edx EDX input
+/// @param esi ESI input
+/// @param edi EDI input
+/// @param out_esi Output ESI
+/// @param out_edi Output EDI
+/// @return Hypercall result
 static ulong_t linux_hypercall(ulong_t eax,
                                       ulong_t ecx, ulong_t edx, ulong_t esi, ulong_t edi,
                                       ulong_t *out_esi, ulong_t *out_edi)
@@ -196,6 +210,13 @@ static ulong_t linux_hypercall(ulong_t eax,
     return eax;
 }
 
+/// @brief Issue SecBase hypercall with 4 return values
+/// @param arg_ax AX input/output
+/// @param arg_cx CX input/output
+/// @param arg_dx DX input/output
+/// @param arg_si SI input/output
+/// @param arg_di DI input/output
+/// @return Hypercall result
 static ulong_t _linux_hypercall_ret4(ulong_t arg_ax, ulong_t *arg_cx, ulong_t *arg_dx,
                                            ulong_t *arg_si, ulong_t *arg_di)
 {

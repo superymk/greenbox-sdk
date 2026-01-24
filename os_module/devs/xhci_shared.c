@@ -21,16 +21,16 @@ static size_t xhci_mmio_size = 0;
 static bool os_xhci_run_setting = false;
 static bool os_xhci_intr_setting = false;
 
+/// @brief Map XHCI MMIO space
+/// @param hc_bdf XHCI PCI BDF
+/// @param out_mmio_size Output MMIO size
+/// @return Mapped MMIO pointer or NULL on failure
 static void* xhci_map_mmio(union pci_bdf hc_bdf, size_t* out_mmio_size)
 {
     pci_bar_t bar0 = 0;
     pci_bar_t bar1 = 0;
     paddr_t pci_bar0_paddr = INVALID_PADDR;
     void* bar0_ptr = NULL;
-
-    // Check: <out_mmio_size> must be a valid addr.
-    if(!out_mmio_size)
-        return NULL;
 
     // MMIO region is stored in BAR0
     pci_read_barinfo(hc_bdf, PCI_BASE_ADDRESS_0, &bar0, out_mmio_size);
@@ -44,29 +44,44 @@ static void* xhci_map_mmio(union pci_bdf hc_bdf, size_t* out_mmio_size)
     return bar0_ptr;
 }
 
+/// @brief Unmap XHCI MMIO space
+/// @param mmio_ptr MMIO pointer
+/// @param mmio_size MMIO size
 static void xhci_unmap_mmio(void* mmio_ptr, size_t mmio_size)
 {
     os->mm_iounmap(mmio_ptr, mmio_size);
 }
 
+/// @brief Read XHCI USBCMD
+/// @param xhci_ob_base XHCI operational base
+/// @return USBCMD value
 static uint32_t xhci_read_usbcmd(vaddr_t xhci_ob_base)
 {
     vaddr_t usbcmd = xhci_ob_base + XHCI_OB_OFFSET_USBCMD;
     return sa_read32(usbcmd);
 }
 
+/// @brief Write XHCI USBCMD
+/// @param xhci_ob_base XHCI operational base
+/// @param value USBCMD value
 static void xhci_write_usbcmd(vaddr_t xhci_ob_base, uint32_t value)
 {
     vaddr_t usbcmd = xhci_ob_base + XHCI_OB_OFFSET_USBCMD;
     sa_write32(usbcmd, value);
 }
 
+/// @brief Read XHCI USBSTS
+/// @param xhci_ob_base XHCI operational base
+/// @return USBSTS value
 static uint32_t xhci_read_usbsts(vaddr_t xhci_ob_base)
 {
     vaddr_t usbsts = xhci_ob_base + XHCI_OB_OFFSET_USBSTS;
     return sa_read32(usbsts);
 }
 
+/// @brief Enable or disable XHCI interrupts
+/// @param xhci_ob_base XHCI operational base
+/// @param enable True to enable, false to disable
 static void _xhci_intr_enable_disable(vaddr_t xhci_ob_base, bool enable)
 {
     uint32_t usbcmd = xhci_read_usbcmd(xhci_ob_base);
@@ -80,17 +95,17 @@ static void _xhci_intr_enable_disable(vaddr_t xhci_ob_base, bool enable)
 }
 
 
+/// @brief Stop XHCI and wait for halt
+/// @param xhci_ob_base XHCI operational base
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS xhci_stop(vaddr_t xhci_ob_base)
 {
     vaddr_t usbcmd = xhci_ob_base;
-	uint32_t cmd = 0, sts = 0;
+	uint32_t cmd = 0;
+	uint32_t sts = 0;
 	uint32_t i = 0;
     uint32_t cmd_mask = XHCI_REG_CMD_RS;
     uint32_t sts_mask = XHCI_REG_STS_RS;
-
-    // Sanity checks
-    if(!xhci_ob_base)
-        return E_INV_ARG;
 	
     // clear bits of USBCMD
     cmd = xhci_read_usbcmd(xhci_ob_base);
@@ -126,17 +141,17 @@ static OSSTATUS xhci_stop(vaddr_t xhci_ob_base)
 	return OS_SUCCESS;
 }
 
+/// @brief Run XHCI and wait for ready
+/// @param xhci_ob_base XHCI operational base
+/// @return OS_SUCCESS on success, error code on failure
 DECL_UNUSED static OSSTATUS xhci_run(vaddr_t xhci_ob_base)
 {
 	vaddr_t usbcmd = xhci_ob_base;
-	uint32_t cmd = 0, sts = 0;
-	uint32_t i = 0;
+    uint32_t cmd = 0;
+    uint32_t sts = 0;
+    uint32_t i = 0;
     uint32_t cmd_mask = XHCI_REG_CMD_RS;
     uint32_t sts_mask = XHCI_REG_STS_RS;
-
-	// Sanity checks
-    if(!xhci_ob_base)
-        return E_INV_ARG;
 
     // set bits of USBCMD
     cmd = xhci_read_usbcmd(xhci_ob_base);
@@ -171,6 +186,10 @@ DECL_UNUSED static OSSTATUS xhci_run(vaddr_t xhci_ob_base)
 	return OS_SUCCESS;
 }
 
+/// @brief Read byte from XHCI MMIO
+/// @param _xhci_mmio_ptr MMIO base
+/// @param offset Register offset
+/// @return Register value
 static uint8_t _xhci_read8(void* _xhci_mmio_ptr, uint32_t offset)
 {
     return sa_read8((vaddr_t)_xhci_mmio_ptr + offset);
@@ -243,6 +262,8 @@ OSSTATUS do_CMD_IOSM_USB3_SHARED_XHCI_UNPROBE(struct tz_cmd_packet *cmd_packet)
     return status;
 }
 
+/// @brief Pause XHCI controller
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _do_pause_xhci(void)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -281,6 +302,9 @@ OSSTATUS do_CMD_IOSM_USB3_SHARED_XHCI_PAUSE(struct tz_cmd_packet *cmd_packet)
     uint32_t cmd = 0;
 
     UNUSED(cmd_packet);
+    if (!xhci_mmio_ptr)
+        return E_INV_ARG;
+
     xhci_ob_base = (vaddr_t)xhci_mmio_ptr + xhci_ob_offset;
 
     //// Check the USBCMD of the RUN bit.
@@ -300,6 +324,9 @@ OSSTATUS do_CMD_IOSM_USB3_SHARED_XHCI_RESUME(struct tz_cmd_packet *cmd_packet)
     uint8_t xhci_ob_offset = _xhci_read8(xhci_mmio_ptr, XHCI_REG_OFFSET_CAPLENGTH);
 
     UNUSED(cmd_packet);
+    if (!xhci_mmio_ptr)
+        return E_INV_ARG;
+
     DRV_INFO("Run XHCI [%02X:%02X:%02X]\n", xhci_bdf.bus, xhci_bdf.dev, xhci_bdf.fn);
     xhci_ob_base = (vaddr_t)xhci_mmio_ptr + xhci_ob_offset;
 

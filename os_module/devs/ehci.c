@@ -16,16 +16,16 @@ static size_t ehci_mmio_size = 0;
 static bool os_alist_setting = false;
 static bool os_plist_setting = false;
 
+/// @brief Map EHCI MMIO space
+/// @param ehci_bdf EHCI PCI BDF
+/// @param out_mmio_size Output MMIO size
+/// @return Mapped MMIO pointer or NULL on failure
 static void* ehci_map_mmio(union pci_bdf ehci_bdf, size_t* out_mmio_size)
 {
     pci_bar_t bar0 = 0;
     pci_bar_t bar1 = 0;
     paddr_t pci_bar0_paddr = INVALID_PADDR;
     void* bar0_ptr = NULL;
-
-    // Check: <out_mmio_size> must be a valid addr.
-    if(!out_mmio_size)
-        return NULL;
 
     // MMIO region is stored in BAR0
     pci_read_barinfo(ehci_bdf, PCI_BASE_ADDRESS_0, &bar0, out_mmio_size);
@@ -39,32 +39,43 @@ static void* ehci_map_mmio(union pci_bdf ehci_bdf, size_t* out_mmio_size)
     return bar0_ptr;
 }
 
+/// @brief Unmap EHCI MMIO space
+/// @param mmio_ptr MMIO pointer
+/// @param mmio_size MMIO size
 static void ehci_unmap_mmio(void* mmio_ptr, size_t mmio_size)
 {
     os->mm_iounmap(mmio_ptr, mmio_size);
 }
 
+/// @brief Read EHCI USBCMD register
+/// @param ehci_regs EHCI operational registers base
+/// @return USBCMD value
 static uint32_t ehci_read_usbcmd(vaddr_t ehci_regs)
 {
     vaddr_t usbcmd = ehci_regs;
     return sa_read32(usbcmd);
 }
 
+/// @brief Read EHCI USBSTS register
+/// @param ehci_regs EHCI operational registers base
+/// @return USBSTS value
 static uint32_t ehci_read_usbsts(vaddr_t ehci_regs)
 {
     vaddr_t usbsts = ehci_regs + 4;
     return sa_read32(usbsts);
 }
 
+/// @brief Disable EHCI list and wait for status
+/// @param ehci_regs EHCI operational registers base
+/// @param cmd_mask USBCMD mask
+/// @param sts_mask USBSTS mask
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS ehci_disable_list(vaddr_t ehci_regs, uint32_t cmd_mask, uint32_t sts_mask)
 {
     vaddr_t usbcmd = ehci_regs;
-	uint32_t cmd = 0, sts = 0;
-	uint32_t i = 0;
-
-    // Sanity checks
-    if(!ehci_regs)
-        return E_INV_ARG;
+    uint32_t cmd = 0;
+    uint32_t sts = 0;
+    uint32_t i = 0;
 	
     // clear bits of USBCMD
     cmd = ehci_read_usbcmd(ehci_regs);
@@ -100,15 +111,17 @@ static OSSTATUS ehci_disable_list(vaddr_t ehci_regs, uint32_t cmd_mask, uint32_t
 	return OS_SUCCESS;
 }
 
+/// @brief Enable EHCI list and wait for status
+/// @param ehci_regs EHCI operational registers base
+/// @param cmd_mask USBCMD mask
+/// @param sts_mask USBSTS mask
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS ehci_enable_list(vaddr_t ehci_regs, uint32_t cmd_mask, uint32_t sts_mask)
 {
 	vaddr_t usbcmd = ehci_regs;
-	uint32_t cmd = 0, sts = 0;
-	uint32_t i = 0;
-
-	// Sanity checks
-    if(!ehci_regs)
-        return E_INV_ARG;
+    uint32_t cmd = 0;
+    uint32_t sts = 0;
+    uint32_t i = 0;
 
     // set bits of USBCMD
     cmd = ehci_read_usbcmd(ehci_regs);
@@ -216,6 +229,9 @@ OSSTATUS do_CMD_IOSM_USB2_PAUSE_EHCI(struct tz_cmd_packet *cmd_packet)
     uint32_t cmd = 0;
 
     UNUSED(cmd_packet);
+    if (!ehci_mmio_ptr)
+        return E_INV_ARG;
+
     DRV_INFO("Pause EHCI [00:1d:00]\n");
     usb_regs = (vaddr_t)ehci_mmio_ptr + 0x20;
     
@@ -271,6 +287,9 @@ OSSTATUS do_CMD_IOSM_USB2_RESUME_EHCI(struct tz_cmd_packet *cmd_packet)
     vaddr_t usb_regs = INVALID_VADDR;
 
     UNUSED(cmd_packet);
+    if (!ehci_mmio_ptr)
+        return E_INV_ARG;
+
     DRV_INFO("Run EHCI [00:1d:00]\n");
     usb_regs = (vaddr_t)ehci_mmio_ptr + 0x20;
 

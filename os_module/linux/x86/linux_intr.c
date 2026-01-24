@@ -1411,10 +1411,8 @@ void linux_intr_local_irq_disable(void)
     local_irq_disable();
 }
 
-/*
- * This will get called by the kernel as soon as it's safe
- * to do everything normally allowed by kernel modules.
- */
+/// @brief Bottom-half handler for SecOS-OS interrupt
+/// @param taskp Work item
 static void irqhandler_bh(struct work_struct *taskp)
 {
     // struct myprivate *myp = container_of(taskp, struct myprivate, task);
@@ -1427,11 +1425,10 @@ static void irqhandler_bh(struct work_struct *taskp)
     SACOMM_DEBUG("<comm_sos_handle_queued_msgs> finished!\n");
 }
 
-/*
- * This function services keyboard interrupts. It reads the relevant
- * information from the keyboard and then puts the non time critical
- * part into the work queue. This will be run when the kernel considers it safe.
- */
+/// @brief Top-half interrupt handler
+/// @param irq IRQ number
+/// @param dev_id Device context
+/// @return IRQ_HANDLED
 static irqreturn_t irqhandler_th(int irq, void *dev_id)
 {
     struct myprivate *myp = (struct myprivate *)dev_id;
@@ -1444,6 +1441,9 @@ static irqreturn_t irqhandler_th(int irq, void *dev_id)
 
 // #include <linux/of_platform.h>
 
+/// @brief Register IRQ handler
+/// @param irq IRQ number
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _register_irq(int irq)
 {
     int ret;
@@ -1461,23 +1461,27 @@ static OSSTATUS _register_irq(int irq)
     return OS_SUCCESS;
 }
 
+/// @brief Allocate resources and register IRQ handler
+/// @param irq IRQ number
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _linux_intr_register(int irq)
 {
     myp = kmalloc(sizeof(struct myprivate), GFP_KERNEL);
+    if (!myp)
+        return E_NO_MEM;
 
     INIT_WORK(&myp->task, irqhandler_bh);
 
     return _register_irq(irq);
 }
 
-// clean up OS interrupt helper functions
+/// @brief Unregister IRQ handler and free resources
+/// @param irq IRQ number
 static void _linux_intr_unregister(int irq)
 {
-    /*
-     * This is only here for completeness. It's totally irrelevant, since
-     * we don't have a way to restore the normal keyboard interrupt so the
-     * computer is completely useless and has to be rebooted.
-     */
+    // This is only here for completeness. It's totally irrelevant, since
+    // we don't have a way to restore the normal keyboard interrupt so the
+    // computer is completely useless and has to be rebooted.
     free_irq(irq, myp);
     if (myp)
     {
@@ -1494,6 +1498,8 @@ static void _linux_intr_unregister(int irq)
 #define IRQ_SEARCH_START (19)
 #endif
 
+/// @brief Find a free IRQ for SecOS-OS notifications
+/// @return IRQ number or INVALID_IRQ
 static int _linux_find_sos_os_irq(void)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -1512,6 +1518,8 @@ static int _linux_find_sos_os_irq(void)
     return INVALID_IRQ;
 }
 
+/// @brief Register SecOS-OS IRQ handler
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _linux_register_sos_os_irq(void)
 {
     OSSTATUS status = OS_SUCCESS;

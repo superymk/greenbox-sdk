@@ -6,7 +6,7 @@
 
 #include <sa_headers.h>
 
-extern void os_send_ipi_to_cpu(u8 vector, lapic_id_t apic_id);
+extern void os_send_ipi_to_cpu(uint8_t vector, lapic_id_t apic_id);
 
 static uint32_t tos_lapic_id = 0;
 static uint32_t tos_ipi_vector = 0;
@@ -72,7 +72,7 @@ OSSTATUS tos_notify_ipi(void)
         return E_INV_ARG;
     }
 
-    os_send_ipi_to_cpu((u8)tos_ipi_vector, tos_lapic_id);
+    os_send_ipi_to_cpu((uint8_t)tos_ipi_vector, tos_lapic_id);
 
     // On success
     return OS_SUCCESS;

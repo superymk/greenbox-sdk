@@ -23,13 +23,14 @@
 
 #define PS2_TIMEOUT 500
 
-/* Loops until the controller's input buffer is empty or our timer has expired.
- * Call this function before writing to the controller's command port, PS2_CMD.
- */
+/// @brief Wait until controller input buffer is empty
+/// @return True if ready before timeout
 static bool ps2_wait_write(void)
 {
     int timer = PS2_TIMEOUT;
 
+    // Loops until the controller's input buffer is empty or our timer has expired.
+    // Call this function before writing to the controller's command port, PS2_CMD.
     while ((os->inb(PS2_STATUS) & 2) && timer-- > 0)
     {
         // asm("pause");
@@ -38,14 +39,15 @@ static bool ps2_wait_write(void)
     return timer != 0;
 }
 
-/* Loops until data is available in the controller's output buffer or until our
- * timer has expired.
- * Call this function before reading from the controller's data port, PS2_DATA.
- */
+/// @brief Wait until controller output buffer has data
+/// @return True if data available before timeout
 static bool ps2_wait_read(void)
 {
     int timer = PS2_TIMEOUT;
 
+    // Loops until data is available in the controller's output buffer or until our
+    // timer has expired.
+    // Call this function before reading from the controller's data port, PS2_DATA.
     while (!(os->inb(PS2_STATUS) & 1) && timer-- >= 0)
     {
         // asm("pause");
@@ -54,15 +56,12 @@ static bool ps2_wait_read(void)
     return timer != 0;
 }
 
-/* Returns the first byte of data available from `port`.
- * Returns `(uint8_t) -1` on read error, and also when this value was
- * legitimately read. TODO: room for improvement.
- */
+/// @brief Returns the first byte of data available from PS/2 controller
+/// @param port I/O port
+/// @param out_val Output value
+/// @return True on success, false on timeout
 static bool ps2_read(uint16_t port, uint8_t* out_val)
 {
-    if(!out_val)
-        return false;
-
     if (ps2_wait_read())
     {
         *out_val = os->inb(port);
@@ -72,9 +71,11 @@ static bool ps2_read(uint16_t port, uint8_t* out_val)
     return false;
 }
 
-/* Tries to write a byte on the specified port, and returns whether the
- * operation was successful.
- */
+/// @brief Tries to write a byte on the specified port of the PS/2 controller, and returns whether the operation was 
+/// successful.
+/// @param port I/O port
+/// @param b Value to write
+/// @return True on success, false on timeout
 static bool ps2_write(uint16_t port, uint8_t b)
 {
     if (ps2_wait_write())
@@ -100,6 +101,7 @@ static bool ps2_write(uint16_t port, uint8_t b)
 // }
 
 
+/// @brief Drain PS/2 device buffers
 static void _drain_ps2_dev_buffers(void)
 {
     uint8_t val = 0;
@@ -114,7 +116,6 @@ static void _drain_ps2_dev_buffers(void)
     // After dropping the response, the output buffers of device 2 are clear
     (void)ps2_read(PS2_DATA, &val);
 }
-
 
 OSSTATUS do_CMD_IOSM_PS2_DRAIN_BUFFERS(struct tz_cmd_packet *cmd_packet)
 {

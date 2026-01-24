@@ -7,12 +7,12 @@
 static struct sa_siginfo infos[NUM_SIGINFO_SLOTS];
 static lock_t infos_lock; // Lock to update <infos>
 
+/// @brief Find a free siginfo slot
+/// @param out_idx Output slot index
+/// @return true if found, false otherwise
 static bool find_free_siginfo_slot(uint32_t *out_idx)
 {
     uint32_t i = 0;
-
-    if(!out_idx)
-        return false;
 
     FOREACH_S(i, NUM_SIGINFO_SLOTS, NUM_SIGINFO_SLOTS, 0, 1)
     {
@@ -27,12 +27,13 @@ static bool find_free_siginfo_slot(uint32_t *out_idx)
     return false;
 }
 
+/// @brief Find a siginfo slot by application PID
+/// @param app_pid Application PID
+/// @param out_idx Output slot index
+/// @return true if found, false otherwise
 static bool find_siginfo_slot_by_app_pid(process_id app_pid, uint32_t *out_idx)
 {
     uint32_t i = 0;
-
-    if(!out_idx)
-        return false;
 
     FOREACH_S(i, NUM_SIGINFO_SLOTS, NUM_SIGINFO_SLOTS, 0, 1)
     {
@@ -47,8 +48,6 @@ static bool find_siginfo_slot_by_app_pid(process_id app_pid, uint32_t *out_idx)
     return false;
 }
 
-/// @brief Init the cache of detailed info associated with events sent to the red applications.
-/// @param  
 void app_notif_mgr_init(void)
 {
     uint32_t i = 0;
@@ -68,8 +67,6 @@ void app_notif_mgr_init(void)
     }
 }
 
-/// @brief Finalize the cache of detailed info associated with events sent to the red applications.
-/// @param  
 void app_notif_mgr_fini(void)
 {
     uint32_t i = 0;
@@ -86,12 +83,6 @@ void app_notif_mgr_fini(void)
     }
 }
 
-/// @brief Enqueue the detailed information of the notification sent to the untrusted application <app_pid>.
-/// @param app_pid PID of the target untrusted application.
-/// @param sp_id Sender of the notification.
-/// @param info1 Detailed info.
-/// @param info2 More detailed info, not always exist.
-/// @return 
 OSSTATUS app_notif_enqueue_info(process_id app_pid, spid_t sp_id, ulong_t info1, ulong_t info2)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -131,12 +122,6 @@ out:
     return status;
 }
 
-/// @brief Dequeue the detailed information of the notification sent to the untrusted application <app_pid>.
-/// @param app_pid PID of the target untrusted application.
-/// @param sp_id Sender of the notification.
-/// @param info1 Detailed info.
-/// @param info2 More detailed info, not always exist.
-/// @return 
 OSSTATUS app_notif_dequeue_info(process_id app_pid, spid_t* sp_id, ulong_t* info1, ulong_t* info2)
 {
     OSSTATUS status = OS_SUCCESS;

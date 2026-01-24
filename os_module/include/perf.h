@@ -10,6 +10,8 @@
 #ifndef __ASSEMBLY__
 typedef uint64_t perf_counter_t;
 
+/// @brief Increment performance counter
+/// @param cnt Counter pointer
 extern void perf_counter_inc(perf_counter_t* cnt);
 
 

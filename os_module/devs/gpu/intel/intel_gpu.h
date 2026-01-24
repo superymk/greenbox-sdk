@@ -77,8 +77,19 @@ struct intel_gpu_intl
     GPU_RESUME_OP gpu_resume_op;
 };
 
+/// @brief Probe Intel GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS intel_gpu_probe(struct gpu_pdev* gpu);
+
+/// @brief Pause Intel GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS intel_gpu_pause(struct gpu_pdev *gpu);
+
+/// @brief Resume Intel GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS intel_gpu_resume(struct gpu_pdev *gpu);
 
 #endif //__ASSEMBLY__

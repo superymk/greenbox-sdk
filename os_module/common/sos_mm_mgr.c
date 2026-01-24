@@ -20,14 +20,9 @@ struct vk_resource_manifest vk_manifest =
 
 static paddr_t next_pick_paddr = SPS_MEM_PADDR_BASE;
 
-// #define PAGE4K_SHIFT			12
-// #define PAGE_MASK_4K				0xfffff000
-// #define PAGE_SIZE_4K				(1<<PAGE4K_SHIFT)
-// #define SIZE_ROUNDUP_4K(size)	(((size) + PAGE_SIZE_4K - 1) & PAGE_MASK_4K)
-
 paddr_t sos_mm_try_alloc_phys(size_t size)
 {
-    paddr_t result;
+    paddr_t result = INVALID_PADDR;
 
     // [TODO] ugly hack, and it will cause a lot of internal fragment
     // [TODO][Issue 17] Reimplement <sos_mm_try_alloc_phys> and related functions
@@ -46,7 +41,6 @@ void sos_mm_try_free_phys(paddr_t paddr_in_sos)
     PRINT("<sos_mm_try_free_phys> is un-implemented\n");
 }
 
-//! Allocate memory and put the information in <vk_manifest>
 OSSTATUS sos_comm_resc_provision(void)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -105,7 +99,6 @@ OSSTATUS sos_comm_resc_provision(void)
     return OS_SUCCESS;
 }
 
-//! Free memory recorded in <vk_manifest>
 void sos_comm_resc_return(void)
 {
     vaddr_t *p_rx_chanctl_start = &vk_manifest.vk_os_rx_chanctl_start_vaddr;
@@ -142,7 +135,6 @@ void sos_comm_resc_return(void)
 #endif
 }
 
-//! Request SecOS to allocate shared memory
 OSSTATUS sos_sharedmem_alloc(offset_t *out_offset, uint32_t alignment, uint32_t size)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -180,7 +172,6 @@ OSSTATUS sos_sharedmem_alloc(offset_t *out_offset, uint32_t alignment, uint32_t 
     return OS_SUCCESS;
 }
 
-//! Request SecOS to free shared memory
 OSSTATUS sos_sharedmem_free(offset_t offset, size_t sz)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -211,7 +202,6 @@ OSSTATUS sos_sharedmem_free(offset_t offset, size_t sz)
     return OS_SUCCESS;
 }
 
-//! Convert <offset> to SecAgent addressable <vaddr>
 vaddr_t sos_sharedmem_ptr(offset_t offset)
 {
     if (sos_addrs.sos_sharemem_start == INVALID_VADDR)

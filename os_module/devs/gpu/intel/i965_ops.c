@@ -100,13 +100,11 @@ OSSTATUS intel_gpu_probe(struct gpu_pdev *gpu)
 
 OSSTATUS intel_gpu_pause(struct gpu_pdev *gpu)
 {
-    struct pci_device *pci = NULL;
     struct intel_gpu_intl *i965_gpu = NULL;
 
     // Sanity checks
     if (!gpu)
-        return EINVAL;
-    pci = &gpu->pci;
+        return E_INV_ARG;
     i965_gpu = (struct intel_gpu_intl *)gpu->private;
 
     return i965_gpu->gpu_pause_op(gpu);
@@ -114,13 +112,11 @@ OSSTATUS intel_gpu_pause(struct gpu_pdev *gpu)
 
 OSSTATUS intel_gpu_resume(struct gpu_pdev *gpu)
 {
-    struct pci_device *pci = NULL;
     struct intel_gpu_intl *i965_gpu = NULL;
 
     // Sanity checks
     if (!gpu)
-        return EINVAL;
-    pci = &gpu->pci;
+        return E_INV_ARG;
     i965_gpu = (struct intel_gpu_intl *)gpu->private;
 
     return i965_gpu->gpu_resume_op(gpu);

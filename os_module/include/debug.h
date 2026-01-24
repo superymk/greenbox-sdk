@@ -9,6 +9,9 @@
 
 #ifndef __ASSEMBLY__
 
+/// @brief Dump memory contents
+/// @param start_vaddr Start virtual address
+/// @param size Size in bytes
 extern void dbg_dumpmem(vaddr_t start_vaddr, size_t size);
 
 

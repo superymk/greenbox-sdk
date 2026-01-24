@@ -10,6 +10,10 @@
 #define INGTT(gvaddr) (((volatile uint32_t *)ggtt_vaddr)[(gvaddr) >> PAGE_SHIFT_4K])
 typedef unsigned long gpu_vaddr_t;
 
+/// @brief Update GGTT mapping for a GPU virtual address
+/// @param gpu_regs GPU register base
+/// @param gvaddr GPU virtual address
+/// @param spaddr System physical address
 static void _ggtt_update_mapping(void* gpu_regs, gpu_vaddr_t gvaddr, paddr_t spaddr)
 {
 	vaddr_t ggtt_vaddr = (vaddr_t)gpu_regs + MB(2);
@@ -28,10 +32,10 @@ static vaddr_t fb_vaddr = INVALID_VADDR;
 OSSTATUS do_CMD_IOSM_FB_TEST_ON(struct tz_cmd_packet *cmd_packet)
 {
     OSSTATUS status = OS_SUCCESS;
-    uint32_t fb_size = MB(2);
-    uint32_t fb_pages = fb_size >> 12;
+    size_t fb_size = MB(2);
+    uint32_t fb_pages = (uint32_t)(fb_size >> 12);
     void* gpu_regs = NULL;
-    uint32_t gpu_regs_mem_size = MB(4);
+    size_t gpu_regs_mem_size = MB(4);
 
     UNUSED(cmd_packet);
     DRV_INFO("do_CMD_IOSM_FB_TEST_ON\n");
@@ -44,6 +48,12 @@ OSSTATUS do_CMD_IOSM_FB_TEST_ON(struct tz_cmd_packet *cmd_packet)
     }
 
     // Allocate frame buffer
+    if (fb_vaddr != INVALID_VADDR)
+    {
+        os->mm_free_physical_contiguous_pages(fb_vaddr, fb_pages, ALLOC_DMA_MEMORY);
+        fb_vaddr = INVALID_VADDR;
+    }
+
     fb_vaddr = os->mm_alloc_physical_contiguous_pages_nocache(fb_pages, ALLOC_DMA_MEMORY);
     if(fb_vaddr == INVALID_VADDR)
     {
@@ -94,10 +104,10 @@ out:
 OSSTATUS do_CMD_IOSM_FB_TEST_OFF(struct tz_cmd_packet *cmd_packet)
 {
     OSSTATUS status = OS_SUCCESS;
-    uint32_t fb_size = MB(2);
-    uint32_t fb_pages = fb_size >> 12;
+    size_t fb_size = MB(2);
+    uint32_t fb_pages = (uint32_t)(fb_size >> 12);
     void* gpu_regs = NULL;
-    uint32_t gpu_regs_mem_size = MB(4);
+    size_t gpu_regs_mem_size = MB(4);
 
     UNUSED(cmd_packet);
     DRV_INFO("do_CMD_IOSM_FB_TEST_OFF\n");
@@ -110,7 +120,10 @@ OSSTATUS do_CMD_IOSM_FB_TEST_OFF(struct tz_cmd_packet *cmd_packet)
     }
 
     if(fb_vaddr != INVALID_VADDR)
+    {
         os->mm_free_physical_contiguous_pages(fb_vaddr, fb_pages, ALLOC_DMA_MEMORY);
+        fb_vaddr = INVALID_VADDR;
+    }
 
     // Write registers
     gpu_write_reg((vaddr_t)gpu_regs, _DVSACNTR, 0);
