@@ -20,6 +20,8 @@
 
 #include <loader_sa_intfs.h>
 
+#include "../gui/util_log.h"
+
 #define IOCTL_SECAGENT \
     CTL_CODE(FILE_DEVICE_UNKNOWN, 0x1, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
@@ -49,9 +51,8 @@ static void app_mm_free(vaddr_t vaddr)
     bool status = false;
 
     status = VirtualFree((void *)vaddr, 0, MEM_RELEASE);
-    (void)status;
-    // if (!status)
-    // 	APP_ERR("Free memory error! Error:#%d\n", (int)GetLastError());
+    if (!status)
+    	FileUtils_Log("Free memory error! Error:#%d\n", (int)GetLastError());
 }
 
 static VOID CALLBACK IoCompletionRoutine(
@@ -102,8 +103,7 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
                          NULL);
     if (hDevice == INVALID_HANDLE_VALUE)
     {
-        // APP_ERR("<os_ioctl> Access SecAgent Error (Error: #%d)\n",
-        // (err_status = (int)GetLastError()));
+        FileUtils_Log("<os_ioctl> Access SecAgent Error (Error: #%d)\n", (err_status = (int)GetLastError()));
         goto out;
     }
 
@@ -111,14 +111,14 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
     pIoOperation = (PIO_OPERATION)app_mm_alloc(sizeof(IO_OPERATION));
     if (!pIoOperation)
     {
-        // APP_ERR("<os_ioctl> Failed to create <pIoOperation>!\n");
+        FileUtils_Log("<os_ioctl> Failed to create <pIoOperation>!\n");
         goto out;
     }
 
     resp = (struct tz_cmd_packet *)app_mm_alloc(sizeof(struct tz_cmd_packet));
     if (!resp)
     {
-        // APP_ERR("<os_ioctl> Failed to create <resp>!\n");
+        FileUtils_Log("<os_ioctl> Failed to create <resp>!\n");
         goto out;
     }
 
@@ -132,14 +132,14 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
     pIoOperation->overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     if (pIoOperation->overlapped.hEvent == NULL)
     {
-        // APP_ERR("<os_ioctl> Failed to create event\n");
+        FileUtils_Log("<os_ioctl> Failed to create event\n");
         goto out;
     }
 
     pIo = CreateThreadpoolIo(hDevice, IoCompletionRoutine, pIoOperation, NULL);
     if (!pIo)
     {
-        // APP_ERR("<os_ioctl> Failed to create IO object\n");
+        FileUtils_Log("<os_ioctl> Failed to create IO object\n");
         goto out;
     }
 
@@ -164,7 +164,7 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
         } else {
             // Real failure: must cancel the TP I/O "started" accounting.
             CancelThreadpoolIo(pIo);
-            // APP_ERR("<os_ioctl> DeviceIoControl failed (Error: #%d)\n", err_status);
+            FileUtils_Log("<os_ioctl> DeviceIoControl failed (Error: #%d)\n", err_status);
             status = false;
             goto out_wait; // still go to wait path carefully (see below)
         }
@@ -188,7 +188,7 @@ out_wait:
         if (!ok) 
         {
             err_status = (int)GetLastError();
-            // APP_ERR("<os_ioctl> GetOverlappedResult failed (Error: #%d)\n", err_status);
+            FileUtils_Log("<os_ioctl> GetOverlappedResult failed (Error: #%d)\n", err_status);
             status = false;
         } else 
         {
@@ -197,7 +197,7 @@ out_wait:
                 memcpy(cmd, resp, sizeof(struct tz_cmd_packet));
             } else {
                 // driver returned too few bytes
-                // APP_ERR("<os_ioctl> IOCTL returned %lu bytes (< tz_cmd_packet)\n", bytes);
+                FileUtils_Log("<os_ioctl> IOCTL returned %lu bytes (< tz_cmd_packet)\n", bytes);
                 status = false;
             }
         }
@@ -219,7 +219,7 @@ out:
     if (err_no)
         *err_no = err_status;
 
-    // // APP_ERR("[Superymk] <os_ioctl> Finished cmd:%u\n", cmd->id);
+    // FileUtils_Log("[Superymk] <os_ioctl> Finished cmd:%u\n", cmd->id);
     return status;
 }
 
@@ -233,7 +233,7 @@ wchar_t *win_convert_char_to_LPCWSTR(const char *charStr)
     if (bufferSize == 0)
     {
         // Handle error
-        printf("Error in MultiByteToWideChar: %d\n", GetLastError());
+        FileUtils_Log("Error in MultiByteToWideChar: %d\n", GetLastError());
         return L"";
     }
 
@@ -241,7 +241,7 @@ wchar_t *win_convert_char_to_LPCWSTR(const char *charStr)
     wchar_t *wideStr = (wchar_t *)malloc(bufferSize * sizeof(wchar_t));
     if (wideStr == NULL)
     {
-        printf("Memory allocation failed\n");
+        FileUtils_Log("Memory allocation failed\n");
         return L"";
     }
 
@@ -250,7 +250,7 @@ wchar_t *win_convert_char_to_LPCWSTR(const char *charStr)
     if (result == 0)
     {
         // Handle error
-        printf("Error in MultiByteToWideChar: %d\n", GetLastError());
+        FileUtils_Log("Error in MultiByteToWideChar: %d\n", GetLastError());
         free(wideStr);
         return L"";
     }
