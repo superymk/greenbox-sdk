@@ -40,10 +40,24 @@ typedef enum
 // Maximum of 15 data interfaces (i.e., Interfaces containing data endpoints). Each interface has one or more endpoints.
 #define USBPDEV_MAX_DATA_INTERFACES_NUM (USBPDEV_MAX_DATA_ENDPOINTS_NUM)
 
+struct usb_hid_descriptor {
+	uint8_t  bLength;
+	uint8_t  bDescriptorType;
+	uint16_t bcdHID;
+	uint8_t  bCountryCode;
+	uint8_t  bNumDescriptors;
+	uint8_t  bClassDescriptorType;
+	uint16_t wClassDescriptorLength;
+} PACKED;
+
 struct usbpdev_endpoint_descriptor
 {
-	struct usb_interface_descriptor* iface; // The owner USB interface
-	struct usb_endpoint_descriptor* epdesc; // The content of the USB endpoint
+	// Interface descriptor that owns this endpoint and associated descriptors (e.g., HID descriptor)
+	struct usb_interface_descriptor* iface;
+	struct usb_hid_descriptor* hid_desc; // HID descriptor, if any
+
+	// USB endpoint descriptor
+	struct usb_endpoint_descriptor* epdesc;
 };
 
 struct sp_usbpdev_s
@@ -71,6 +85,7 @@ struct sp_usbpdev_s
 #define USB_DT_ENDPOINT                 0x05
 #define USB_DT_DEVICE_QUALIFIER         0x06
 #define USB_DT_OTHER_SPEED_CONFIG       0x07
+#define USB_DT_ENDPOINT_HID             0x21
 #define USB_DT_ENDPOINT_COMPANION       0x30
 
 #define USB_ENDPOINT_DIR_MASK           0x80
