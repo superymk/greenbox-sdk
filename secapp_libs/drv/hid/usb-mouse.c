@@ -25,6 +25,9 @@ static struct sp_usbpdev_pipe *_mouse_intr_pipes[MAX_MOUSE_INTR_PIPES] = {0};
 static char *mouse_keydata = NULL;
 // static bool mouse_isr_enable = false;
 
+static uint8_t* _mouse_hid_desc_data = NULL;
+static uint32_t _mouse_hid_desc_data_size = 0;
+
 static bool pressed_left = false;
 static bool pressed_right = false;
 static bool pressed_middle = false;
@@ -295,8 +298,6 @@ void print_hex(const char *prefix, const void *prtptr, size_t size)
 struct sp_usbpdev_pipe *usb_mouse_init(struct sp_usbpdev_s *usbmouse_dev, struct usb_interface_descriptor *iface)
 {
     SAP_STATUS status = SUCCESS;
-    uint8_t* hid_desc_val = NULL;
-    uint32_t hid_desc_size = 0;
     struct sp_usbpdev_pipe *_usbmouse_intr_pipe = NULL;
 
     // Sanity checks
@@ -325,27 +326,24 @@ struct sp_usbpdev_pipe *usb_mouse_init(struct sp_usbpdev_s *usbmouse_dev, struct
     SAP_INFO("<usb_mouse_init>: Get HID Descriptor\n");
     if(ep->hid_desc)
     {
-        hid_desc_size = ep->hid_desc->wClassDescriptorLength;
+        _mouse_hid_desc_data_size = ep->hid_desc->wClassDescriptorLength;
 
-        hid_desc_val = (uint8_t*)smalloc(hid_desc_size);
-        if (!hid_desc_val)
+        _mouse_hid_desc_data = (uint8_t*)smalloc(_mouse_hid_desc_data_size);
+        if (!_mouse_hid_desc_data)
         {
             SAP_ERR("No memory to allocate HID descriptor content buffer!\n");
             goto get_ep_hid_desc_err;
         }
 
         usbhid_print_hid_desc(ep->hid_desc);
-        status = read_hid_desc_content(usbmouse_dev, ep, hid_desc_val);
+        status = read_hid_desc_content(usbmouse_dev, ep, _mouse_hid_desc_data);
         if (FAIL(status))
         {
             SAP_ERR("Read HID descriptor content error! status:%lu\n", status);
             goto get_ep_hid_desc_err;
         }
 
-        print_hex("HID Descriptor Content:", hid_desc_val, hid_desc_size);
-
-        sfree(hid_desc_val, hid_desc_size);
-        hid_desc_val = NULL;
+        print_hex("HID Descriptor Content:", _mouse_hid_desc_data, _mouse_hid_desc_data_size);
     }
 
     SAP_INFO("<usb_mouse_init>: Alloc Mouse Interrupt Pipe\n");
@@ -411,10 +409,10 @@ usb_hid_err:
     }
 alloc_intr_pipe_err:
 get_ep_hid_desc_err:
-    if (hid_desc_val)
+    if (_mouse_hid_desc_data)
     {
-        sfree(hid_desc_val, hid_desc_size);
-        hid_desc_val = NULL;
+        sfree(_mouse_hid_desc_data, _mouse_hid_desc_data_size);
+        _mouse_hid_desc_data = NULL;
     }
 get_ep_desc_err:
     return NULL;
@@ -427,6 +425,13 @@ void usb_mouse_fini(struct sp_usbpdev_pipe *pipe)
 
     // Free kbd USB intr pipe
     _usb_mouse_free_intrpipe(pipe);
+
+    // Free HID descriptor content buffer
+    if(_mouse_hid_desc_data)
+    {
+        sfree(_mouse_hid_desc_data, _mouse_hid_desc_data_size);
+        _mouse_hid_desc_data = NULL;
+    }
 
     SAP_INFO("Finalized USB Mouse Specific USB pipes\n");
 }
