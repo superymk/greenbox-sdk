@@ -9,12 +9,22 @@
 
 #ifndef __ASSEMBLY__
 
+/// @brief Initialize OS app notification subsystem
 extern void linux_os_app_notif_subsystem_init(void);
+
+/// @brief Finalize OS app notification subsystem
 extern void linux_os_app_notif_subsystem_fini(void);
 
+/// @brief Register app notification event
+/// @param info Registration info
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS linux_os_app_notif_register(struct sa_app_notif_reginfo* info);
+
+/// @brief Unregister app notification event
 extern void linux_os_app_notif_unregister(void);
 
+/// @brief Signal an application by PID
+/// @param pid Process ID
 extern void linux_signal_app(process_id pid);
 
 #endif // __ASSEMBLY__

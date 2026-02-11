@@ -83,8 +83,9 @@
 #define IOSM_PCIE_SUBCMD_DENY_MEMACCESS_TO_DEV                          (20)
 #define IOSM_PCIE_SUBCMD_RESTORE_MEMACCESS_TO_DEV                       (21)
 
-#define IOSM_PCIE_SUBCMD_IOMMU_DMA_MMAP                                 (30)
-#define IOSM_PCIE_SUBCMD_IOMMU_DMA_MUNMAP                               (31)
+#define IOSM_PCIE_SUBCMD_IOMMU_IS_AVAILABLE                             (30)
+#define IOSM_PCIE_SUBCMD_IOMMU_DMA_MMAP                                 (31)
+#define IOSM_PCIE_SUBCMD_IOMMU_DMA_MUNMAP                               (32)
 
 
 // #define IOSM_PCIE_SUBCMD_SHARE_NS_OS_KERNEL_R                           (50)
@@ -169,6 +170,11 @@ typedef struct
     union pci_bdf   bdf;
     IOMMU_PT_TYPE   iommu_pt_type;
 } PCI_DEV_OWNER_REGISTER_PARAMS;
+
+typedef struct
+{
+    uint32_t iommu_is_owned;
+} IOMMU_AVAILABLE_RESP;
 
 typedef struct
 {

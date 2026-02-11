@@ -131,6 +131,7 @@
     <ClCompile>
       <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WppEnabled>true</WppEnabled>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -154,6 +155,7 @@
     <ClCompile>
       <TreatWarningAsError>false</TreatWarningAsError>
       <PreprocessorDefinitions>__WINDOWS__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WppEnabled>true</WppEnabled>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -220,7 +222,6 @@
     <ClCompile Include="..\devs\xhci_shared.c" />
     <ClCompile Include="..\utils\utils.c" />
     <ClCompile Include="driver_entry.c" />
-    <ClCompile Include="main.c" />
     <ClCompile Include="win_cpu.c" />
     <ClCompile Include="win_event_notify.c" />
     <ClCompile Include="win_funcs.c" />

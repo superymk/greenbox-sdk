@@ -47,6 +47,9 @@ extern OSSTATUS comm_sos_process_resp_msg(struct comm_os_msg* resp_msg);
 	printk("\n");	
 }*/
 
+/// @brief Handle ACK for a message
+/// @param msg Message to acknowledge
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _comm_sos_handle_msg_ack(struct comm_os_msg* msg)
 {
     // Mark the message as handled
@@ -57,7 +60,6 @@ static OSSTATUS _comm_sos_handle_msg_ack(struct comm_os_msg* msg)
     return comm_sos_send_msg_nowait(msg);
 }
 
-//! Handle a message sent from SecOS/SecProcess
 OSSTATUS comm_sos_handle_msg(struct comm_os_msg* msg)
 {
 	OSSTATUS status = OS_SUCCESS;
@@ -158,7 +160,9 @@ void comm_sos_handler_fini(void)
 
 
 /********* Functions - Wait and Receive responses *********/
-//! Get and remove the waiting message
+/// @brief Get and remove the waiting message
+/// @param req_id Request ID
+/// @return Pointer to waiting message or NULL
 static struct comm_os_msg* _handler_pop_waitmsg(msg_id_t req_id)
 {
 	struct comm_os_msg* wait_msg = NULL;

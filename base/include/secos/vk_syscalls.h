@@ -503,6 +503,10 @@
 
 
 /********* Syscalls - IOMMU *********/
+/// @brief Return true iff the IOMMU is available to GreenBox.
+/// @return Return true iff the IOMMU is available to GreenBox.
+#define SYS_IOMMU_IS_OWNED							2200
+
 /// @brief Create an empty IOMMU page table for devices exclusively owned by the secure domain.
 /// This page table translates paddrs in the secure domain to spaddrs to ease the implementation of drivers in secure 
 /// domain

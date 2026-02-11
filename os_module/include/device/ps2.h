@@ -7,9 +7,10 @@
 
 #include <os_types.h>
 
-
-
 #ifndef __ASSEMBLY__
+/// @brief Drain PS/2 device buffers
+/// @param cmd_packet Command packet
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS do_CMD_IOSM_PS2_DRAIN_BUFFERS(struct tz_cmd_packet *cmd_packet);
 
 #endif // __ASSEMBLY__

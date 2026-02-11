@@ -19,32 +19,41 @@ struct sa_siginfo
     ulong_t info2;
 };
 
-/// @brief Initialize the cache of detailed info associated with notifications sent to the red applications.
-/// @param 
+/// @brief Initialize the cache of detailed info associated with notifications sent to the red applications
 extern void app_notif_mgr_init(void);
 
-/// @brief Finalize the cache of detailed info associated with notifications sent to the red applications.
-/// @param  
+/// @brief Finalize the cache of detailed info associated with notifications sent to the red applications
 extern void app_notif_mgr_fini(void);
 
-/// @brief Enqueue the detailed information of the notification sent to the untrusted application <app_pid>.
-/// @param app_pid PID of the target untrusted application.
-/// @param sp_id Sender of the notification.
-/// @param info1 Detailed info.
-/// @param info2 More detailed info, not always exist.
-/// @return 
+/// @brief Enqueue detailed notification information for an untrusted application
+/// @param app_pid PID of the target untrusted application
+/// @param sp_id Sender of the notification
+/// @param info1 Detailed info
+/// @param info2 More detailed info (optional)
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS app_notif_enqueue_info(process_id app_pid, spid_t sp_id, ulong_t info1, ulong_t info2);
 
-/// @brief Dequeue the detailed information of the notification sent to the untrusted application <app_pid>.
-/// @param app_pid PID of the target untrusted application.
-/// @param sp_id Sender of the notification.
-/// @param info1 Detailed info.
-/// @param info2 More detailed info, not always exist.
-/// @return 
+/// @brief Dequeue detailed notification information for an untrusted application
+/// @param app_pid PID of the target untrusted application
+/// @param sp_id Sender of the notification
+/// @param info1 Detailed info
+/// @param info2 More detailed info (optional)
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS app_notif_dequeue_info(process_id app_pid, spid_t* sp_id, ulong_t* info1, ulong_t* info2);
 
+/// @brief Poll OS notification info from SecAgent
+/// @param cmd_packet Command packet
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS do_CMD_POLL_OS_NOTIFICATION_INFO(struct tz_cmd_packet *cmd_packet);
+
+/// @brief Register OS notification handler
+/// @param cmd_packet Command packet
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS do_CMD_REGISTER_OS_NOTIFICATION(struct tz_cmd_packet *cmd_packet);
+
+/// @brief Unregister OS notification handler
+/// @param cmd_packet Command packet
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS do_CMD_UNREGISTER_OS_NOTIFICATION(struct tz_cmd_packet *cmd_packet);
 
 #endif // __ASSEMBLY__

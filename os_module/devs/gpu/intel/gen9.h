@@ -9,8 +9,14 @@
 
 #ifndef __ASSEMBLY__
 
-
+/// @brief Pause Gen9 GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS i965_gen9_gpu_pause(struct gpu_pdev *gpu);
+
+/// @brief Resume Gen9 GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS i965_gen9_gpu_resume(struct gpu_pdev *gpu);
 
 #endif //__ASSEMBLY__

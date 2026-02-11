@@ -44,7 +44,9 @@ void linux_mm_free(void* ptr)
 	kfree(ptr);
 }
 
-// Return the upper value of integer N, where N = log2(value)
+/// @brief Return the upper value of integer N, where N = log2(value)
+/// @param value Input value
+/// @return Upper log2 value
 static uint32_t upper_order_base2(uint32_t value)
 {
 	uint32_t result = 0;
@@ -228,6 +230,9 @@ OSSTATUS linux_mm_check_current_process_page_permission(ulong_t uvaddr, size_t s
 
 	// Check: parameters must be valid
 	if(!uvaddr || !size || !out_allowed_read_write)
+		return E_INV_ARG;
+
+	if (size > 0xFFFFFFFFu)
 		return E_INV_ARG;
 
 	for(offset = 0; offset < size; offset += PAGE_SIZE)

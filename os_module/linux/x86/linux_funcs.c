@@ -23,6 +23,7 @@
 
 bool cpu_support_clflush = false;
 
+/// @brief Initialize Linux-specific configurations
 static void linux_cfgs_init(void)
 {
     uint32_t eax, edx;
@@ -34,21 +35,28 @@ static void linux_cfgs_init(void)
         cpu_support_clflush = true;
 }
 
+/// @brief Finalize Linux-specific configurations
 static void linux_cfgs_fini(void)
 {
     cpu_support_clflush = false;
 }
 
+/// @brief Initialize SecOS boot params
+/// @param boot_params Boot params
 static void linux_sos_boot_params_init(struct sos_boot_params *boot_params)
 {
     boot_params->sos_compat_conf = SOS_COMPATIBILITY_LINUX;
 }
 
+/// @brief Get current process ID
+/// @return Process ID
 static process_id linux_get_current_pid(void)
 {
     return (process_id)current->tgid;
 }
 
+/// @brief Read current processor ID
+/// @return Processor ID
 static uint32_t linux_read_processor_id(void)
 {
     return (uint32_t)smp_processor_id();

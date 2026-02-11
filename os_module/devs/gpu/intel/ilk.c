@@ -26,13 +26,13 @@ static uint32_t os_oa_cntr;
 // static uint32_t os_fbc_cntr; // ILK does not have FBC
 static uint32_t os_vga_cntr;
 
+/// @brief Pause Intel ILK GPU and save state
+/// @param i965_gpu GPU private info
+/// @param gpu_regs GPU MMIO base
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_pause(struct intel_gpu_intl *i965_gpu, vaddr_t gpu_regs)
 {
     (void)i965_gpu;
-
-    // Sanity checks
-    if (!gpu_regs)
-        return E_INV_ARG;
 
     // Backup OS's GPU register contents
     os_gpu_render_rb_ctl = gpu_read_reg(gpu_regs, RING_CTL(RENDER_RING_BASE));
@@ -105,13 +105,13 @@ static OSSTATUS _gpu_pause(struct intel_gpu_intl *i965_gpu, vaddr_t gpu_regs)
     return OS_SUCCESS;
 }
 
+/// @brief Resume Intel ILK GPU and restore state
+/// @param i965_gpu GPU private info
+/// @param gpu_regs GPU MMIO base
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_resume(struct intel_gpu_intl *i965_gpu, vaddr_t gpu_regs)
 {
     (void)i965_gpu;
-
-    // Sanity checks
-    if (!gpu_regs)
-        return E_INV_ARG;
 
     // Resume GPU
     //// Resume ring buffers

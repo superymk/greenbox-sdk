@@ -430,16 +430,52 @@ bool os_ioctl(struct tz_cmd_packet *cmd, int *err_no)
                           &pIoOperation->overlapped);
     if (!ret)
     {
-        //-f--> Oops...
-        APP_ERR("<os_ioctl> Send IOCTL to SecAgent Error (Error: #%d)\n", (err_status = GetLastError()));
+        err_status = (int)GetLastError();
 
-        status = false;
+        if (err_status == ERROR_IO_PENDING) {
+            // EXPECTED for overlapped I/O. Not an error.
+            status = true;
+        } else {
+            // Real failure: must cancel the TP I/O "started" accounting.
+            CancelThreadpoolIo(pIo);
+            APP_ERR("<os_ioctl> DeviceIoControl failed (Error: #%d)\n", err_status);
+            status = false;
+            goto out_wait; // still go to wait path carefully (see below)
+        }
     }
     else
+    {
+        // Completed synchronously (still may get a TP callback; depends on completion mechanism)
         status = true;
+    }
 
+out_wait:
     // Wait for all IO operations to complete
     WaitForThreadpoolIoCallbacks(pIo, false);
+
+    // At this point I/O is complete (either callback ran, or synchronous completion).
+    // Validate result if you want:
+    if (status) 
+    {
+        DWORD bytes = 0;
+        BOOL ok = GetOverlappedResult(hDevice, &pIoOperation->overlapped, &bytes, FALSE);
+        if (!ok) 
+        {
+            err_status = (int)GetLastError();
+            APP_ERR("<os_ioctl> GetOverlappedResult failed (Error: #%d)\n", err_status);
+            status = false;
+        } else 
+        {
+            // Copy output back to caller-visible cmd
+            if (bytes >= sizeof(struct tz_cmd_packet)) {
+                memcpy(cmd, resp, sizeof(struct tz_cmd_packet));
+            } else {
+                // driver returned too few bytes
+                APP_ERR("<os_ioctl> IOCTL returned %lu bytes (< tz_cmd_packet)\n", bytes);
+                status = false;
+            }
+        }
+    }
 
 out:
     if (pIo)

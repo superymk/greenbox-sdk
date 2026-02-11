@@ -59,11 +59,33 @@
 #define pci_dev_vendor_id_to_dev_id(dev_vendor_id)			(uint16_t)(((dev_vendor_id) >> 16) & 0xFFFF)
 #define pci_dev_vendor_id_to_vendor_id(dev_vendor_id)		(uint16_t)((dev_vendor_id) & 0xFFFF)
 
+/// @brief Read 8-bit PCI config register
+/// @param bdf PCI BDF
+/// @param addr Config offset
+/// @return Register value
 extern uint8_t pci_config_read8(union pci_bdf bdf, uint32_t addr);
+
+/// @brief Read 16-bit PCI config register
+/// @param bdf PCI BDF
+/// @param addr Config offset
+/// @return Register value
 extern uint16_t pci_config_read16(union pci_bdf bdf, uint32_t addr);
+
+/// @brief Read 32-bit PCI config register
+/// @param bdf PCI BDF
+/// @param addr Config offset
+/// @return Register value
 extern uint32_t pci_config_read32(union pci_bdf bdf, uint32_t addr);
+
+/// @brief Write 32-bit PCI config register
+/// @param bdf PCI BDF
+/// @param addr Config offset
+/// @param val Value to write
 extern void pci_config_write32(union pci_bdf bdf, uint32_t addr, uint32_t val);
 
+/// @brief Read vendor/device ID
+/// @param bdf PCI BDF
+/// @return Vendor/device ID
 extern uint32_t pci_read_vendor_device(union pci_bdf bdf);
 
 /// @brief Read the configuration space (excluding the offset 30h and onwards) of the given PCI device.
@@ -71,21 +93,35 @@ extern uint32_t pci_read_vendor_device(union pci_bdf bdf);
 /// accesses to avoid the contention of PCI cfg and data PIO registers.
 /// Thus, this function calls SecBase to dump the PCI configuration space "atomically" from the commodity OSes' 
 /// perspectives.
-/// @param bdf 
-/// @param out_pci_cfg_space_buf 
-/// @return 
+/// @param bdf PCI BDF
+/// @param out_pci_cfg_space_buf Output buffer
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS pci_read_cfg_space(union pci_bdf bdf, struct pci_device* out_pci_cfg_space_buf);
 
+/// @brief Read BAR value and size
+/// @param bdf PCI BDF
+/// @param addr BAR offset
+/// @param bar Output BAR value
+/// @param bar_size Output BAR size (optional)
 extern void pci_read_barinfo(union pci_bdf bdf, uint32_t addr, pci_bar_t* bar, size_t* bar_size);
+
+/// @brief Write BAR value
+/// @param bdf PCI BDF
+/// @param addr BAR offset
+/// @param value BAR value
 extern void pci_write_barinfo(union pci_bdf bdf, uint32_t addr, uint32_t value);
 
-/// @brief Get the MMIO spaddr from the given PCI BAR registers.
-/// @param pci 
-/// @param bar_sel 
-/// @param out_64bit_mmio_addr Optional.
-/// @return 
+/// @brief Get the MMIO spaddr from the given PCI BAR registers
+/// @param bar_low32 Low 32-bit BAR
+/// @param bar_high32 High 32-bit BAR
+/// @param out_64bit_mmio_addr Optional
+/// @return MMIO physical address or INVALID_PADDR
 extern paddr_t pci_device_bar_to_spaddr(pci_bar_t bar_low32, pci_bar_t bar_high32, bool* out_64bit_mmio_addr);
 
+/// @brief Compare PCI BDFs
+/// @param addr1 First BDF
+/// @param addr2 Second BDF
+/// @return True if equal, false otherwise
 extern bool pci_bdf_equal(union pci_bdf addr1, union pci_bdf addr2);
 #endif // __ASSEMBLY__
 

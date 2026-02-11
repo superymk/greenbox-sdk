@@ -9,6 +9,9 @@
 
 #ifndef __ASSEMBLY__
 
+/// @brief Trigger OS interrupt
+/// @param cmd_packet Command packet
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS do_CMD_OS_TRIGGER_INTR(struct tz_cmd_packet *cmd_packet);
 
 #endif // __ASSEMBLY__

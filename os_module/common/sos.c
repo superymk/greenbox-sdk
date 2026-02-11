@@ -4,24 +4,26 @@
 
 #include <sa_headers.h>
 
+/// @brief Trigger interrupts based on bitmap
+/// @param intr_bitmap Pointer to interrupt bitmap array
 static void _trigger_intrs(uint32_t* intr_bitmap)
 {
-	int idx;
-	int shift;
-	
-	for (idx = 1; idx < 8; idx++)
-	{
-		u32 intr_map_value = intr_bitmap[idx];
-		for(shift = 0; shift < (sizeof(u32)*8); shift++)
-		{
-			if(intr_map_value & (1<<shift))
-			{
-				uint32_t vector = idx * 32 + shift;
-				os->intr_trigger_interrupt(vector);
-				DRV_DEBUG("trigger interrupt: 0x%x!\n", vector);
-			}
-		}
-	}
+    uint32_t idx = 0;
+    uint32_t shift = 0;
+
+    for (idx = 1; idx < 8; idx++)
+    {
+        uint32_t intr_map_value = intr_bitmap[idx];
+        for (shift = 0; shift < (sizeof(uint32_t) * 8); shift++)
+        {
+            if (intr_map_value & (1U << shift))
+            {
+                uint32_t vector = (uint32_t)(idx * 32 + shift);
+                os->intr_trigger_interrupt(vector);
+                DRV_DEBUG("trigger interrupt: 0x%x!\n", vector);
+            }
+        }
+    }
 }
 
 /********* Public Functions *********/
@@ -76,6 +78,9 @@ OSSTATUS sos_get_status(VKSTATUS* out_status)
     return OS_SUCCESS;
 }
 
+/// @brief Get returned interrupt bitmap from SecOS
+/// @param out_intr Output pointer to interrupt bitmap
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS sos_get_ret_intr(uint32_t** out_intr)
 {
     volatile struct sos_boot_params* boot_params = (volatile struct sos_boot_params*)sos_addrs.param_start;
@@ -100,7 +105,7 @@ static OSSTATUS sos_get_ret_intr(uint32_t** out_intr)
 OSSTATUS do_CMD_PROBE_SECOS_STATUS(struct tz_cmd_packet *cmd_packet)
 {
     OSSTATUS status = OS_SUCCESS;
-    VKSTATUS sos_status;
+    VKSTATUS sos_status = SUCCESS;
 
     // Check: SecOS must have been registered 
     if(!sos_is_registered)
@@ -231,55 +236,6 @@ OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
     }
 
     cmd_packet->arg1 = boot_params->status.status;
-
-
-
-    // // [Superymk]
-    // {
-    //     ulong_t tos_resp_cmd = REQ_TINYOS_CMD_INVALID;
-    //     ulong_t tos_resp_status1, tos_resp_status2, tos_resp_status3;
-    // 
-    //     sos_is_running = false;
-    //     while(1)
-    //     {
-    //         if(!timeout_ms)
-    //         {
-    //             // Timeout
-    //             status = E_TIMEOUT;
-    //             break;
-    //         }
-
-    //         hyp_ret = os->hypercall_ret4(NS_HC_GET_TINYOS_RESPONSE, &tos_resp_cmd, &tos_resp_status1, &tos_resp_status2, &tos_resp_status3);
-    //         if (hyp_ret)
-    //         {
-    //             DRV_ERR("[IOCTL-CMD_RUN_SECOS] Failed to get response from TinyOS! status:%lu\n", hyp_ret);
-    //             status = E_INTERNAL_ERROR;
-    //             break;
-    //         }
-
-    //         if(tos_resp_cmd == REQ_TINYOS_CMD_BOOT_SECOS)
-    //         {
-    //             // Get the response from TinyOS
-
-    //             if(tos_resp_status1 == RESP_TINYOS_SUCCESS)
-    //             {
-    //                 sos_is_running = true;
-    //                 status = OS_SUCCESS;
-    //             }
-    //             else
-    //             {
-    //                 DRV_ERR("[IOCTL-CMD_RUN_SECOS] TinyOS boot SecOS failed! status:%lu\n", tos_resp_status1);
-    //                 status = E_INTERNAL_ERROR;
-    //             }
-
-    //             break;
-    //         }
-
-    //         os->udelay(1000);
-    //         timeout_ms--;
-    //     }
-    // }
-    // // [Superymk] End
 
     return status;
 }

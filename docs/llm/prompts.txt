@@ -1,0 +1,45 @@
+I need to improve every *.c file in the selected folder and each of its sub-folders to be of industry-level code quality. 
+
+(1) Find and fix any bugs. Note that private functions (e.g., static functions) do not perform any null checks of function parameters. The caller must ensure they are not null.
+
+(2) I prefer to use linux style of function name and variable naming; e.g., "int mem_len = 0;" instead of "int memLen;", and always initialize the variable. For windows driver code, I am fine to name the function parameters using Windows style; e.g., "IN ULONG IoControlCode". But the local variables should use linux style.
+
+(3) Unify the use of datatypes; e.g., use size_t instead of SIZE_T.
+
+(4) Unify code specs, if a function is a private function (e.g., static function), add comments in *.c files only. If a function is a public function, then add the function specs in *.h files only. The comment style is:
+```
+/// @brief 
+/// @param arg1 
+/// @param arg2 
+/// @return 
+static int XXXX(int arg1, int arg2)
+{
+
+}
+```
+
+If the function returns nothing, then delete "/// @return".
+
+If the function returns OSSTATUS, then the comment for the return should have more details; e.g., "/// @return OS_SUCCESS on success, error code on failure".
+
+Preserve comments for sections like "/********* Public Functions *********/".
+
+Public functions must have "extern" in .h files.
+
+In comments, variables and function names may have "<>" to clarify; e.g., "the parameter <mem_len>" instead of "the parameter mem_len".
+
+(5) Do not change the logic of the code unless there is a bug.
+
+for loops use uint32_t for incrementing variables, unless otherwise specified.
+
+(6) Each source code file must have the SPDX identifier at the very beginning as follows:
+```
+// SPDX-License-Identifier: GPL-2.0-only OR Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+```
+
+(7) Replace "u8/u16/u32/u64" to be "uint8_t/uint16_t/uint32_t/uint64_t" 
+
+
+

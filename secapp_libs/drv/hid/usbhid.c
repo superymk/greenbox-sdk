@@ -122,6 +122,65 @@ void usbhid_mgr_fini(void)
     _dev_infos_clean();
 }
 
+SAP_STATUS read_hid_desc_content(struct sp_usbpdev_s* dev, struct usbpdev_endpoint_descriptor* ep, uint8_t* out_hid_desc_content)
+{
+    SAP_STATUS status = SUCCESS;
+    struct usb_interface_descriptor* iface = NULL;
+    struct usb_hid_descriptor *hid_desc = NULL;
+    struct usb_device_request* req = NULL;
+    uint8_t* hid_desc_content_buf = NULL;
+
+    // Check: Parameters must be valid
+    if (!dev || !ep || !out_hid_desc_content)
+        return EINVAL;
+
+    iface = ep->iface;
+    hid_desc = ep->hid_desc;
+    if (!iface || !hid_desc)
+        return EINVAL;
+
+    uint32_t intf_idx = iface->bInterfaceNumber;
+    
+    req = (struct usb_device_request *)usbbuf_alloc(USBBUF_MEM_DMA, sizeof(struct usb_device_request));
+    if(!req)
+    {
+        status = ENOMEM;
+        goto out;
+    }
+
+    hid_desc_content_buf = (uint8_t *)usbbuf_alloc(USBBUF_MEM_DMA, hid_desc->wClassDescriptorLength);
+    if(!hid_desc_content_buf)
+    {
+        status = ENOMEM;
+        goto out;
+    }
+
+    req->bmRequestType = UT_READ_INTERFACE;
+    req->bRequest = UR_GET_DESCRIPTOR;
+    USETW(req->wValue, UDESC_CS_CONFIG << 8);
+    USETW(req->wIndex, intf_idx);
+    USETW(req->wLength, hid_desc->wClassDescriptorLength);
+
+    status = iosm_usb_send_default_control(dev, req, hid_desc_content_buf, USB_TRANSFER_DEFAULT_TIMEOUT_MS);
+    if(FAIL(status))
+    {
+        status = EINTERNAL;
+        goto out;
+    }
+
+    memcpy(out_hid_desc_content, hid_desc_content_buf, hid_desc->wClassDescriptorLength);
+
+    // On success
+    status = SUCCESS;
+
+out:
+    if(hid_desc_content_buf)
+        usbbuf_dealloc(USBBUF_MEM_DMA, hid_desc_content_buf);
+    if(req)
+        usbbuf_dealloc(USBBUF_MEM_DMA, req);
+    return status;
+}
+
 // Send USB HID protocol message.
 SAP_STATUS set_protocol(struct sp_usbpdev_s* dev, u16 val, u16 inferface)
 {
@@ -306,4 +365,17 @@ SAP_STATUS usb_intr_handler(intr_t intr)
 
     // On success
     return SUCCESS;
+}
+
+/********* Debug functions *********/
+void usbhid_print_hid_desc(struct usb_hid_descriptor *hid_desc)
+{
+    SAP_INFO("  HID Descriptor:\n");
+    SAP_INFO("    bLength:            %d\n", hid_desc->bLength);
+    SAP_INFO("    bDescriptorType:    %d\n", hid_desc->bDescriptorType);
+    SAP_INFO("    bcdHID:   %02x.%02x\n", (hid_desc->bcdHID >> 8) & 0xFF, hid_desc->bcdHID & 0xFF);
+    SAP_INFO("    bCountryCode:  %d\n", hid_desc->bCountryCode);
+    SAP_INFO("    bNumDescriptors:      %d\n", hid_desc->bNumDescriptors);
+    SAP_INFO("    bClassDescriptorType:    %d\n", hid_desc->bClassDescriptorType);
+    SAP_INFO("    wClassDescriptorLength: %d\n", hid_desc->wClassDescriptorLength);
 }
