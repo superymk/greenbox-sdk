@@ -45,7 +45,7 @@
 #define LOG_DEBUG 		9 //! debug-level messages
 
 #define APP_LOG				LOG_INFO
-#define APP_COMM_LOG		LOG_INFO
+#define APP_COMM_LOG		LOG_DEBUG // LOG_INFO
 #define HID_BRIDGE_LOG		LOG_INFO
 #define GUI_BRIDGE_LOG		LOG_INFO
 #define TPM_BRIDGE_LOG		LOG_INFO

@@ -30,6 +30,7 @@ size_t do_CMD_TIME_GETTIMEOFDAY(struct libc_msg* msg)
     // Call the function
     libc_clear_errno();
 	result = (uint64_t)gettimeofday(&tv, &tz);
+    ERR("[Superymk] <do_CMD_TIME_GETTIMEOFDAY> tv.tv_sec:%lu\n", (uint64_t)tv.tv_sec);
 
 	// Response
 	varbuf = varbuf_access_start(msg->resp_data);
