@@ -28,11 +28,13 @@ Steps:
 ## For Ubuntu 24.04.3
 Pre-requisites:
 - Install automake-1.15.1
+    - ```sudo apt remove automake```
     - Download automake-1.15.1 (https://ftp.gnu.org/gnu/automake/automake-1.15.1.tar.gz), compile it, and sudo make install.
+        - Must install automake-1.15.1 first to ensure the command ```automake --version``` shows 1.15.1, The apt installation of automake later will add aclocal-1.16 etc.
 - Install compiler tools
     ```
     sudo apt update
-    sudo apt install build-essential libtool crossbuild-essential-i386 gcc-mingw-w64 git pkg-config mtools texinfo patchelf
+    sudo apt install build-essential libtool crossbuild-essential-i386 gcc-mingw-w64 git pkg-config mtools texinfo patchelf automake
     sudo apt install libwxgtk3.2-dev libtomcrypt-dev libusb-1.0-0-dev libcurl4-openssl-dev
     sudo apt install libsdl2-dev
     sudo apt install bison flex gawk
