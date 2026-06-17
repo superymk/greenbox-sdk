@@ -13,6 +13,10 @@
 
 #define USB_DEVICE_VENDOR_PRODUCT_ID_STRING_LEN  (5)    // length is 4 (e.g., "1d6b"). +1 for '\0'
 
+#define USB3_PERIPHERAL_DEVICE1_USBDEVADDR (7) // Must be the same with definitions in desktop_mgr's config_mgr.c
+#define USB3_PERIPHERAL_DEVICE2_USBDEVADDR (8) // Must be the same with definitions in desktop_mgr's config_mgr.c
+#define USB3_PERIPHERAL_DEVICE3_USBDEVADDR (9) // Must be the same with definitions in desktop_mgr's config_mgr.c
+
 static char *cfg_buffer = NULL;
 
 static SL_STATUS _cfg_read(const char *filepath)
@@ -383,6 +387,34 @@ static SL_STATUS _cfg_parse_usb3(cJSON *cfg_json, SL_CFG *out_cfg)
             out_cfg->usb3_info.hid_dev2_product_id = 0;
     }
 
+    // For USB3 only: Replace USB addresses of peripheral devices (not hubs) to be constant values.
+    // Reason 1: Secure parameters of IOSM-USB3 and DesktopMgr are changed if a peripheral USB device uses different
+    // addresses over GreenBox sessions. This may happen after the red OS resets USB devices.
+    // Reason 2: IOSM-USB3 cares about topology of USB devices, not their addresses, because the hardware USB host
+    // controller assigns USB addresses to devices.
+    {
+        uint8_t orig_hid_dev1_addr = out_cfg->usb3_info.hid_dev1_addr;
+        uint8_t orig_hid_dev2_addr = out_cfg->usb3_info.hid_dev2_addr;
+
+        if (orig_hid_dev1_addr != 0)
+        {
+            out_cfg->usb3_info.hid_dev1_addr = USB3_PERIPHERAL_DEVICE1_USBDEVADDR;
+        }
+
+        if (orig_hid_dev2_addr != 0)
+        {
+            if (orig_hid_dev2_addr == orig_hid_dev1_addr)
+            {
+                out_cfg->usb3_info.hid_dev2_addr = USB3_PERIPHERAL_DEVICE1_USBDEVADDR;
+            }
+            else
+            {
+                out_cfg->usb3_info.hid_dev2_addr = USB3_PERIPHERAL_DEVICE2_USBDEVADDR;
+            }
+        }
+    }
+
+    // On success
     return SL_SUCCESS;
 }
 
