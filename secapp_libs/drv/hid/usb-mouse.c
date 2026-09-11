@@ -3,503 +3,477 @@
 // Author: Virgil Gligor (Carnegie Mellon University)
 
 #include <sap_headers_libc.h>
-#include <palddk.h>
-
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <lib-iosm-usb.h>
-
-#include <drv/hid/input_events.h>
 #include "usb-mouse.h"
-#include "debug.h"
 #include "usbhid.h"
 
-extern void libdrv_hid_mouse_event_enqueue(struct mouse_event *event);
 extern void libdrv_hid_call_mouse_listeners(struct mouse_event *event);
 
-#define MAX_MOUSE_INTR_PIPES (8)
+#define MAX_MOUSE_INTR_PIPES 8u
+#define MOUSE_EVENT_CAPACITY 5u
 
-static struct sp_usbpdev_pipe *_mouse_intr_pipes[MAX_MOUSE_INTR_PIPES] = {0};
-static char *mouse_keydata = NULL;
-// static bool mouse_isr_enable = false;
-
-static uint8_t* _mouse_hid_desc_data = NULL;
-static uint32_t _mouse_hid_desc_data_size = 0;
-
-static bool pressed_left = false;
-static bool pressed_right = false;
-static bool pressed_middle = false;
-
-/********* Private Functions *********/
-#define MOUSE_KEYDATA_SIZE (8)
-
-static void _pipe_infos_clean(void)
+/* One registered mouse interface owns its transport, parsed descriptor and
+ * input history. An empty entry has interrupt_pipe == NULL. */
+struct mouse_usb_dev
 {
-    uint32_t i = 0;
+    struct sp_usbpdev_pipe *interrupt_pipe;
+    struct hid_report_descriptor *report_descriptor;
+    uint8_t interface_number;
+    size_t input_packet_capacity;
+    uint8_t input_report[HID_REPORT_MAX_PACKET];
+    /* Each descriptor report index retains its buttons even when another
+     * report ID carries only movement. pressed_buttons is their union. */
+    uint8_t report_pressed_buttons[HID_REPORT_MAX_IDS];
+    uint8_t pressed_buttons;
+    /* A report can produce releases, presses, movement, wheel and pan. All
+     * readers drain these events before polling another input report. */
+    struct mouse_event pending_events[MOUSE_EVENT_CAPACITY];
+    unsigned pending_event_count;
+    unsigned next_pending_event_index;
+};
 
-    FOREACH_S(i, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
-    {
-        _mouse_intr_pipes[i] = NULL;
-    }
-}
+static struct mouse_usb_dev mouse_usb_devices[MAX_MOUSE_INTR_PIPES];
+/* Continue polling after the device that most recently supplied a report. */
+static unsigned next_mouse_index;
 
-static int _pipe_infos_find(struct sp_usbpdev_pipe *pipe)
+static int find_mouse_device_index(struct sp_usbpdev_pipe *pipe)
 {
-    uint32_t i = 0;
+    unsigned mouse_index;
 
-    FOREACH_S(i, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
+    FOREACH_S(mouse_index, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
     {
-        if (_mouse_intr_pipes[i] == pipe)
-            return i;
+        if (mouse_usb_devices[mouse_index].interrupt_pipe == pipe)
+        {
+            return (int)mouse_index;
+        }
     }
 
     return -1;
 }
 
-// Find the first endpoint of a given type in an interface description.
-struct usbpdev_endpoint_descriptor *_mouse_find_ep(
-    struct sp_usbpdev_s *usbdev, int type, int dir, struct usb_interface_descriptor *iface)
+/* Find queued input before any device is polled again. */
+static struct mouse_usb_dev *find_mouse_with_pending_events(void)
 {
-    uint32_t i = 0;
+    unsigned mouse_index;
 
-    // Check: Parameters must be valid
-    if (!usbdev)
-        return NULL;
-
-    FOREACH_S(i, usbdev->data_eps_num, USBPDEV_MAX_DATA_ENDPOINTS_NUM, 0, 1)
+    FOREACH_S(mouse_index, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
     {
-        struct usbpdev_endpoint_descriptor *ep = &usbdev->data_eps[i];
+        struct mouse_usb_dev *mouse_device = &mouse_usb_devices[mouse_index];
 
-        if (ep && ep->iface && ep->epdesc)
+        if (mouse_device->interrupt_pipe &&
+            mouse_device->next_pending_event_index < mouse_device->pending_event_count)
         {
-            if (((ep->epdesc->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == dir) &&
-                ((ep->epdesc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == type) &&
-                ((ep->iface) == iface))
-                return ep;
+            return mouse_device;
         }
     }
 
     return NULL;
 }
 
-#define BYTE1_Y_OVERFLOW (1 << 7)
-#define BYTE1_X_OVERFLOW (1 << 6)
-#define BYTE1_Y_SIGN_BIT (1 << 5)
-#define BYTE1_X_SIGN_BIT (1 << 4)
-#define BYTE1_MIDDLE_BTN (1 << 2)
-#define BYTE1_RIGHT_BTN (1 << 1)
-#define BYTE1_LEFT_BTN (1 << 0)
-
-#define BYTE4_WHEEL_NO_MOVE 0
-#define BYTE4_WHEEL_VERTICAL_UP 1
-#define BYTE4_WHEEL_VERTICAL_DOWN 0xF
-#define BYTE4_WHEEL_HORNIZONTAL_RIGHT 2
-#define BYTE4_WHEEL_HORNIZONTAL_LEFT 0xE
-
-static SAP_STATUS _mouse_read_nonblock(struct sp_usbpdev_pipe *pipe, struct mouse_event *out_1st_event)
+static unsigned button_usages_to_event_buttons(uint8_t button_usages)
 {
-    SAP_STATUS status = SUCCESS;
-    struct mouse_event mouse_event = {.action = LIBDRV_HID_MOUSE_NO_EVENT};
-    char byte_1, byte_2, byte_3, byte_4;
-    // bool y_sign = false, x_sign = false
-    bool wheel = false;
+    unsigned event_button_mask = 0;
 
-    // Sanity checks
-    if (!pipe)
+    if (button_usages & 1u)
     {
-        *out_1st_event = mouse_event;
-        return EINVAL;
+        event_button_mask |= LIBDRV_HID_BTN_LEFT;
     }
 
-    for (;;)
+    if (button_usages & 2u)
     {
-        status = iosm_usb_poll_intr(pipe, mouse_keydata, MOUSE_KEYDATA_SIZE);
-        if (PASS(status))
-            // Received key press/release
-            break;
-        else if (status == E_USBTD_IS_ACTIVE)
-        {
-            status = SUCCESS;
-            mouse_event.action = LIBDRV_HID_MOUSE_NO_EVENT;
-            goto out;
-        }
-        else
-        {
-            SAP_ERR("QTD error! status:%lu\n", status);
-            status = EINTERNAL;
-            mouse_event.action = LIBDRV_HID_MOUSE_NO_EVENT;
-            goto out;
-        }
+        event_button_mask |= LIBDRV_HID_BTN_RIGHT;
     }
 
-    // Step 1. Read the mouse input raw data
-    // The following mouse message formats follows
-    // http://wiki.osdev.org/Mouse_Input
-    byte_1 = mouse_keydata[0];
-    byte_2 = mouse_keydata[1];
-    byte_3 = mouse_keydata[2];
-    byte_4 = mouse_keydata[3];
-
-    // Step 2. Handle Byte_1 first
-    if ((byte_1 & BYTE1_Y_OVERFLOW) || (byte_1 & BYTE1_X_OVERFLOW))
-        goto out; // discard the packet if overflow bit sets
-
-    // y_sign = byte_1 & BYTE1_Y_SIGN_BIT;
-    // x_sign = byte_1 & BYTE1_X_SIGN_BIT;
-
-    // Byte_1 - Button
-    // [TODO][Issue 129] usb-mouse.c cannot handle button release correctly when multiple buttons were pressed.
-    if (byte_1 & BYTE1_MIDDLE_BTN)
+    if (button_usages & 4u)
     {
-        mouse_event.button |= LIBDRV_HID_BTN_MIDDLE;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_PRESSED;
-        pressed_middle = true;
-    }
-    else if (pressed_middle)
-    {
-        // we must released the middle
-        mouse_event.button |= LIBDRV_HID_BTN_MIDDLE;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_RELEASED;
-        pressed_middle = false;
-    }
-    if (byte_1 & BYTE1_RIGHT_BTN)
-    {
-        mouse_event.button |= LIBDRV_HID_BTN_RIGHT;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_PRESSED;
-        pressed_right = true;
-    }
-    else if (pressed_right)
-    {
-        // we must released the right
-        mouse_event.button |= LIBDRV_HID_BTN_RIGHT;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_RELEASED;
-        pressed_right = false;
-    }
-    if (byte_1 & BYTE1_LEFT_BTN)
-    {
-        mouse_event.button |= LIBDRV_HID_BTN_LEFT;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_PRESSED;
-        pressed_left = true;
-    }
-    else if (pressed_left)
-    {
-        // we must released the right
-        mouse_event.button |= LIBDRV_HID_BTN_LEFT;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_RELEASED;
-        pressed_left = false;
+        event_button_mask |= LIBDRV_HID_BTN_MIDDLE;
     }
 
-    // Step 3. Handle byte_2 and byte_3
-    // The description in http://wiki.osdev.org/Mouse_Input is wrong
-    mouse_event.delta_x = (signed char)byte_2;
-    mouse_event.delta_y = (signed char)byte_3;
-    if (byte_2 || byte_3)
-        mouse_event.action = LIBDRV_HID_MOUSE_MOVED;
-
-    // Step 4. Handle byte_4
-    if ((byte_4 & 0xF) == BYTE4_WHEEL_VERTICAL_UP)
-    {
-        mouse_event.wheel = LIBDRV_HID_WHEEL_UP;
-        wheel = true;
-    }
-    else if ((byte_4 & 0xF) == BYTE4_WHEEL_VERTICAL_DOWN)
-    {
-        mouse_event.wheel = LIBDRV_HID_WHEEL_DOWN;
-        wheel = true;
-    }
-    else if ((byte_4 & 0xF) == BYTE4_WHEEL_HORNIZONTAL_RIGHT)
-    {
-        mouse_event.wheel = LIBDRV_HID_WHEEL_RIGHT;
-        wheel = true;
-    }
-    else if ((byte_4 & 0xF) == BYTE4_WHEEL_HORNIZONTAL_LEFT)
-    {
-        mouse_event.wheel = LIBDRV_HID_WHEEL_LEFT;
-        wheel = true;
-    }
-
-    if (wheel)
-    {
-        mouse_event.button |= LIBDRV_HID_BTN_WHEEL;
-        mouse_event.action = LIBDRV_HID_MOUSE_BTN_PRESSED;
-    }
-
-    // On success
-    status = SUCCESS;
-
-out:
-    *out_1st_event = mouse_event;
-    return status;
+    return event_button_mask;
 }
 
-static void _usb_mouse_free_intrpipe(struct sp_usbpdev_pipe *pipe)
+static void queue_button_transition(struct mouse_usb_dev *mouse_device,
+    uint8_t button_usages, bool pressed)
 {
-    SAP_STATUS status = SUCCESS;
+    struct mouse_event *event;
 
-    if (pipe)
+    if (!button_usages)
     {
-        int idx = _pipe_infos_find(pipe);
+        return;
+    }
 
-        if (idx != -1)
-        {
-            status = iosm_usb_usbpdev_free_pipe(pipe);
-            if (FAIL(status))
-                SAP_ERR("Free USB Interrupt Pipe Error! status:%lu\n", status);
+    event = &mouse_device->pending_events[mouse_device->pending_event_count++];
+    event->action = pressed ? LIBDRV_HID_MOUSE_BTN_PRESSED : LIBDRV_HID_MOUSE_BTN_RELEASED;
+    event->button = button_usages_to_event_buttons(button_usages);
+}
 
-            _mouse_intr_pipes[idx] = NULL;
-        }
+static void queue_report_transitions(struct mouse_usb_dev *mouse_device, uint8_t buttons,
+    uint8_t button_mask, const int32_t *axes, unsigned report_index)
+{
+    unsigned other_report_index;
+    uint8_t combined_pressed_buttons = 0;
+    struct mouse_event *event;
+
+    if (report_index >= HID_REPORT_MAX_IDS)
+    {
+        return;
+    }
+
+    mouse_device->pending_event_count = 0;
+    mouse_device->next_pending_event_index = 0;
+    memset(mouse_device->pending_events, 0, sizeof(mouse_device->pending_events));
+
+    mouse_device->report_pressed_buttons[report_index] =
+        (mouse_device->report_pressed_buttons[report_index] & (uint8_t)~button_mask) |
+        (buttons & button_mask & 7u);
+    FOREACH_S(other_report_index, mouse_device->report_descriptor->report_id_count,
+        HID_REPORT_MAX_IDS, 0, 1)
+    {
+        combined_pressed_buttons |= mouse_device->report_pressed_buttons[other_report_index];
+    }
+
+    queue_button_transition(mouse_device,
+        mouse_device->pressed_buttons & (uint8_t)~combined_pressed_buttons, false);
+    queue_button_transition(mouse_device,
+        combined_pressed_buttons & (uint8_t)~mouse_device->pressed_buttons, true);
+    mouse_device->pressed_buttons = combined_pressed_buttons;
+
+    if (axes[HID_MOUSE_AXIS_X] || axes[HID_MOUSE_AXIS_Y])
+    {
+        event = &mouse_device->pending_events[mouse_device->pending_event_count++];
+        event->action = LIBDRV_HID_MOUSE_MOVED;
+        event->button = button_usages_to_event_buttons(combined_pressed_buttons);
+        event->delta_x = axes[HID_MOUSE_AXIS_X];
+        event->delta_y = axes[HID_MOUSE_AXIS_Y];
+    }
+
+    /* wheel_diff carries positive scroll distance separately from direction.
+     * Widen before negation so the minimum signed 32-bit delta is safe. */
+    if (axes[HID_MOUSE_AXIS_WHEEL])
+    {
+        event = &mouse_device->pending_events[mouse_device->pending_event_count++];
+        event->action = LIBDRV_HID_MOUSE_BTN_PRESSED;
+        event->button = LIBDRV_HID_BTN_WHEEL;
+        event->wheel = axes[HID_MOUSE_AXIS_WHEEL] > 0 ? LIBDRV_HID_WHEEL_UP : LIBDRV_HID_WHEEL_DOWN;
+        event->wheel_diff = axes[HID_MOUSE_AXIS_WHEEL] < 0 ?
+            (uint32_t)(-(int64_t)axes[HID_MOUSE_AXIS_WHEEL]) : (uint32_t)axes[HID_MOUSE_AXIS_WHEEL];
+    }
+
+    if (axes[HID_MOUSE_AXIS_PAN])
+    {
+        event = &mouse_device->pending_events[mouse_device->pending_event_count++];
+        event->action = LIBDRV_HID_MOUSE_BTN_PRESSED;
+        event->button = LIBDRV_HID_BTN_WHEEL;
+        event->wheel = axes[HID_MOUSE_AXIS_PAN] > 0 ? LIBDRV_HID_WHEEL_RIGHT : LIBDRV_HID_WHEEL_LEFT;
+        event->wheel_diff = axes[HID_MOUSE_AXIS_PAN] < 0 ?
+            (uint32_t)(-(int64_t)axes[HID_MOUSE_AXIS_PAN]) : (uint32_t)axes[HID_MOUSE_AXIS_PAN];
     }
 }
 
-/********* Public functions *********/
+static bool dequeue_mouse_event(struct mouse_usb_dev *mouse_device,
+    struct mouse_event *event)
+{
+    if (mouse_device->next_pending_event_index == mouse_device->pending_event_count)
+    {
+        return false;
+    }
+
+    *event = mouse_device->pending_events[mouse_device->next_pending_event_index++];
+
+    if (mouse_device->next_pending_event_index == mouse_device->pending_event_count)
+    {
+        mouse_device->next_pending_event_index = 0;
+        mouse_device->pending_event_count = 0;
+    }
+
+    return true;
+}
+
+static SAP_STATUS poll_mouse_interfaces(void)
+{
+    SAP_STATUS first_error = SUCCESS;
+    unsigned interfaces_visited;
+
+    if (find_mouse_with_pending_events())
+    {
+        return SUCCESS;
+    }
+
+    FOREACH_S(interfaces_visited, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
+    {
+        unsigned mouse_index = next_mouse_index;
+        struct mouse_usb_dev *mouse_device = &mouse_usb_devices[mouse_index];
+        uint8_t buttons, button_mask;
+        int32_t axes[HID_MOUSE_AXIS_COUNT];
+        unsigned report_index;
+        SAP_STATUS status;
+
+        next_mouse_index = (next_mouse_index + 1u) % MAX_MOUSE_INTR_PIPES;
+        if (!mouse_device->interrupt_pipe)
+        {
+            continue;
+        }
+
+        memset(mouse_device->input_report, 0, sizeof(mouse_device->input_report));
+        status = iosm_usb_poll_intr(mouse_device->interrupt_pipe, mouse_device->input_report,
+            mouse_device->input_packet_capacity);
+        if (status == E_USBTD_IS_ACTIVE)
+        {
+            continue;
+        }
+        if (FAIL(status))
+        {
+            if (PASS(first_error))
+            {
+                first_error = status;
+            }
+
+            continue;
+        }
+
+        /* The SDK has no completed byte count, and xHCI copies stale DMA tail
+         * bytes on short transfers. The parser receives capacity; rejecting
+         * truncation requires the transport to supply the actual length. */
+        if (hid_report_decode_mouse(mouse_device->report_descriptor, mouse_device->input_report,
+            mouse_device->input_packet_capacity, &buttons, &button_mask, axes,
+            &report_index) != HID_PARSE_OK)
+        {
+            continue;
+        }
+
+        queue_report_transitions(mouse_device, buttons, button_mask, axes, report_index);
+        if (mouse_device->pending_event_count)
+        {
+            return SUCCESS;
+        }
+    }
+
+    return first_error;
+}
+
 SAP_STATUS usb_mouse_mgr_init(void)
 {
-    _pipe_infos_clean();
+    usb_mouse_mgr_fini();
 
-    // Allocate mouse_keydata
-    if (!mouse_keydata)
-    {
-        mouse_keydata = (char *)malloc(MOUSE_KEYDATA_SIZE);
-        if (!mouse_keydata)
-        {
-            SAP_ERR("Allocate USB mouse data error!\n");
-            return ENOMEM;
-        }
-    }
-
-    // On success
     return SUCCESS;
 }
 
 void usb_mouse_mgr_fini(void)
 {
-    if (mouse_keydata)
+    unsigned mouse_index;
+
+    FOREACH_S(mouse_index, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
     {
-        free(mouse_keydata);
-        mouse_keydata = NULL;
+        usb_mouse_fini(mouse_usb_devices[mouse_index].interrupt_pipe);
     }
 
-    _pipe_infos_clean();
+    next_mouse_index = 0;
 }
 
-void print_hex(const char *prefix, const void *prtptr, size_t size)
+struct sp_usbpdev_pipe *usb_mouse_init_from_descriptor(struct sp_usbpdev_s *device,
+    struct usbpdev_endpoint_descriptor *endpoint, struct hid_report_descriptor *descriptor,
+    bool boot_protocol)
 {
-    size_t i;
-    for ( i = 0; i < size; i++ ) {
-        if ( i % 16 == 0 && prefix != NULL )
-            printf("\n%s", prefix);
-        printf("%02x ", *(const uint8_t *)prtptr++);
-    }
-    printf("\n");
-}
+    struct sp_usbpdev_pipe *interrupt_pipe = NULL;
+    struct mouse_usb_dev *mouse_device;
+    size_t packet_capacity;
+    unsigned mouse_index;
+    int pipe_index;
 
-struct sp_usbpdev_pipe *usb_mouse_init(struct sp_usbpdev_s *usbmouse_dev, struct usb_interface_descriptor *iface)
-{
-    SAP_STATUS status = SUCCESS;
-    struct sp_usbpdev_pipe *_usbmouse_intr_pipe = NULL;
-
-    // Sanity checks
-    if (!usbmouse_dev || !iface)
+    if (!device || !endpoint || !endpoint->iface || !endpoint->epdesc || !descriptor ||
+        descriptor->input_types != HID_REPORT_MOUSE)
     {
-        SAP_ERR("<usb_mouse_init> usbmouse_dev has not been initialized yet!\n");
-        return NULL;
+        goto fail;
     }
 
-    // Init the interrupt pipe
-    struct usbpdev_endpoint_descriptor *ep = _mouse_find_ep(
-        usbmouse_dev, USB_ENDPOINT_XFER_INT, UE_DIR_IN, iface);
-    if (!ep || !ep->epdesc)
+    packet_capacity = UGETW(endpoint->epdesc->wMaxPacketSize);
+    if (!packet_capacity || packet_capacity > HID_REPORT_MAX_PACKET ||
+        !descriptor->max_input_bytes || descriptor->max_input_bytes > packet_capacity ||
+        !descriptor->report_id_count || descriptor->report_id_count > HID_REPORT_MAX_IDS)
     {
-        SAP_ERR("ep or epdesc is NULL!\n");
-        goto get_ep_desc_err;
-    }
-    struct usb_endpoint_descriptor *epdesc = ep->epdesc;
-
-    if (UGETW(epdesc->wMaxPacketSize) < 3)
-    {
-        SAP_ERR("Unsupported wMaxPacketSize (%u) of the mouse!\n", UGETW(epdesc->wMaxPacketSize));
-        goto get_ep_desc_err;
+        goto fail;
     }
 
-    SAP_INFO("<usb_mouse_init>: Get HID Descriptor\n");
-    if(ep->hid_desc)
+    FOREACH_S(mouse_index, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
     {
-        _mouse_hid_desc_data_size = ep->hid_desc->wClassDescriptorLength;
-
-        _mouse_hid_desc_data = (uint8_t*)smalloc(_mouse_hid_desc_data_size);
-        if (!_mouse_hid_desc_data)
+        mouse_device = &mouse_usb_devices[mouse_index];
+        if (mouse_device->interrupt_pipe && mouse_device->interrupt_pipe->dev == device &&
+            mouse_device->interface_number == endpoint->iface->bInterfaceNumber)
         {
-            SAP_ERR("No memory to allocate HID descriptor content buffer!\n");
-            goto get_ep_hid_desc_err;
+            free(descriptor);
+            return mouse_device->interrupt_pipe;
         }
+    }
 
-        usbhid_print_hid_desc(ep->hid_desc);
-        status = read_hid_desc_content(usbmouse_dev, ep, _mouse_hid_desc_data);
+    pipe_index = find_mouse_device_index(NULL);
+    if (pipe_index < 0)
+    {
+        goto fail;
+    }
+
+    interrupt_pipe = iosm_usb_usbpdev_alloc_intr_pipe(device, endpoint->epdesc);
+    if (!interrupt_pipe)
+    {
+        goto fail;
+    }
+
+    mouse_device = &mouse_usb_devices[(unsigned)pipe_index];
+    memset(mouse_device, 0, sizeof(*mouse_device));
+    mouse_device->report_descriptor = descriptor;
+    mouse_device->interface_number = endpoint->iface->bInterfaceNumber;
+    mouse_device->input_packet_capacity = packet_capacity;
+    mouse_device->interrupt_pipe = interrupt_pipe;
+
+    SAP_INFO("USB HID mouse interface %u: running in %s protocol\n",
+        mouse_device->interface_number, boot_protocol ? "BOOT" : "REPORT");
+    return interrupt_pipe;
+
+fail:
+    /* A pipe allocated before registration cannot be freed by slot lookup. */
+    if (interrupt_pipe)
+    {
+        SAP_STATUS status = iosm_usb_usbpdev_free_pipe(interrupt_pipe);
+
         if (FAIL(status))
         {
-            SAP_ERR("Read HID descriptor content error! status:%lu\n", status);
-            goto get_ep_hid_desc_err;
-        }
-
-        print_hex("HID Descriptor Content:", _mouse_hid_desc_data, _mouse_hid_desc_data_size);
-    }
-
-    SAP_INFO("<usb_mouse_init>: Alloc Mouse Interrupt Pipe\n");
-    _usbmouse_intr_pipe = iosm_usb_usbpdev_alloc_intr_pipe(usbmouse_dev, epdesc);
-    if (!_usbmouse_intr_pipe)
-    {
-        SAP_ERR("Allocate USB Mouse interrupt pipe error!\n");
-        goto alloc_intr_pipe_err;
-    }
-    SAP_INFO("Finish allocating USB Mouse interrupt pipe\n");
-
-    if (usbmouse_dev->bus_type == USB3)
-    {
-        // [TODO] Use BOOT protocol for now. We should switch to REPORT protocol
-        if (iface->bInterfaceSubClass == 1)
-        {
-            // The device supports BOOT protocol, see "Detecting HID devices" on https://wiki.osdev.org/USB_Human_Interface_Devices
-            status = set_protocol(usbmouse_dev, 0, iface->bInterfaceNumber);
-            if (FAIL(status))
-            {
-                SAP_ERR("USB Mouse init HID error: failed to set protocol! status:%lu\n", status);
-                goto usb_hid_err;
-            }
-
-            status = set_idle(usbmouse_dev, 0);
-            if (FAIL(status))
-            {
-                // [TODO][Quirk] Some mouses (e.g., Logitech G502) cannot handle <set_idle> here. So this function
-                // continues on error.
-                SAP_ERR("USB Mouse init HID error: failed to set idle! status:%lu\n", status);
-                // goto usb_hid_err;
-            }
-        }
-        else
-        {
-            SAP_ERR("USB Mouse init HID error: Device (interface:%u) does not support BOOT protocol!\n", iface->bInterfaceNumber);
-            goto usb_hid_err;
+            SAP_ERR("USB mouse: free interrupt pipe failed (status:%lu)\n", status);
         }
     }
 
-    // // Enable ISR
-    // mouse_isr_enable = true;
-
-    // Record the interrupt pipe
-    {
-        int idx = _pipe_infos_find(NULL);
-
-        if (idx == -1)
-            goto record_pipe_err;
-
-        _mouse_intr_pipes[idx] = _usbmouse_intr_pipe;
-    }
-
-    // On success
-    return _usbmouse_intr_pipe;
-
-record_pipe_err:
-usb_hid_err:
-    if (_usbmouse_intr_pipe)
-    {
-        _usb_mouse_free_intrpipe(_usbmouse_intr_pipe);
-        _usbmouse_intr_pipe = NULL;
-    }
-alloc_intr_pipe_err:
-get_ep_hid_desc_err:
-    if (_mouse_hid_desc_data)
-    {
-        sfree(_mouse_hid_desc_data, _mouse_hid_desc_data_size);
-        _mouse_hid_desc_data = NULL;
-    }
-get_ep_desc_err:
+    free(descriptor);
     return NULL;
 }
 
-void usb_mouse_fini(struct sp_usbpdev_pipe *pipe)
+struct sp_usbpdev_pipe *usb_mouse_init(struct sp_usbpdev_s *device,
+    struct usb_interface_descriptor *interface_descriptor)
 {
-    // // Disable ISR
-    // mouse_isr_enable = false;
+    struct usbpdev_endpoint_descriptor *endpoint = NULL;
+    struct hid_report_descriptor *descriptor = NULL;
+    bool boot_protocol = false;
+    unsigned mouse_index;
 
-    // Free kbd USB intr pipe
-    _usb_mouse_free_intrpipe(pipe);
-
-    // Free HID descriptor content buffer
-    if(_mouse_hid_desc_data)
+    if (!device || !interface_descriptor)
     {
-        sfree(_mouse_hid_desc_data, _mouse_hid_desc_data_size);
-        _mouse_hid_desc_data = NULL;
+        return NULL;
     }
 
-    SAP_INFO("Finalized USB Mouse Specific USB pipes\n");
-}
-
-SAP_STATUS usb_mouse_read_nonblock(struct mouse_event *out_1st_event)
-{
-    SAP_STATUS status = SUCCESS;
-    uint32_t i = 0;
-
-    if (!out_1st_event)
-        return EINVAL;
-
-    FOREACH_S(i, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
+    FOREACH_S(mouse_index, MAX_MOUSE_INTR_PIPES, MAX_MOUSE_INTR_PIPES, 0, 1)
     {
-        struct sp_usbpdev_pipe *pipe = _mouse_intr_pipes[i];
-        if (pipe)
-        {
-            status = _mouse_read_nonblock(pipe, out_1st_event);
-            if (FAIL(status))
-                return status;
+        struct mouse_usb_dev *mouse_device = &mouse_usb_devices[mouse_index];
 
-            if (out_1st_event->action != LIBDRV_HID_MOUSE_NO_EVENT)
-            {
-                // A mouse triggers an event
-                return SUCCESS;
-            }
+        if (mouse_device->interrupt_pipe && mouse_device->interrupt_pipe->dev == device &&
+            mouse_device->interface_number == interface_descriptor->bInterfaceNumber)
+        {
+            return mouse_device->interrupt_pipe;
         }
     }
 
-    // No mouse triggers an event, just return SUCCESS.
+    if (FAIL(usbhid_prepare_interface(device, interface_descriptor, HID_REPORT_MOUSE,
+        &endpoint, &descriptor, &boot_protocol)))
+    {
+        return NULL;
+    }
+
+    return usb_mouse_init_from_descriptor(device, endpoint, descriptor, boot_protocol);
+}
+
+void usb_mouse_fini(struct sp_usbpdev_pipe *interrupt_pipe)
+{
+    SAP_STATUS status;
+    int pipe_index;
+    struct mouse_usb_dev *mouse_device;
+
+    if (!interrupt_pipe)
+    {
+        return;
+    }
+
+    pipe_index = find_mouse_device_index(interrupt_pipe);
+    if (pipe_index < 0)
+    {
+        return;
+    }
+
+    mouse_device = &mouse_usb_devices[(unsigned)pipe_index];
+
+    /* Unregister before releasing transport resources. Clearing this entry
+     * also discards any remaining events when a listener detaches its mouse. */
+    mouse_device->interrupt_pipe = NULL;
+    status = iosm_usb_usbpdev_free_pipe(interrupt_pipe);
+    if (FAIL(status))
+    {
+        SAP_ERR("USB mouse: free interrupt pipe failed (status:%lu)\n", status);
+    }
+
+    free(mouse_device->report_descriptor);
+    memset(mouse_device, 0, sizeof(*mouse_device));
+}
+
+SAP_STATUS usb_mouse_read_nonblock(struct mouse_event *out_event)
+{
+    SAP_STATUS status;
+    struct mouse_usb_dev *mouse_device;
+
+    if (!out_event)
+    {
+        return EINVAL;
+    }
+
+    memset(out_event, 0, sizeof(*out_event));
+    out_event->action = LIBDRV_HID_MOUSE_NO_EVENT;
+
+    status = poll_mouse_interfaces();
+    if (FAIL(status))
+    {
+        return status;
+    }
+
+    mouse_device = find_mouse_with_pending_events();
+    if (mouse_device)
+    {
+        (void)dequeue_mouse_event(mouse_device, out_event);
+    }
+
     return SUCCESS;
 }
 
 //! \brief Read mouse event due to periodically pull and/or mouse interrupts
 SAP_STATUS usb_mouse_handler(void)
 {
-    SAP_STATUS status = SUCCESS;
-    // struct mouse_event event;
-    struct mouse_event *event = NULL;
+    struct mouse_event event;
+    struct mouse_usb_dev *mouse_device;
+    struct sp_usbpdev_pipe *source_pipe;
+    SAP_STATUS status;
+    unsigned event_index, events_to_deliver;
 
-    event = smalloc(sizeof(struct mouse_event));
-    if (!event)
-    {
-        SAP_ERR("No memory to queue the new USB2 mouse event!\n");
-        status = ENOMEM;
-        goto err;
-    }
-
-    status = usb_mouse_read_nonblock(event);
+    status = poll_mouse_interfaces();
     if (FAIL(status))
     {
-        goto err;
+        return status;
     }
 
-    if (event->action != LIBDRV_HID_MOUSE_NO_EVENT)
+    mouse_device = find_mouse_with_pending_events();
+    if (!mouse_device)
     {
-        print_mouse_event("USB2", event);
-
-        // Call all listeners
-        libdrv_hid_call_mouse_listeners(event);
+        return SUCCESS;
     }
 
-    // On success
-    sfree(event, sizeof(struct mouse_event));
-    return SUCCESS;
+    source_pipe = mouse_device->interrupt_pipe;
+    events_to_deliver = mouse_device->pending_event_count - mouse_device->next_pending_event_index;
 
-err:
-    if (event)
-        sfree(event, sizeof(struct mouse_event));
-    return status;
+    /* Copy before callbacks; a listener may detach the source pipe. Continue
+     * only while this device still owns the original event queue. */
+    FOREACH_S(event_index, events_to_deliver, MOUSE_EVENT_CAPACITY, 0, 1)
+    {
+        if (mouse_device->interrupt_pipe != source_pipe ||
+            !dequeue_mouse_event(mouse_device, &event))
+        {
+            break;
+        }
+
+        libdrv_hid_call_mouse_listeners(&event);
+    }
+
+    return SUCCESS;
 }
