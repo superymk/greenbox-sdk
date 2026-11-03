@@ -128,7 +128,7 @@ extern int os_file_lock_release(ulong_t fd);
 
 extern int fs_create_directories(const char *filepath);
 extern FILE* fopen_normalized_path(const char *filepath, const char* mode);
-extern int fs_read_file(const char *filepath, uint8_t create_if_not_exist, uint8_t **data, size_t *len);
+extern int fs_read_file(const char *filepath, bool create_if_not_exist, uint8_t **data, size_t *len);
 extern int fs_write_file(const char *filepath, const uint8_t *data, size_t len);
 extern int fs_delete_file(const char *filepath);
 extern int fs_file_get_size(const char* filepath, size_t* out_sz);

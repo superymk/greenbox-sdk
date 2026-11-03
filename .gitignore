@@ -17,3 +17,6 @@ output/
 
 secos/sos.lds
 secapp_libs/secapp.lds
+
+.vscode
+*/.vscode
