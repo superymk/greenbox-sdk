@@ -5,8 +5,8 @@ Pre-requisites:
 Pre-requisites:
 - MSYS2 (msys2-x86_64-20250221.exe or above)
     - Whenever a newer version of msys2 is used, one must replace the libraries in ```code/win/cygwin``` and ```code/win/libusb``` with the corresponding MSYS2 libraries.
-- Visual Studio 2022 (Community version or above) + Win10 WDK
-    - See [Step 1 to Step 3](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-visual-studio-step-1-install-visual-studio-2022) about how to install Win10 SDK and WDK.
+- Visual Studio 2026 (Community version or above) + Win11 WDK
+    - See [Step 1 to Step 3](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk) about how to install Win11 SDK and WDK.
 - Qt 6 and above with Qt Creator 16 and above
     - Install via the online installer on https://www.qt.io/download-qt-installer-oss
     - Use the MSVC2022 Qt kit "Desktop Qt XXXXXX MSVC2022 64bit", not the "Desktop Qt XXXXXX MinGW 64-bit".
@@ -19,7 +19,7 @@ Steps:
     - ```loaders/sos_loader_gui_client/win/SOSLoader_GUI/SOSLoader_GUI.sln```
     - ```os_module/win/SecAgent.sln```
         - Need to copy ```win_config_xmhf_log.h.example``` to ```win_config_xmhf_log.h``` in the ```os_module/include/os_funcs/os/``` folder.
-    - ```code/tools_dist/tpm/sub_tools/efi_tpm2_event_logs/efi_tpm2_event_logs.sln```
+    - ```tools_dist/tpm/sub_tools/efi_tpm2_event_logs/efi_tpm2_event_logs.sln```
 4. Run Qt Creator to build ```secapp_demos/rdesktop/app/ui/RDesktop/CMakeLists.txt``` and ```secapp_demos/rdesktop/app/ui/RFiles/CMakeLists.txt```. Build the x64 release version for all these projects.
     - Configure projects to Enable "Debug" and "Release", and set output folder to be "Debug" and "Release", not "Desktop_Qt_X_Y_Z_MSVC2022_64bit-*".
 5. Open a MSYS2-ucrt64 terminal, go to the ```code/``` folder, run the build command ```make win``` to build loaders for Windows.
