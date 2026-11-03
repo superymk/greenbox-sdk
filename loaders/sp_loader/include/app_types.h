@@ -76,12 +76,8 @@ typedef uint64_t perf_counter_t;
 	#define NULL ((void*)0)
 #endif
 
-#ifndef __GNUG__
-#ifndef bool
-	typedef uint8_t bool;
-	#define true 1
-	#define false 0
-#endif
+#ifndef __cplusplus
+#include <stdbool.h>
 #endif
 
 #define TO_PTR(x) (void*)(x)
