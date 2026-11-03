@@ -2,8 +2,14 @@
 	"folders": [
 		{
 			"name": "os_module",
-			"path": "code/os_module"
+			"path": "os_module"
 		}
 	],
-    "settings": {}
+	"settings": {
+		"files.associations": {
+			"win_intr.h": "c",
+			"*.c_old": "c",
+			"sa_headers.h": "c"
+		}
+	}
 }

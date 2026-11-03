@@ -22,7 +22,9 @@ export TARGET_PLATFORM                  = amd64
 # The target running OS: linux, windows_msys2
 # Note: MSYS2 UCRT is needed to build under "windows"
 export OS                               = linux
-export DEVELOP                          = y
+
+## Force use UXMHF64 v1
+export CONFIG_USE_LEGACY_UXMHF64_V1     = n
 
 export CONFIG_SOSLOADER_GUI             = y
 export CONFIG_SOSLOADER_GUI_DEBUG       = n
@@ -36,7 +38,8 @@ export CONFIG_DEBUG_LOADERS_MEMLEAK     = n
 # Verbose Level: V_DEBUG V_PERF V_INFO V_NOTICE V_WARNING V_ERR V_CRIT V_EMERG
 export VERBOSE_LVL              = V_DEBUG
 
-# PAL_DEMO could be either SP_EXAMPLE_SAP or SP_TEST_PAL or RDESKTOP_PAL or RICH_GUI_SAP or RFILES_SAP
+# PAL_DEMO could be either standalone SecApps like SP_EXAMPLE_SAP or SP_TEST_PAL or RDESKTOP_PAL or RICH_GUI_SAP or RFILES_SAP,
+# or groups of SecApps like GB_BUNDLED_GUI_SAPS
 export PAL_DEMO                 = RICH_GUI_SAP
 
 # [Copied from the old SecBase]

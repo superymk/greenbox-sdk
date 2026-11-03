@@ -81,22 +81,6 @@ void wnd_login_mark_first_load(void)
     _wnd_login_is_first_load = true;
 }
 
-// static void event_cb(lv_event_t * e)
-// {
-//     // lv_obj_t * obj = lv_event_get_current_target(e);
-//     // LV_LOG_USER("Button %s clicked", lv_msgbox_get_active_btn_text(obj));
-//     // (void)obj;
-// }
-
-// void OnClick_BtnTerminate(lv_event_t * e)
-// {
-//     // // sp_dtm_terminate();
-//     // const char * btns[] = {"Apply", "Close", ""};
-//     // lv_obj_t * mbox1 = lv_msgbox_create(NULL, "Info", "Please close the window to exit GreenBox.", btns, true);
-//     // lv_obj_add_event_cb(mbox1, event_cb, LV_EVENT_VALUE_CHANGED, NULL);
-//     // lv_obj_center(mbox1);
-// }
-
 void wnd_login_show(void)
 {
     libdtm_hid_unregister_kbd_listener(sp_kbd_listener);

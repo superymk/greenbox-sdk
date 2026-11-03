@@ -5,6 +5,17 @@
 #include <palddk.h>
 #include <stdio.h>
 
+void sp_dbg_print_hex(const char *prefix, const void *prtptr, size_t size)
+{
+    size_t i;
+    for ( i = 0; i < size; i++ ) {
+        if ( i % 16 == 0 && prefix != NULL )
+            printf("\n%s", prefix);
+        printf("%02x ", *(const uint8_t *)prtptr++);
+    }
+    printf("\n");
+}
+
 void debug_sp_print_memory(void* ptr, size_t sz)
 {
 	uint32_t i = 0;

@@ -9,6 +9,7 @@
 #include "protocols/gdrive_limited.h"
 
 #include "ui/rfiles_ui/wnd_rfiles.h"
+#include "ui/rfiles_ui/wnd_rfiles_login.h"
 #include "ui/rfiles_ui/wnd_rfiles_list.h"
 
 /// @brief SecProcess constant properties (e.g., name, type).
@@ -70,7 +71,14 @@ __attribute__((unused)) static SAP_STATUS _read_cfgs(SP_UTASK *params)
     win_phy_width = in_sap_conf->window_info.win_logical_width * in_sap_conf->window_info.win_scale;
     win_phy_height = in_sap_conf->window_info.win_logical_height * in_sap_conf->window_info.win_scale;
 
-    // Pass the configs to the window_rfiles_list.
+    // Pass the configs to the window_rfiles_login and window_rfiles_list.
+    status = wnd_rfiles_login_init_cfgs(&sap_conf);
+    if (FAIL(status))
+    {
+        SAP_ERR("Failed to pass configs to Window-RFiles-Login! status:%lu\n", status);
+        return EINTERNAL;
+    }
+
     status = wnd_rfiles_list_init_cfgs(&sap_conf);
     if (FAIL(status))
     {
@@ -164,11 +172,11 @@ void sp_main(SP_UTASK *params)
     }
 
 out:
-    sp_exit(params);
+    sp_on_exit(params);
     return;
 }
 
-void sp_exit(SP_UTASK *sp_params)
+void sp_on_exit(SP_UTASK *sp_params)
 {
     libdtm_hid_unregister_kbd_listener(libgui_kbd_listener);
 	libdtm_hid_unregister_mouse_listener(libgui_mouse_listener);
@@ -254,7 +262,7 @@ bool sp_handle_app_request(struct ipc_msg *msg)
 
 void sp_handle_exception(void)
 {
-    sp_exit(current_sp);
+    sp_on_exit(current_sp);
 }
 
 
@@ -282,11 +290,11 @@ void sp_handle_exception(void)
 //         sp_yield();
 //     }
 
-//     sp_exit(params);
+//     sp_on_exit(params);
 //     return;
 // }
 
-// void sp_exit(SP_UTASK *sp_params)
+// void sp_on_exit(SP_UTASK *sp_params)
 // {
 //     SAP_INFO("Demo - Remote Files Exited!\n");
 // }

@@ -1,17 +1,24 @@
+// SPDX-License-Identifier: Proprietary
+// Author: Miao Yu (Carnegie Mellon University)
+// Author: Virgil Gligor (Carnegie Mellon University)
+
 /*
- * -------------------------------------------------------------------------------------
- * Carnegie Mellon University
- * Copyright (C) 2023 - 2023 Carnegie Mellon University. All Rights Reserved.
- * 
- * This software is the proprietary information of Carnegie Mellon University.
- * Use is subject to license terms.
- * 
- * Any reproduction, modification, distribution, or disclosure of this software, or any part of it, without the express
- * written consent of Carnegie Mellon University. is strictly prohibited.
- * -------------------------------------------------------------------------------------
- * 
- * Authors: Miao Yu
- *          Virgil Gligor
+ * Public API Header - Limited License
+ * Copyright (c) 2021 - 2026 Miao Yu, Virgil Gligor
+ *
+ * Permission is granted to use, copy, and redistribute this header file
+ * verbatim for the sole purpose of compiling software that interfaces with
+ * GreenBox via its public API, provided that:
+ *   (1) this notice is retained in all copies; and
+ *   (2) the file is not modified.
+ *
+ * Including or referencing this header, by itself, does not impose any
+ * copyleft or source-disclosure obligations on your software. Rights to
+ * the GreenBox implementation are governed by LICENSE-PROPRIETARY
+ * (or GPL-2.0-only where applicable). No patent rights are granted by this
+ * header. Trademarks are not licensed.
+ *
+ * For commercial licensing, contact: Miao Yu (superymk-cmu-edu)
  */
 
 #ifndef SECBASE_HC_H
@@ -21,27 +28,26 @@
 
 #include "uxmhf64_compilers.h"
 
-#define SECBASE_PRESENCE_REQ				0x47424F58	// "GBOX"
-#define SECBASE_PRESENCE_RESP				0x4D454F57	// "MEOW"
+#define SECBASE_PRESENCE_REQ                0x47424F58    // "GBOX"
+#define SECBASE_PRESENCE_RESP                0x4D454F57    // "MEOW"
 
 // The begin number of hypercall functions for each IEE
-#define NS_HC_FN_NUM_START					0
-#define S_HC_FN_NUM_START					100000
+#define NS_HC_FN_NUM_START                    0
+#define S_HC_FN_NUM_START                    100000
 
-// Commodity OS
-#define NS_HC_INIT_SECBASE_ONDEMAND_PER_CPU	(NS_HC_FN_NUM_START + 0)
+///////////////// Hypercalls for entire NS domain (i.e., both Rich OS and TinyOS) /////////////////
+#define NS_HC_INIT_SECBASE_ONDEMAND_PER_CPU    (NS_HC_FN_NUM_START + 0)
+#define NS_HC_FINI_SECBASE_ONDEMAND_PER_CPU    (NS_HC_FN_NUM_START + 1)
 
-#define NS_HC_FINI_SECBASE_ONDEMAND_PER_CPU	(NS_HC_FN_NUM_START + 1)
-
+///////////////// Hypercalls for Rich OS (Commodity OS) /////////////////
 /// @brief Get the unique ID (32 byte maximum) of the current machine. For example, the ID is UXMHF64's SRK for machines
 /// with TPM2.X.
-#define NS_HC_GET_UNIQUE_MACHINE_ID     	(NS_HC_FN_NUM_START + 5)
+#define NS_HC_GET_UNIQUE_MACHINE_ID         (NS_HC_FN_NUM_START + 5)
 
-#define NS_HC_REGISTER_SECOS				(NS_HC_FN_NUM_START + 10)
-#define NS_HC_UNREGISTER_SECOS				(NS_HC_FN_NUM_START + 11)
-#define NS_HC_BOOT_SECOS					(NS_HC_FN_NUM_START + 12)
-#define NS_HC_RESUME_SECOS					(NS_HC_FN_NUM_START + 13)
-#define NS_HC_READ_DMESG					(NS_HC_FN_NUM_START + 20)
+#define NS_HC_REGISTER_SECOS                (NS_HC_FN_NUM_START + 10)
+#define NS_HC_UNREGISTER_SECOS              (NS_HC_FN_NUM_START + 11)
+#define NS_HC_RESUME_SECOS                  (NS_HC_FN_NUM_START + 13)
+#define NS_HC_READ_DMESG                    (NS_HC_FN_NUM_START + 20)
 
 /// @brief Return the SecBase's boot state. It is always measured in SECBASE_BOOT_STATE_PCR_SRTM/DRTM if TPM is available.
 #define NS_HC_GET_SECBASE_BOOT_STATE (NS_HC_FN_NUM_START + 30)
@@ -54,7 +60,7 @@
 /// @param CPU_REG_CX pointer of main memory regions in the NS domain to store the PCR value.
 /// @param r 
 /// @return 
-#define NS_HC_TPM_GET_SECBASE_MEASUREMENT	(NS_HC_FN_NUM_START + 100)
+#define NS_HC_TPM_GET_SECBASE_MEASUREMENT   (NS_HC_FN_NUM_START + 100)
 
 #define NS_HC_TPM_SEAL_HYPAPP_SECRETS       (NS_HC_FN_NUM_START + 101)
 
@@ -71,96 +77,159 @@
 /// @param CPU_REG_CX pointer of main memory regions in the NS domain.
 /// @return Return MHV_SUCCESS on success.
 ///         Return MHV_* errors on corresponding errors.
-#define NS_HC_ASSIGN_MMEM_TO_S				(NS_HC_FN_NUM_START + 1000)
+#define NS_HC_ASSIGN_MMEM_TO_S               (NS_HC_FN_NUM_START + 1000)
 
 //// Interrupt related
-#define NS_HC_GET_LAPIC_ID					(NS_HC_FN_NUM_START + 3000)
+#define NS_HC_GET_LAPIC_ID                   (NS_HC_FN_NUM_START + 3000)
 
 //// Debug related
 // [Important] These hypercalls are disabled in production version
 #ifdef SECBASE_DEVELOP
-	#define OS_DEBUG_ATTACH_DEBUGGER 		(NS_HC_FN_NUM_START + 10000)
-	#define OS_DEBUG_DETACH_DEBUGGER 		(NS_HC_FN_NUM_START + 10001)
-	#define OS_DEBUG_ACCESS_VMCS 			(NS_HC_FN_NUM_START + 10002)
-	#define OS_DEBUG_ACCESS_MEM  			(NS_HC_FN_NUM_START + 10003)
-	#define OS_DEBUG_ACCESS_REGS			(NS_HC_FN_NUM_START + 10004)
-		// Access mode
-		#define DEBUG_READ_REG			0
-		#define DEBUG_WRITE_REG			1
-		// Register selector
-		#define	REG_SEL_EAX				1
-		#define	REG_SEL_EBX				2
-		#define	REG_SEL_ECX				3
-		#define	REG_SEL_EDX				4
-		#define	REG_SEL_ESI				5
-		#define	REG_SEL_EDI				6
-		#define	REG_SEL_EBP				7
-		#define	REG_SEL_ESP				8
-		#define	REG_SEL_EFLAGS			9
-		#define	REG_SEL_EIP				10
-		#define	REG_SEL_CS				20
-		#define	REG_SEL_DS				21
-		#define	REG_SEL_ES				22
-		#define	REG_SEL_FS				23
-		#define	REG_SEL_GS				24
-		#define	REG_SEL_SS				25
+    #define OS_DEBUG_ATTACH_DEBUGGER         (NS_HC_FN_NUM_START + 10000)
+    #define OS_DEBUG_DETACH_DEBUGGER         (NS_HC_FN_NUM_START + 10001)
+    #define OS_DEBUG_ACCESS_VMCS             (NS_HC_FN_NUM_START + 10002)
+    #define OS_DEBUG_ACCESS_MEM              (NS_HC_FN_NUM_START + 10003)
+    #define OS_DEBUG_ACCESS_REGS             (NS_HC_FN_NUM_START + 10004)
+        // Access mode
+        #define DEBUG_READ_REG             0
+        #define DEBUG_WRITE_REG            1
+        // Register selector
+        #define    REG_SEL_EAX                1
+        #define    REG_SEL_EBX                2
+        #define    REG_SEL_ECX                3
+        #define    REG_SEL_EDX                4
+        #define    REG_SEL_ESI                5
+        #define    REG_SEL_EDI                6
+        #define    REG_SEL_EBP                7
+        #define    REG_SEL_ESP                8
+        #define    REG_SEL_EFLAGS             9
+        #define    REG_SEL_EIP                10
+        #define    REG_SEL_CS                 20
+        #define    REG_SEL_DS                 21
+        #define    REG_SEL_ES                 22
+        #define    REG_SEL_FS                 23
+        #define    REG_SEL_GS                 24
+        #define    REG_SEL_SS                 25
 
     PACKED_STRUCT_BEGIN
     union reg_debug
-	{
-		struct{
-			uint32_t   access_mode		:  1,
-				reg_sel	:  15,
-				cpu_sel :  8,
-				__reserved_1	: 8;
-		} PACKED_STRUCT;
+    {
+        struct{
+            uint32_t   access_mode        :  1,
+                reg_sel    :  15,
+                cpu_sel :  8,
+                __reserved_1    : 8;
+        } PACKED_STRUCT;
 
-		uint32_t val;
-	};
+        uint32_t val;
+    };
     PACKED_STRUCT_END
 
-	#define OS_DEBUG_CONTINUE_EXECUTION		(NS_HC_FN_NUM_START + 10005)
-		#define CONT_EXEC_OK			1
-		#define CONT_EXEC_FAILED		2
-	#define OS_DEBUG_SET_TF					(NS_HC_FN_NUM_START + 10006)
-		#define DISABLE_TF				0
-		#define ENABLE_TF				1
-	#define OS_DEBUG_BREAK					(NS_HC_FN_NUM_START + 10007)
-		#define BREAK_AT_ADDR			0
-		#define BREAK_NOW				1
-	#define OS_DEBUG_BREAK_DATA				(NS_HC_FN_NUM_START + 10008)
-	#define OS_DEBUG_GVADDR_TO_GPADDR		(NS_HC_FN_NUM_START + 10009)
+    #define OS_DEBUG_CONTINUE_EXECUTION        (NS_HC_FN_NUM_START + 10005)
+        #define CONT_EXEC_OK            1
+        #define CONT_EXEC_FAILED        2
+    #define OS_DEBUG_SET_TF                    (NS_HC_FN_NUM_START + 10006)
+        #define DISABLE_TF              0
+        #define ENABLE_TF               1
+    #define OS_DEBUG_BREAK                     (NS_HC_FN_NUM_START + 10007)
+        #define BREAK_AT_ADDR           0
+        #define BREAK_NOW               1
+    #define OS_DEBUG_BREAK_DATA                (NS_HC_FN_NUM_START + 10008)
+    #define OS_DEBUG_GVADDR_TO_GPADDR          (NS_HC_FN_NUM_START + 10009)
 #endif
 
 //// x86 Specific
-#define NS_HC_X86_PIO_DUMP_PCI_CFG_SPACE	    		(NS_HC_FN_NUM_START + 20000)
+#define NS_HC_X86_PIO_DUMP_PCI_CFG_SPACE                (NS_HC_FN_NUM_START + 20000)
 
-#define NS_HC_TEST3							(NS_HC_FN_NUM_START + 99997)
-#define NS_HC_TEST2							(NS_HC_FN_NUM_START + 99998)
-#define NS_HC_TEST							(NS_HC_FN_NUM_START + 99999)
+//// Untrusted OS's interfaces to send commands to TinyOS
+
+/// @brief Get TinyOS's info; e.g., LAPIC id of the TinyOS's CPU, running or not.
+/// @param CPU_REG_CX The result buffer of the info.
+/// @return 
+#define NS_HC_GET_TINYOS_INFO                 (NS_HC_FN_NUM_START + 99800)
+#define     TINYOS_IPI_VECTOR           (0x80) // Use legacy rich OSes' system call interrupt vector, because they are
+                                            // less likely to configure peripheral devices to use this interrupt vector.
+
+/// @brief Boot TinyOS on the hided AP CPUs. The current CPU sends an INIT signal to those CPUs.                                            
+#define NS_HC_BOOT_TINYOS                 (NS_HC_FN_NUM_START + 99801)
+
+/// @brief Send a request from the untrusted rich OS to TinyOS.
+/// @param CPU_REG_CX The command to the TinyOS.
+/// @param CPU_REG_DX Arg1 of the command.
+/// @param CPU_REG_SI Arg2 of the command.
+/// @param CPU_REG_DI Arg3 of the command.
+/// @return 
+#define NS_HC_REQUEST_TINYOS                 (NS_HC_FN_NUM_START + 99805)
+
+/// @brief Receive the request response sent from TinyOS.
+/// @param CPU_REG_CX The command to the TinyOS.
+/// @param CPU_REG_DX Status1 of the command.
+/// @param CPU_REG_SI Status2 of the command.
+/// @param CPU_REG_DI Status3 of the command.
+/// @return 
+#define NS_HC_GET_TINYOS_RESPONSE            (NS_HC_FN_NUM_START + 99806)
+
+///////////////// Hypercalls for TinyOS /////////////////
+#define NS_HC_TINYOS_DELIVER_ALL_EXCEPTIONS_TO_TINYOS   (NS_HC_FN_NUM_START + 99900)
+
+/// @brief Set TinyOS's status.
+/// @param CPU_REG_CX The new status.
+/// @return 
+#define NS_HC_TINYOS_SET_STATUS              (NS_HC_FN_NUM_START + 99901)
+#define     TINYOS_STATUS_HALT           (0)
+#define     TINYOS_STATUS_RUNNING        (1)
+
+/// @brief Receive a request sent from the untrusted rich OS to TinyOS.
+/// @param CPU_REG_CX The command to the TinyOS.
+/// @param CPU_REG_DX Arg1 of the command.
+/// @param CPU_REG_SI Arg2 of the command.
+/// @param CPU_REG_DI Arg3 of the command.
+/// @return 
+#define NS_HC_TINYOS_GET_REQUEST             (NS_HC_FN_NUM_START + 99910)
+#define     REQ_TINYOS_CMD_INVALID          (0)
+#define     REQ_TINYOS_CMD_BOOT_SECOS       (1)
+
+/// @brief Send a request response from TinyOS to the untrusted rich OS.
+/// @param CPU_REG_CX The command handled by TinyOS.
+/// @param CPU_REG_DX Status1 of the command.
+/// @param CPU_REG_SI Status2 of the command.
+/// @param CPU_REG_DI Status3 of the command.
+/// @return 
+#define NS_HC_TINYOS_SET_RESPONSE            (NS_HC_FN_NUM_START + 99911)
+#define     RESP_TINYOS_SUCCESS          (0)
+#define     RESP_TINYOS_FAIL             (1)
+
+#define NS_HC_TINYOS_BOOT_SECOS              (NS_HC_FN_NUM_START + 99920)
+
+
+
+
+#define NS_HC_TEST3                          (NS_HC_FN_NUM_START + 99997)
+#define NS_HC_TEST2                          (NS_HC_FN_NUM_START + 99998)
+#define NS_HC_TEST                           (NS_HC_FN_NUM_START + 99999)
 
 // SecOS only
 //// General service
-#define SOS_HC_INIT_WK_MHV_COMM  			(S_HC_FN_NUM_START + 1)
-#define SOS_HC_FINI_WK_MHV_COMM				(S_HC_FN_NUM_START + 2)
-#define SOS_HC_DELIVER_ALL_EXCEPTIONS_TO_SOS      (S_HC_FN_NUM_START + 3)
-#define WK_HC_READ_MHV_PERF					(S_HC_FN_NUM_START + 10)
-#define WK_HC_CLEAR_MHV_PERF				(S_HC_FN_NUM_START + 11)
-#define SOS_HC_GET_SECBASE_CPU_IDX  		(S_HC_FN_NUM_START + 12)
+#define SOS_HC_INIT_WK_MHV_COMM               (S_HC_FN_NUM_START + 1)
+#define SOS_HC_FINI_WK_MHV_COMM               (S_HC_FN_NUM_START + 2)
+#define SOS_HC_DELIVER_ALL_EXCEPTIONS_TO_SOS  (S_HC_FN_NUM_START + 3)
+#define WK_HC_READ_MHV_PERF                   (S_HC_FN_NUM_START + 10)
+#define WK_HC_CLEAR_MHV_PERF                  (S_HC_FN_NUM_START + 11)
+#define SOS_HC_GET_SECBASE_CPU_IDX            (S_HC_FN_NUM_START + 12)
 
 /// @brief Use hardware timer to delay CPU for <rcx/ecx> milli-seconds. The larger the value is, the more accurate for
 /// the delay due to overhead to enable the hardware timer and prepare the hypercall.
 /// @param vcpu 
 /// @param r 
 /// @return 
-#define SOS_HC_HWTIMER_MDELAY  				(S_HC_FN_NUM_START + 13)
+#define SOS_HC_HWTIMER_MDELAY                 (S_HC_FN_NUM_START + 13)
 
 /// @brief Return sensitive platform info (e.g., hardware configurations that typically not exposed to untrusted  
 /// ring-3 applications).
 /// @param vcpu 
 /// @param r 
 /// @return 
-#define SOS_HC_GET_PLATFORM_INFO_SENSITIVE  (S_HC_FN_NUM_START + 20)
+#define SOS_HC_GET_PLATFORM_INFO_SENSITIVE    (S_HC_FN_NUM_START + 20)
 
 /// @brief Return non-sensitive platform info (e.g., hardware configurations that can be known by untrusted ring-3 
 /// applications).
@@ -168,19 +237,19 @@
 /// @param r 
 /// @return 
 #define SOS_HC_GET_PLATFORM_INFO_NON_SENSITIVE  (S_HC_FN_NUM_START + 21)
-#define SOS_HC_GET_PRNG_SEEDED_FROM_HW      (S_HC_FN_NUM_START + 25)
-    #define PRNG_MAX_LEN                (1024)
+#define SOS_HC_GET_PRNG_SEEDED_FROM_HW          (S_HC_FN_NUM_START + 25)
+    #define PRNG_MAX_LEN                  (1024)
 
 //// SecProcess/uTPM
-#define SOS_HC_HASH_SECPROCESS				(S_HC_FN_NUM_START + 1000)
-#define SOS_HC_VERIFY_SECPROCESS			(S_HC_FN_NUM_START + 1001)
+#define SOS_HC_HASH_SECPROCESS                  (S_HC_FN_NUM_START + 1000)
+#define SOS_HC_VERIFY_SECPROCESS                (S_HC_FN_NUM_START + 1001)
 
 /// @brief Set the uTPM's master secret and re-initialize the uTPM.
 /// @param vcpu 
 /// @param r 
 /// @return Return MHV_SUCCESS on success.
 ///         Return MHV_* errors on corresponding errors.
-#define SOS_HC_uTPM_SET_SECRET_AND_REINITIALIZE       (S_HC_FN_NUM_START + 1010)
+#define SOS_HC_uTPM_SET_SECRET_AND_REINITIALIZE (S_HC_FN_NUM_START + 1010)
 
 
 /// @brief Set the given PCR with the given measurement.
@@ -188,39 +257,37 @@
 /// @param r 
 /// @return Return MHV_SUCCESS on success.
 ///         Return MHV_* errors on corresponding errors.
-#define SOS_HC_uTPM_SET_MEASUREMENT	        (S_HC_FN_NUM_START + 1012)
+#define SOS_HC_uTPM_SET_MEASUREMENT            (S_HC_FN_NUM_START + 1012)
 
-#define SOS_HC_uTPM_GET_QUOTE	            (S_HC_FN_NUM_START + 1013)
+#define SOS_HC_uTPM_GET_QUOTE                  (S_HC_FN_NUM_START + 1013)
 
 //// Security related 
-#define SOS_HC_CHECK_SECBASE_VERSION			(S_HC_FN_NUM_START + 5000)
-#define 	SECBASE_DEVELOPMENT_BUILD	1
-#define		SECBASE_RETAIL_BUILD		2
-#define SOS_HC_EXIT_SECOS						(S_HC_FN_NUM_START + 5001)
-#define SOS_HC_SWITCH_TO_OS_WITH_INTR			(S_HC_FN_NUM_START + 5002)
-#define SOS_HC_SWITCH_TO_OS_WITH_INTRs_SEQ	(S_HC_FN_NUM_START + 5003)
+#define SOS_HC_CHECK_SECBASE_VERSION           (S_HC_FN_NUM_START + 5000)
+#define     SECBASE_DEVELOPMENT_BUILD      1
+#define        SECBASE_RETAIL_BUILD        2
+#define SOS_HC_EXIT_SECOS                      (S_HC_FN_NUM_START + 5001)
 
 //// Mem/IO ports related
-#define SOS_GPADDR_TO_SPADDR				(S_HC_FN_NUM_START + 10000)
-#define SOS_HC_VIRT_NS_MEM					(S_HC_FN_NUM_START + 10001)
-#define SOS_ASSIGN_MEM_TO_NS				(S_HC_FN_NUM_START + 10002)
-#define SOS_HC_TRAP_ACCESS_INIT				(S_HC_FN_NUM_START + 10005)
-#define SOS_HC_TRAP_ACCESS_FINI				(S_HC_FN_NUM_START + 10006)
-#define SOS_HC_TRAP_MEMORY_ACCESS			(S_HC_FN_NUM_START + 10007)
-#define 	MEM_PASSTHROUGH				0
-#define		MEM_MEDIATE_READ			(1 << 0) // [NOTE] Execution is treated same as Read permission, but do not support mediation
-#define		MEM_MEDIATE_WRITE			(1 << 1)
-#define		MEM_BLOCK_ACCESS			(1 << 2)
-#define		MEM_NOTIFY_ACCESS			(0 << 2)
-#define SOS_HC_TRAP_MEMORY_ACCESS_MULTI		(S_HC_FN_NUM_START + 10008)
-#define SOS_HC_TRAP_PIO_ACCESS				(S_HC_FN_NUM_START + 10009)
-#define 	PIO_PASSTHROUGH				0
-#define		PIO_MEDIATE_READ			(1 << 0)
-#define		PIO_MEDIATE_WRITE			(1 << 1)
-#define		PIO_BLOCK_ACCESS			(1 << 2)
-#define		PIO_NOTIFY_ACCESS			(0 << 2)
-#define SOS_HC_ASSIGN_PLATFORM_MEM_TO_S		(S_HC_FN_NUM_START + 10050) // [TODO] Merge with SOS_ASSIGN_MEM_TO_S
-#define SOS_HC_ASSIGN_PLATFORM_MEM_TO_NS	(S_HC_FN_NUM_START + 10051) // [TODO] Merge with SOS_ASSIGN_MEM_TO_NS
+#define SOS_GPADDR_TO_SPADDR                   (S_HC_FN_NUM_START + 10000)
+#define SOS_HC_VIRT_NS_MEM                     (S_HC_FN_NUM_START + 10001)
+#define SOS_ASSIGN_MEM_TO_NS                   (S_HC_FN_NUM_START + 10002)
+#define SOS_HC_TRAP_ACCESS_INIT                (S_HC_FN_NUM_START + 10005)
+#define SOS_HC_TRAP_ACCESS_FINI                (S_HC_FN_NUM_START + 10006)
+#define SOS_HC_TRAP_MEMORY_ACCESS              (S_HC_FN_NUM_START + 10007)
+#define     MEM_PASSTHROUGH                0
+#define        MEM_MEDIATE_READ             (1 << 0) // [NOTE] Execution is treated same as Read permission, but do not support mediation
+#define        MEM_MEDIATE_WRITE            (1 << 1)
+#define        MEM_BLOCK_ACCESS             (1 << 2)
+#define        MEM_NOTIFY_ACCESS            (0 << 2)
+#define SOS_HC_TRAP_MEMORY_ACCESS_MULTI        (S_HC_FN_NUM_START + 10008)
+#define SOS_HC_TRAP_PIO_ACCESS                 (S_HC_FN_NUM_START + 10009)
+#define     PIO_PASSTHROUGH                0
+#define        PIO_MEDIATE_READ             (1 << 0)
+#define        PIO_MEDIATE_WRITE            (1 << 1)
+#define        PIO_BLOCK_ACCESS             (1 << 2)
+#define        PIO_NOTIFY_ACCESS            (0 << 2)
+#define SOS_HC_ASSIGN_PLATFORM_MEM_TO_S        (S_HC_FN_NUM_START + 10050) // [TODO] Merge with SOS_ASSIGN_MEM_TO_S
+#define SOS_HC_ASSIGN_PLATFORM_MEM_TO_NS       (S_HC_FN_NUM_START + 10051) // [TODO] Merge with SOS_ASSIGN_MEM_TO_NS
 
 /// @brief Update the cache policy in the SecBase's page table; i.e., always mapping identically from hva to spa.
 /// @param CPU_REG_CX Base spaddr of the memory region.
@@ -230,96 +297,90 @@
 #define SOS_HC_SECBASE_PT_UPDATE_CACHE         (S_HC_FN_NUM_START + 10052)
 
 //// Interrupts related
-#define SOS_HC_INTR_SEPARATION_ENABLE		(S_HC_FN_NUM_START + 11000)
-#define SOS_HC_INTR_OS_LAPIC_ID				(S_HC_FN_NUM_START + 11001)
-#define SOS_HC_INTR_NMI_DISABLE				(S_HC_FN_NUM_START + 11002)
-#define SOS_HC_INTR_NMI_ENABLE				(S_HC_FN_NUM_START + 11003)
-#define SOS_HC_INTR_RECORD_NS_INTR_ADD		(S_HC_FN_NUM_START + 11010)
-#define SOS_HC_INTR_RECORD_NS_INTR_REMOVE	(S_HC_FN_NUM_START + 11011)
-#define SOS_HC_INTR_RECORD_NS_INTR_START_AND_S_INTR_INJECT_STOP		(S_HC_FN_NUM_START + 11012)
-#define SOS_HC_INTR_RECORD_NS_INTR_STOP_AND_S_INTR_INJECT_START		(S_HC_FN_NUM_START + 11013)
-#define SOS_HC_INTR_RECORD_NS_INTR_STOP_AND_S_INTR_INJECT_STOP		(S_HC_FN_NUM_START + 11014)		// Needed by SecOS exit
-
-//// Interrupts quirks related
-//// [TODO] These quirks should be fixed in the future
-#define SOS_HC_QUIRKS_INTR_INJECT_S_OWNED_INTERRUPTS	(S_HC_FN_NUM_START + 11500)
+#define SOS_HC_INTR_OS_LAPIC_ID                (S_HC_FN_NUM_START + 11001)
+#define SOS_HC_INTR_NMI_DISABLE                (S_HC_FN_NUM_START + 11002)
+#define SOS_HC_INTR_NMI_ENABLE                 (S_HC_FN_NUM_START + 11003)
 
 //// IOMMU related
-#define SOS_HC_IOMMU_PT_CREATE_S_EXCLUSIVE				(S_HC_FN_NUM_START + 15000)
-#define SOS_HC_IOMMU_PT_CREATE_S_NS_SHARED				(S_HC_FN_NUM_START + 15001) // [TODO] Merge with SOS_HC_IOMMU_PT_CREATE_S_EXCLUSIVE
-#define SOS_HC_IOMMU_PT_DESTROY							(S_HC_FN_NUM_START + 15002)
-#define SOS_HC_IOMMU_PT_MAP_S_EXCLUSIVE					(S_HC_FN_NUM_START + 15003)
-#define		DMA_ACCESS_ALLOW			1
-#define 	DMA_ACCESS_DENY				2
-#define SOS_HC_IOMMU_PT_MAP_S_NS_SHARED					(S_HC_FN_NUM_START + 15004)
-#define SOS_HC_IOMMU_PT_BIND_DEVICE						(S_HC_FN_NUM_START + 15005)
-#define SOS_HC_IOMMU_PT_UNBIND_DEVICE					(S_HC_FN_NUM_START + 15006)
+#define SOS_HC_IOMMU_PT_CREATE_S_EXCLUSIVE                 (S_HC_FN_NUM_START + 15000)
+#define SOS_HC_IOMMU_PT_CREATE_S_NS_SHARED                 (S_HC_FN_NUM_START + 15001) // [TODO] Merge with SOS_HC_IOMMU_PT_CREATE_S_EXCLUSIVE
+#define SOS_HC_IOMMU_PT_DESTROY                            (S_HC_FN_NUM_START + 15002)
+#define SOS_HC_IOMMU_PT_MAP_S_EXCLUSIVE                    (S_HC_FN_NUM_START + 15003)
+#define        DMA_ACCESS_ALLOW            1
+#define     DMA_ACCESS_DENY                2
+#define SOS_HC_IOMMU_PT_MAP_S_NS_SHARED                    (S_HC_FN_NUM_START + 15004)
+#define SOS_HC_IOMMU_PT_BIND_DEVICE                        (S_HC_FN_NUM_START + 15005)
+#define SOS_HC_IOMMU_PT_UNBIND_DEVICE                      (S_HC_FN_NUM_START + 15006)
 
 //// IOMMU for IGFX quirks related
-#define SOS_HC_IOMMU_IGFX_ENABLE_VTD					(S_HC_FN_NUM_START + 15400)
-#define SOS_HC_IOMMU_IGFX_DISABLE_VTD					(S_HC_FN_NUM_START + 15401)
+#define SOS_HC_IOMMU_IGFX_ENABLE_VTD                       (S_HC_FN_NUM_START + 15400)
+#define SOS_HC_IOMMU_IGFX_DISABLE_VTD                      (S_HC_FN_NUM_START + 15401)
 
 //// IOMMU Debug related
-#define SOS_HC_IOMMU_DEBUG_PRINT_AND_CLEAR_FAULT_REGS	(S_HC_FN_NUM_START + 15500)
-#define SOS_HC_IOMMU_DEBUG_RESTART_DMA_IOMMU			(S_HC_FN_NUM_START + 15501)
-#define SOS_HC_IOMMU_DEBUG_DISABLE_DMA_IOMMU			(S_HC_FN_NUM_START + 15502)
+#define SOS_HC_IOMMU_DEBUG_PRINT_AND_CLEAR_FAULT_REGS      (S_HC_FN_NUM_START + 15500)
+#define SOS_HC_IOMMU_DEBUG_RESTART_DMA_IOMMU               (S_HC_FN_NUM_START + 15501)
+#define SOS_HC_IOMMU_DEBUG_DISABLE_DMA_IOMMU               (S_HC_FN_NUM_START + 15502)
 
 //// x86 Specific
-#define SOS_HC_X86_IOAPIC_FORCE_DEFINE_NS_ACCESS	    (S_HC_FN_NUM_START + 20000)
-#define SOS_HC_X86_IOAPIC_FORCE_UNDEFINE_NS_ACCESS	    (S_HC_FN_NUM_START + 20001)
+#define SOS_HC_X86_IOAPIC_FORCE_DEFINE_NS_ACCESS           (S_HC_FN_NUM_START + 20000)
+#define SOS_HC_X86_IOAPIC_FORCE_UNDEFINE_NS_ACCESS         (S_HC_FN_NUM_START + 20001)
 
-#define SOS_HC_X86_MAP_PLATFORM_MEM_TO_S	    		(S_HC_FN_NUM_START + 20100)
-#define SOS_HC_UNMAP_PLATFORM_MEM_FROM_S				(S_HC_FN_NUM_START + 20101)
+#define SOS_HC_X86_MAP_PLATFORM_MEM_TO_S                   (S_HC_FN_NUM_START + 20100)
+#define SOS_HC_UNMAP_PLATFORM_MEM_FROM_S                   (S_HC_FN_NUM_START + 20101)
 
 //// Device Specific
-#define SOS_HC_DEV_HPET_GET_INFO						(S_HC_FN_NUM_START + 23000)
+#define SOS_HC_DEV_HPET_GET_INFO                           (S_HC_FN_NUM_START + 23000)
 
-#define SOS_HC_DEV_PCIE_REGISTER						(S_HC_FN_NUM_START + 24000)
-#define SOS_HC_DEV_PCIE_UNREGISTER						(S_HC_FN_NUM_START + 24001)
-#define SOS_HC_DEV_PCIE_ASSIGN_TO_S						(S_HC_FN_NUM_START + 24002)
-#define SOS_HC_DEV_PCIE_ASSIGN_TO_NS					(S_HC_FN_NUM_START + 24003)
+#define SOS_HC_DEV_PCIE_REGISTER                           (S_HC_FN_NUM_START + 24000)
+#define SOS_HC_DEV_PCIE_UNREGISTER                         (S_HC_FN_NUM_START + 24001)
+#define SOS_HC_DEV_PCIE_ASSIGN_TO_S                        (S_HC_FN_NUM_START + 24002)
+#define SOS_HC_DEV_PCIE_ASSIGN_TO_NS                       (S_HC_FN_NUM_START + 24003)
 
-#define SOS_HC_DEV_XHCI_REGISTER_BASE_SPADDR			(S_HC_FN_NUM_START + 25000)
+#define SOS_HC_DEV_XHCI_REGISTER_BASE_SPADDR               (S_HC_FN_NUM_START + 25000)
 
 //// General Debug
-#define SOS_HC_DEBUG_PRINT_CLEAR_EVENT_COUNTERS			(S_HC_FN_NUM_START + 50000)
+#define SOS_HC_DEBUG_PRINT_CLEAR_EVENT_COUNTERS            (S_HC_FN_NUM_START + 50000)
 
-#define SOS_HC_TEST1                                    (S_HC_FN_NUM_START + 90000)
-#define SOS_HC_TEST2                                    (S_HC_FN_NUM_START + 90001)
-#define SOS_HC_TEST3                                    (S_HC_FN_NUM_START + 90002)
+#define SOS_HC_TEST1                                       (S_HC_FN_NUM_START + 90000)
+#define SOS_HC_TEST2                                       (S_HC_FN_NUM_START + 90001)
+#define SOS_HC_TEST3                                       (S_HC_FN_NUM_START + 90002)
 
 typedef struct _sos_hc_params_trap_memory
 {
-	ulong_t	dest_spa;
-	size_t			trap_size;
-	uint32_t 		mediation_type;
+    ulong_t    dest_spa;
+    size_t            trap_size;
+    uint32_t         mediation_type;
 } SOS_HC_PARAMS_TRAP_MEM;
 
 
 /// @brief Parameters for the hypercall SOS_HC_HASH_SECPROCESS
 typedef struct _sos_hc_params_hash_secprocess
 {
-	ulong_t 		sp_code_gvaddr;
-	size_t			sp_code_size;
-	ulong_t 		sp_rodata_gvaddr;
-	size_t			sp_rodata_size;
-	ulong_t 		sp_data_gvaddr;
-	size_t			sp_data_size;
+    ulong_t         sp_code_gvaddr;
+    size_t          sp_code_size;
+    ulong_t         sp_rodata_gvaddr;
+    size_t          sp_rodata_size;
+    ulong_t         sp_data_gvaddr;
+    size_t          sp_data_size;
 
-	ulong_t 		sp_sparams_gvaddr;
+    ulong_t         sp_sparams_gvaddr;
 
-	// If not 0, then SecBase hashes the given secure parameters region [sp_sparams_vaddr, sp_sparams_vaddr + sp_sparams_size)
-    size_t 			sp_sparams_size;  
+    // If not 0, then SecBase hashes the given secure parameters region [sp_sparams_vaddr, sp_sparams_vaddr + sp_sparams_size)
+    size_t          sp_sparams_size;  
 
-	ulong_t 		out_sp_img_hash_gvaddr;
-	ulong_t			out_sp_img_hash_size_gvaddr;
-	ulong_t			out_sp_sparams_hash_gvaddr;
-	ulong_t			out_sp_sparams_hash_size_gvaddr;
+    ulong_t         out_sp_img_hash_gvaddr;
+    ulong_t         out_sp_img_hash_size_gvaddr;
+    ulong_t         out_sp_sparams_hash_gvaddr;
+    ulong_t         out_sp_sparams_hash_size_gvaddr;
 } SOS_HC_PARAMS_HASH_SECPROCESS;
 
 typedef struct
 {
-	ulong_t	pcie_cfg_space_mmio_base_spaddr;
+    ulong_t    pcie_cfg_space_mmio_base_spaddr;
+
+    // Insecure configurations of UXMHF64-runtime
+    uint32_t config_insecure_iommu_passthru_to_ns:1,
+             __reserved1:31;
 } SOS_HC_PLATFORM_SENSITIVE_INFO;
 
 #define SECBASE_MACHINE_ID_MAX_LENGTH (32) // Must be <= UXMHF64_MACHINE_ID_MAX_LENGTH because SecBase cannot report 
@@ -334,7 +395,7 @@ typedef struct PACKED_STRUCT
     uint8_t machine_id[SECBASE_MACHINE_ID_MAX_LENGTH];
     uint8_t machine_id_is_available; // 1 iff the SecBase can retrieve the machine ID. Otherwise 0.
     
-	uint32_t enable_tpm:1, // Set iff SecBase initialized the physical TPM device successfully.
+    uint32_t enable_tpm:1, // Set iff SecBase initialized the physical TPM device successfully.
              enable_efi_tcg2_protocol:1,    // Set iff SecBase initialized the UEFI TCG2 protocol successfully.
              enable_utpm:1, // Set iff SecBase initialized the uTPM successfully.
              __reserved:29;
@@ -354,7 +415,7 @@ PACKED_STRUCT_END
 #define uTPM_MEASUREMENT_LENGTH                 (32)
 
 /// @brief SecOS may reset PCR 4 and above.
-#define uTPM_SECOS_RESETTABLE_PCR_FROM_INDEX	(4)
+#define uTPM_SECOS_RESETTABLE_PCR_FROM_INDEX    (4)
 
 /// @brief Number of PCRs in uTPM.
 /// [NOTE] This value must be the same as <TPM_PCR_NUM>
@@ -440,15 +501,15 @@ typedef uint32_t SECBASE_TPM_EVENT_TYPE;
 #define SECBASE_TPM_EV_NONHOST_INFO                       15U
 #define SECBASE_TPM_EV_OMIT_BOOT_DEVICE_EVENTS            16U
 #define SECBASE_TPM_EV_EFI_VARIABLE_DRIVER_CONFIG         17U
-#define SECBASE_TPM_EV_EFI_VARIABLE_BOOT                   18U
+#define SECBASE_TPM_EV_EFI_VARIABLE_BOOT                  18U
 #define SECBASE_TPM_EV_EFI_BOOT_SERVICES_APPLICATION      19U
-#define SECBASE_TPM_EV_EFI_BOOT_SERVICES_DRIVER            20U
-#define SECBASE_TPM_EV_EFI_RUNTIME_SERVICES_DRIVER         21U
-#define SECBASE_TPM_EV_EFI_GPT_EVENT                       22U
-#define SECBASE_TPM_EV_EFI_ACTION                          23U
-#define SECBASE_TPM_EV_EFI_PLATFORM_FIRMWARE_BLOB          24U
-#define SECBASE_TPM_EV_EFI_HANDOFF_TABLES                  25U
-#define SECBASE_TPM_EV_EFI_VARIABLE_AUTHORITY              26U
+#define SECBASE_TPM_EV_EFI_BOOT_SERVICES_DRIVER           20U
+#define SECBASE_TPM_EV_EFI_RUNTIME_SERVICES_DRIVER        21U
+#define SECBASE_TPM_EV_EFI_GPT_EVENT                      22U
+#define SECBASE_TPM_EV_EFI_ACTION                         23U
+#define SECBASE_TPM_EV_EFI_PLATFORM_FIRMWARE_BLOB         24U
+#define SECBASE_TPM_EV_EFI_HANDOFF_TABLES                 25U
+#define SECBASE_TPM_EV_EFI_VARIABLE_AUTHORITY             26U
 
 #define TPM_DIGEST_MAX_LENGTH   (64) // Corresponds to the size of <tpm_pcr_value_t>
 
@@ -471,7 +532,7 @@ typedef struct
 
 typedef struct
 {
-	SECBASE_ROOT_OF_TRUST_TYPE rot_type; /// Type of root of trust used by the SecBase
+    SECBASE_ROOT_OF_TRUST_TYPE rot_type; /// Type of root of trust used by the SecBase
     uint8_t img_digest[TPM_DIGEST_MAX_LENGTH];
     uint32_t img_digest_size;
     uint8_t boot_state_digest[TPM_DIGEST_MAX_LENGTH];
@@ -504,7 +565,14 @@ typedef struct
     uint8_t buf[NS_HC_PARAMS_TPM_SEAL_HYPAPP_SECRETS_BUF_MAX_SIZE];
 } NS_HC_RESP_TPM_SEAL_HYPAPP_SECRETS;
 
+/********* NS_HC_GET_TINYOS_INFO *********/
+typedef struct
+{
+    uint32_t tos_lapic_id;
+    uint32_t tos_ipi_vector;
 
+    uint32_t running_status;
+} NS_HC_RESP_GET_TINYOS_INFO;
 
 
 
@@ -512,13 +580,13 @@ typedef struct
 /// @brief Parameters for the hypercall SOS_HC_VERIFY_SECPROCESS
 typedef struct _sos_hc_params_verify_secprocess
 {
-	ulong_t 		sp_signature;
-	size_t			sp_signature_size;
-	ulong_t 		sp_pubkey;
-	size_t			sp_pubkey_size;
-	size_t 			saltlen;
-	ulong_t 		sp_img_hash;
-	size_t			sp_img_hash_size;
+    ulong_t         sp_signature;
+    size_t          sp_signature_size;
+    ulong_t         sp_pubkey;
+    size_t          sp_pubkey_size;
+    size_t          saltlen;
+    ulong_t         sp_img_hash;
+    size_t          sp_img_hash_size;
 } SOS_HC_PARAMS_VERIFY_SECPROCESS;
 
 #define uTPM_MASTER_SEALING_SECRET_SIZE   (32) // Must be the same with <HW_TPM_MASTER_SEALING_SECRET_SIZE>
@@ -534,7 +602,7 @@ PACKED_STRUCT_END
 PACKED_STRUCT_BEGIN
 typedef struct PACKED_STRUCT
 {
-	uint32_t        pcr;
+    uint32_t        pcr;
     uint8_t         measurement[uTPM_MEASUREMENT_LENGTH];
 } SOS_HC_PARAMS_uTPM_SET_MEASUREMENT;
 PACKED_STRUCT_END
@@ -566,7 +634,7 @@ PACKED_STRUCT_END
 PACKED_STRUCT_BEGIN
 typedef struct PACKED_STRUCT
 {
-	uint8_t                 nonce[uTPM_QUOTE_NONCE_LENGTH];
+    uint8_t                 nonce[uTPM_QUOTE_NONCE_LENGTH];
 
     /*** Output info ***/
     uint32_t                quote_version;
@@ -584,19 +652,7 @@ PACKED_STRUCT_END
 //! <cpu_idx> of VCPU in SecBase; i.e., logic processor id in SecBase. 
 //! [NOTE] XMHF defines VCPU's cpu_id as lapic_id and defines <cpu_idx> as logic processor id, so SecBase uses the name
 //! <cpu_idx>.
-typedef uint32_t 	sb_cpu_idx_t;
-
-
-
-/********* SOS_HC_SWITCH_TO_OS_WITH_INTR *********/
-#define NS_INTRs_SEQ_MAX	(1023)
-PACKED_STRUCT_BEGIN
-typedef struct PACKED_STRUCT
-{
-	uint32_t vectors[NS_INTRs_SEQ_MAX];
-	uint32_t num_intrs;
-} SOS_HC_PARAMS_SWITCH_TO_OS_WITH_INTRs_SEQ;
-PACKED_STRUCT_END
+typedef uint32_t     sb_cpu_idx_t;
 
 /********* NS_HC_GET_SECBASE_BOOT_STATE *********/
 ///
@@ -622,20 +678,24 @@ typedef struct PACKED_STRUCT
 /// [NOTE] This struct must be the same with <MHV_SENSITIVE_BOOT_STATE> in mHV.
 typedef struct PACKED_STRUCT
 {
-	uint8_t is_running;
-	uint8_t __reserved1[3]; // paddings
+    uint8_t is_running;
+    uint8_t __reserved1[3]; // paddings
 
     // CPU (BSP) Info collected during mHV initialization
     uint32_t mhv_init_bsp_vendor;
     uint32_t mhv_init_bsp_model;
     uint32_t mhv_init_bsp_ucode_rev;
+
+    // Insecure configurations of UXMHF64-runtime
+    uint32_t config_insecure_iommu_passthru_to_ns:1,
+             __reserved2:31;
 } NS_HC_PARAMS_GET_SECBASE_BOOT_STATE_SENSITIVE;
 
 /// @brief 
 /// [NOTE] This struct must be compatible with <MHV_BOOT_STATE> in mHV.
 typedef struct PACKED_STRUCT
 {
-	NS_HC_PARAMS_GET_SECBASE_BOOT_STATE_SENSITIVE sensitive_boot_state;
+    NS_HC_PARAMS_GET_SECBASE_BOOT_STATE_SENSITIVE sensitive_boot_state;
 
     UTPM_BOOT_STATE utpm;
 
@@ -656,10 +716,10 @@ typedef enum
 PACKED_STRUCT_BEGIN
 typedef struct PACKED_STRUCT
 {
-	secbase_addr_type_t addr_type;
+    secbase_addr_type_t addr_type;
 
-	ulong_t hpet_base_spa;
-	ulong_t hpet_base_pio;
+    ulong_t hpet_base_spa;
+    ulong_t hpet_base_pio;
 } SOS_HC_RESP_DEV_HPET_GET_INFO;
 PACKED_STRUCT_END
 

@@ -32,6 +32,9 @@ static struct gpu_vendor_sel list_gpus[] = {
 
 static struct gpu_pdev g_gpu_pdev = {.is_probed = false};
 
+/// @brief Probe GPU via vendor table
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_probe(struct gpu_pdev *gpu)
 {
     uint32_t i = 0;
@@ -58,6 +61,9 @@ static OSSTATUS _gpu_probe(struct gpu_pdev *gpu)
     return E_DEV_UNKNOWN;
 }
 
+/// @brief Pause GPU via vendor table
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_pause(struct gpu_pdev *gpu)
 {
     uint32_t i = 0;
@@ -84,6 +90,9 @@ static OSSTATUS _gpu_pause(struct gpu_pdev *gpu)
     return E_DEV_UNKNOWN;
 }
 
+/// @brief Resume GPU via vendor table
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_resume(struct gpu_pdev *gpu)
 {
     uint32_t i = 0;
@@ -117,6 +126,9 @@ OSSTATUS do_CMD_IOSM_FB_PROBE_GPU(struct tz_cmd_packet *cmd_packet)
     union pci_bdf gpu_pci_bdf = {.raw = (uint16_t)cmd_packet->arg1}; // arg1 - The BDF of the GPU PCIe device
     struct pci_device *pci = &g_gpu_pdev.pci;
     union pci_bdf gpu_bdf = pci->bdf;
+
+    if (!cmd_packet)
+        return E_INV_ARG;
 
     // Prevent double probe
     if (g_gpu_pdev.is_probed)
@@ -157,6 +169,9 @@ OSSTATUS do_CMD_IOSM_FB_PAUSE_GPU(struct tz_cmd_packet *cmd_packet)
     union pci_bdf gpu_pci_bdf = {.raw = (uint16_t)cmd_packet->arg1}; // arg1 - The BDF of the GPU PCIe device
     struct pci_device *pci = &g_gpu_pdev.pci;
 
+    if (!cmd_packet)
+        return E_INV_ARG;
+
     // The GPU must be probed
     if (!g_gpu_pdev.is_probed || !pci_bdf_equal(gpu_pci_bdf, pci->bdf))
     {
@@ -183,6 +198,9 @@ OSSTATUS do_CMD_IOSM_FB_RESUME_GPU(struct tz_cmd_packet *cmd_packet)
     OSSTATUS status = OS_SUCCESS;
     union pci_bdf gpu_pci_bdf = {.raw = (uint16_t)cmd_packet->arg1}; // arg1 - The BDF of the GPU PCIe device
     struct pci_device *pci = &g_gpu_pdev.pci;
+
+    if (!cmd_packet)
+        return E_INV_ARG;
 
     // The GPU must be probed
     if (!g_gpu_pdev.is_probed || !pci_bdf_equal(gpu_pci_bdf, pci->bdf))

@@ -1,7 +1,6 @@
-<!DOCTYPE RCC>
-<RCC version="1.0">
-  <qresource>
-    <file>./imgs/icon.png</file>
-    <file>./imgs/banner.png</file>
-  </qresource>
+<RCC>
+    <qresource prefix="/">
+        <file>imgs/icon.png</file>
+        <file>imgs/banner.jpg</file>
+    </qresource>
 </RCC>

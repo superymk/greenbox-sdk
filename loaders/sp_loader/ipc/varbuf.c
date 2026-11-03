@@ -86,8 +86,11 @@ void varbuf_access_finish(varbuf_t* varbuf)
 	if(!varbuf)
 		return;
 	
-	if(varbuf->private)
+	if (varbuf->private)
+	{
 		free(varbuf->private);
+		varbuf->private = NULL;
+	}
 
 	free(varbuf);
 }
@@ -109,16 +112,26 @@ bool varbuf_write_data(varbuf_t* varbuf, const void* var, const uint32_t size)
 		smem_offset_t offset = INVALID_SMEM_OFFSET;
 		
 		if (!cmp_write_u8(cmp, DATA_IN_SHAREDMEM)) // data store type (embedded/in shared mem)
+		{
 	        return false;
+		}
+		
 		if (!cmp_write_u32(cmp, size)) // size of data
+		{
 	        return false;
+		}
 
 		offset = smem_allocate(size);
 		if(offset == INVALID_SMEM_OFFSET)
+		{
 			return false;
+		}
+
 		memcpy((void*)SMEM_OFFSET_TO_VADDR(offset), var, size);
 		if (!cmp_write_u32(cmp, (uint32_t)offset)) // offset in shared memory
+		{
 	        return false;
+		}
 	}
 	else
 	{
@@ -348,7 +361,10 @@ out:
 		*datasz = size;
 
 	if(result && !success)
+	{
 		free(result);
+		result = NULL;
+	}
 
 	return result;
 }
@@ -518,3 +534,32 @@ bool varbuf_util_write_result(varbuf_t* varbuf, uint64_t* result, int* err)
 	return true;
 }
 
+/********* Public Functions - Utils for Types *********/
+bool varbuf_serialize_size_t(varbuf_t *varbuf, size_t size)
+{
+    uint64_t size_temp = (uint64_t)size; 
+
+    if (!varbuf_write_data(varbuf, &size_temp, sizeof(uint64_t))) // serialize size_t as uint64_t
+    {
+       return false;
+    }
+
+    // On success
+    return true;
+}
+
+bool varbuf_deserialize_size_t(varbuf_t *varbuf, size_t* out_size)
+{
+    uint64_t size_temp = 0;
+
+    if (!varbuf_read_fixdata(varbuf, &size_temp, sizeof(uint64_t)))
+    {
+        return false;
+    }
+
+	if (out_size)
+    	*out_size = (size_t)size_temp;
+
+    // On success
+    return true;
+}

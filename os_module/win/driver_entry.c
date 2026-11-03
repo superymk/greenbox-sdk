@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only OR Proprietary
 // Author: Miao Yu (Carnegie Mellon University)
 // Author: Virgil Gligor (Carnegie Mellon University)
+//
+// SecAgent - KMDF (WDF) Non-PnP control device, IOCTL-only
 
 #include <ntddk.h>
 #include <wdf.h>
@@ -9,663 +11,491 @@
 #include "win_intr.h"
 #include <sa_headers.h>
 
-static WCHAR NameBuffer[] = L"\\Device\\SecAgent";
-static WCHAR DOSNameBuffer[] = L"\\DosDevices\\SecAgent";
+// WPP (optional): keep if you already have it wired
+#include "driver_entry.tmh"
 
-static NTSTATUS HandleIOCTL(
-	__in PDEVICE_OBJECT   pDeviceObj,
-	__in PIRP             pIrp
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(INIT, DriverEntry)
+#endif
+
+typedef struct _SA_REQ_CTX
+{
+    WDFMEMORY u_mem;     // holds MDL + mapping lifetime
+    PVOID u_mem_kva;     // system-space mapping to user pages
+    size_t u_mem_len;    // bytes locked/mapped
+    PVOID u_mem_uva;     // original user VA (for debugging)
+} SA_REQ_CTX, *PSA_REQ_CTX;
+
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(SA_REQ_CTX, SaGetReqCtx);
+
+// -----------------------
+// Globals
+// -----------------------
+static WDFDEVICE g_wdf_device = NULL;
+
+static EVT_WDF_IO_IN_CALLER_CONTEXT sa_evt_io_in_caller_context;
+
+/// @brief Map user buffer into kernel and store mapping in request context
+/// @param Request Pointer to WDF request
+/// @param ctx Request context where mapping info will be stored (must be pre-allocated)
+/// @param u_mem_uva User virtual address to map
+/// @param u_mem_len Length of mapping in bytes
+/// @param out_nt_status Pointer to receive NTSTATUS on failure/success
+/// @return OSSTATUS (OS_SUCCESS on success, E_INV_ARG or E_INTERNAL_ERROR on failure)
+static OSSTATUS sa_win_u_map_mem(WDFREQUEST Request, PSA_REQ_CTX ctx, PVOID u_mem_uva, size_t u_mem_len, NTSTATUS* out_nt_status)
+{
+    NTSTATUS nt_status;
+
+    // Check: ctx must be pre-allocated by caller
+    if (!ctx)
+    {
+        *out_nt_status = STATUS_INVALID_PARAMETER;
+        return E_INV_ARG;
+    }
+
+    ctx->u_mem_uva = u_mem_uva;
+    ctx->u_mem_len = u_mem_len;
+
+    // Give read + write access permission to the user memory.
+    //// Requestor must be user-mode; if kernel-mode caller, treat differently.
+    //// (If you have kernel callers, check WdfRequestGetRequestorMode(Request).)
+    nt_status = WdfRequestProbeAndLockUserBufferForWrite(
+        Request,
+        u_mem_uva,
+        u_mem_len,
+        &ctx->u_mem);
+    if (!NT_SUCCESS(nt_status))
+    {
+        *out_nt_status = nt_status;
+        return E_INTERNAL_ERROR;
+    }
+
+    ctx->u_mem_kva = WdfMemoryGetBuffer(ctx->u_mem, NULL);
+    if (!ctx->u_mem_kva)
+    {
+        *out_nt_status = STATUS_INSUFFICIENT_RESOURCES;
+        return E_INTERNAL_ERROR;
+    }
+
+    // On success
+    *out_nt_status = nt_status;
+    return OS_SUCCESS;
+}
+
+/// @brief Preprocess IOCTL requests in caller context (map user memory if required)
+/// @param Device WDF device
+/// @param Request WDF request
+static VOID sa_evt_io_in_caller_context(WDFDEVICE Device, WDFREQUEST Request)
+{
+    OSSTATUS status = OS_SUCCESS;
+    NTSTATUS nt_status = STATUS_SUCCESS;
+    WDF_REQUEST_PARAMETERS params;
+    struct tz_cmd_packet *cmd = NULL;
+    size_t cmd_len = 0;
+
+    WDF_REQUEST_PARAMETERS_INIT(&params);
+    WdfRequestGetParameters(Request, &params);
+
+    // Only preprocess your IOCTL
+    if (params.Type != WdfRequestTypeDeviceControl ||
+        params.Parameters.DeviceIoControl.IoControlCode != IOCTL_SECAGENT)
+    {
+        nt_status = WdfDeviceEnqueueRequest(Device, Request);
+        if (!NT_SUCCESS(nt_status))
+            WdfRequestComplete(Request, nt_status);
+        return;
+    }
+
+    // METHOD_BUFFERED: input lives in SystemBuffer; safe to read here
+    nt_status = WdfRequestRetrieveInputBuffer(Request, sizeof(*cmd), (PVOID *)&cmd, &cmd_len);
+    if (!NT_SUCCESS(nt_status))
+    {
+        WdfRequestComplete(Request, nt_status);
+        return;
+    }
+
+    // If a SecAgent command takes input/output user memory, map the memory in kernel as required by WDF.
+    //// Allocate request context
+    WDF_OBJECT_ATTRIBUTES attrs;
+    PSA_REQ_CTX ctx = NULL;
+
+    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, SA_REQ_CTX);
+
+    nt_status = WdfObjectAllocateContext(Request, &attrs, (PVOID *)&ctx);
+    if (!NT_SUCCESS(nt_status))
+    {
+        WdfRequestComplete(Request, nt_status);
+        return;
+    }
+
+    switch (cmd->id)
+    {
+        case CMD_POLL_OS_NOTIFICATION_INFO:
+            status = sa_win_u_map_mem(Request, ctx, (PVOID)(ULONG_PTR)cmd->arg1, sizeof(struct sa_app_notif_info), &nt_status);
+            break;
+        case CMD_REGISTER_OS_NOTIFICATION:
+            status = sa_win_u_map_mem(Request, ctx, (PVOID)(ULONG_PTR)cmd->arg1, sizeof(struct sa_app_notif_reginfo), &nt_status);
+            break;
+        case CMD_REGISTER_SECOS:
+            status = sa_win_u_map_mem(Request, ctx, (PVOID)(ULONG_PTR)cmd->arg1, sizeof(struct sl_sos_sect_addrs), &nt_status);
+            break;
+        case CMD_REGISTER_SECPROCESS_MEMORY:
+            status = sa_win_u_map_mem(Request, ctx, (PVOID)(ULONG_PTR)cmd->arg1, sizeof(struct hv_reg_sections), &nt_status);
+            break;
+        case CMD_REGISTER_SECPROCESS:
+            status = sa_win_u_map_mem(Request, ctx, (PVOID)(ULONG_PTR)cmd->arg1, sizeof(SP_USTRUCT), &nt_status);
+            break;      
+        case CMD_SECPROCESS_GET_IDS_AND_NAMES:
+            status = sa_win_u_map_mem(Request, ctx, (PVOID)(ULONG_PTR)cmd->arg1, sizeof(struct sp_info_id_name_resp), &nt_status);
+            break;
+        default:
+            // No user memory needs to be mapped, set <status> to be SUCCESS to pass the check of <status> 
+            status = OS_SUCCESS;
+            break;
+    }
+
+    if (SA_FAIL(status))
+    {
+        DRV_ERR("[Windows] Failed to map user memory! cmd: %u\n", cmd->id);
+        WdfRequestComplete(Request, nt_status);
+        return;
+    }
+
+    // Hand off to normal queue processing
+    nt_status = WdfDeviceEnqueueRequest(Device, Request);
+    if (!NT_SUCCESS(nt_status))
+        WdfRequestComplete(Request, nt_status);
+}
+
+/// @brief Handle METHOD_BUFFERED IOCTL requests (core logic)
+/// @param IoControlCode IO control code
+/// @param Buffer In/out buffer pointer (METHOD_BUFFERED system buffer)
+/// @param InLen Input length in bytes
+/// @param OutLen Output length in bytes
+/// @param BytesWritten Out param for bytes written
+/// @param Ctx Optional request context with mapped user memory (NULL if not needed)
+/// @return NTSTATUS (STATUS_SUCCESS on transport success, actual command status in Buffer->status)
+static NTSTATUS
+sa_process_ioctl_buffered(
+    IN ULONG IoControlCode,
+    _Inout_updates_bytes_(BufferLen) PVOID Buffer,
+    IN size_t InLen,
+    IN size_t OutLen,
+    OUT size_t *BytesWritten,
+    IN PSA_REQ_CTX Ctx
 )
 {
-	PIO_STACK_LOCATION      pStack;
-	struct tz_cmd_packet*   cmd_packet = NULL;
-	struct tz_cmd_packet*   in_cmd_packet = NULL;
-	OSSTATUS status = EINVAL;
-	int copy_retval = 1;
-	uint32_t dwDataWritten = 0;
+    OSSTATUS st = OS_SUCCESS;
+    struct tz_cmd_packet *cmd_packet = NULL;
+    struct tz_cmd_packet *in_cmd_packet = (struct tz_cmd_packet *)Buffer;
 
-	UNREFERENCED_PARAMETER(pDeviceObj);
-	assert((PASSIVE_LEVEL ==  KeGetCurrentIrql()), ("HandleIOCTL's entry is in non-Passive IRQL"));
+    *BytesWritten = 0;
 
-	// Check: <pIrp> must be a valid pointer
-    if(!pIrp)
-	{
-        status = EINVAL;
-		goto finish;
-	}
+    if (IoControlCode != IOCTL_SECAGENT)
+    {
+        return STATUS_INVALID_DEVICE_REQUEST;
+    }
 
-	DRV_DEBUG("<HandleIOCTL> Begin handling request.\n");
+    // Check: SecAgent must be running.
+    if (!secagent_is_running())
+    {
+        return STATUS_UNSUCCESSFUL;
+    }
 
-	//-f--> We get the parameters referring to our driver.
-	pStack = IoGetCurrentIrpStackLocation(pIrp);
+    if (Buffer == NULL)
+    {
+        return STATUS_INVALID_PARAMETER;
+    }
 
-	switch(pStack->Parameters.DeviceIoControl.IoControlCode)
-	{
-		 case IOCTL_SECAGENT:
-		 {
-			cmd_packet = (struct tz_cmd_packet*) os->mm_malloc_zeroed(sizeof(struct tz_cmd_packet));
-			if(!cmd_packet){
-				DRV_ERR("<cmd_packet> allocation error!\n");
-				status = E_NO_MEM;
-				goto finish;
-			}
+    if (InLen < sizeof(struct tz_cmd_packet) || OutLen < sizeof(struct tz_cmd_packet))
+    {
+        return STATUS_BUFFER_TOO_SMALL;
+    }
 
-			in_cmd_packet = (struct tz_cmd_packet*)pIrp->AssociatedIrp.SystemBuffer;
+    // Copy the input buffer to prevent TOCTTOU attacks
+    // WDF framework may copy the input buffer, but SecAgent does not trust it to reduce reliance on it.
+    cmd_packet = (struct tz_cmd_packet *)os->mm_malloc_zeroed(sizeof(struct tz_cmd_packet));
+    if (!cmd_packet)
+    {
+        DRV_ERR("<cmd_packet> allocation error!\n");
+        in_cmd_packet->status = E_NO_MEM;
+        goto finish;
+    }
 
-			status = os->copy_from_user(cmd_packet, (void*) in_cmd_packet, sizeof(struct tz_cmd_packet)); 
-			if (SA_FAIL(status)) {
-				DRV_ERR("copy_from_user error!\n");
-				status = E_INTERNAL_ERROR;
-				goto finish;
-			}
+    os->mm_memcpy(cmd_packet, in_cmd_packet, sizeof(struct tz_cmd_packet));
 
-			status = ioctl_request_handler(cmd_packet, &copy_retval);
-			cmd_packet->status = status;
+    // WDF may run SecAgent in a different thread context from the caller applicatin. Thus, we need to replace user 
+    // memory pointers in <cmd_packet> with the kernel va that maps the memory before accessing the memory.
+    switch (cmd_packet->id)
+    {
+        case CMD_POLL_OS_NOTIFICATION_INFO:
+        case CMD_REGISTER_OS_NOTIFICATION:
+        case CMD_REGISTER_SECOS:
+        case CMD_REGISTER_SECPROCESS_MEMORY:
+        case CMD_REGISTER_SECPROCESS:
+        case CMD_SECPROCESS_GET_IDS_AND_NAMES:
+            if(Ctx)
+            {
+                cmd_packet->arg1 = (uint64_t)Ctx->u_mem_kva;
+            }
+            break;
+        default:
+            // No address needs to be replaced
+            break;
+    }
 
-			// Copying the result back to the User Space
-			status = os->copy_to_user((void*) in_cmd_packet, cmd_packet, sizeof(struct tz_cmd_packet)); 
-			if (SA_FAIL(status)) {
-				DRV_ERR("copy_to_user error!\n");
-				status = E_INTERNAL_ERROR;
-				dwDataWritten = 0;
-				goto finish;
-			}
-			dwDataWritten = sizeof(struct tz_cmd_packet);
-		 }
-		 default:
-		 	break;
-	}
+    // Call the main ioctl handler
+    int copy_retval = 1;
+    st = ioctl_request_handler(cmd_packet, &copy_retval);
+    cmd_packet->status = st;
 
+    // Copy back the result
+    os->mm_memcpy(Buffer, cmd_packet, sizeof(struct tz_cmd_packet));
 
 finish:
-	assert((PASSIVE_LEVEL ==  KeGetCurrentIrql()), ("HandleIOCTL's exit is in non-Passive IRQL"));
+    // Transport finished (succeed or not); command result is in (struct tz_cmd_packet*)Buffer->status
+    if (cmd_packet)
+        os->mm_free(cmd_packet);
+    *BytesWritten = sizeof(struct tz_cmd_packet);
 
-	if(cmd_packet)
-    	os->mm_free(cmd_packet);
-
-	if(SA_FAIL(status))
-		pIrp->IoStatus.Status = STATUS_UNSUCCESSFUL;
-	else
-		pIrp->IoStatus.Status = STATUS_SUCCESS;
-
-	pIrp->IoStatus.Information = dwDataWritten;
-	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
-
-	DRV_DEBUG("<HandleIOCTL> Finish handling request.\n");
+    // Always return STATUS_SUCCESS to indicate transport success. The real status is in cmd_packet->status.
     return STATUS_SUCCESS;
 }
 
-static PDEVICE_OBJECT __RegisterDriver(IN PDRIVER_OBJECT DriverObject)
+/// @brief WDF EvtIoDeviceControl callback wrapper
+/// @param Queue WDF queue
+/// @param Request WDF request
+/// @param OutputBufferLength Output buffer length
+/// @param InputBufferLength Input buffer length
+/// @param IoControlCode IO control code
+static VOID sa_evt_io_device_control(
+    IN WDFQUEUE Queue,
+    IN WDFREQUEST Request,
+    IN size_t OutputBufferLength,
+    IN size_t InputBufferLength,
+    IN ULONG IoControlCode)
 {
-	NTSTATUS status;
-	PDEVICE_OBJECT DeviceObject = NULL;
-	UNICODE_STRING uniNameString, uniDOSString;
-	
-	RtlInitUnicodeString(&uniNameString, NameBuffer);
-	RtlInitUnicodeString(&uniDOSString, DOSNameBuffer);
-
-    status = IoCreateDevice(DriverObject,			        // DriverObject
-				sizeof(DEVICE_EXTENSION),	// DeviceExtensionSize
-				&uniNameString,			// DeviceName
-				FILE_DEVICE_UNKNOWN,		// DeviceType
-				0,				// DeviceCharacteristics
-				FALSE,				// Must be shared
-				&DeviceObject);			// *DeviceObject
-
-	if(!NT_SUCCESS(status)) 
-	{
-		DRV_ERR("<__RegisterDriver> IoCreateDevice Error!\n");
-		return NULL;
-	}
-
-	status = IoCreateSymbolicLink (&uniDOSString, &uniNameString);
-
-	if (!NT_SUCCESS(status)) 
-	{
-		DRV_ERR("<__RegisterDriver> IoCreateSymbolicLink Error!\n");
-		return NULL;
-	}
-
-	return DeviceObject;
-}
-
-static void __UnregisterDriver(void)
-{
-	UNICODE_STRING uniDOSString;
-	
-	// Delete Symbolic Link
-	RtlInitUnicodeString(&uniDOSString, DOSNameBuffer);
-	IoDeleteSymbolicLink (&uniDOSString);
-}
-
-
-NTSTATUS SecAgent_CreateClose(
-    PDEVICE_OBJECT DeviceObject,
-    PIRP Irp
-)
-// ++
-
-// Routine Description:
-
-//     This device control dispatcher handles create & close IRPs.
-
-// Arguments:
-
-//     DeviceObject - Context for the activity.
-//     Irp          - The device control argument block.
-
-// Return Value:
-
-//     NTSTATUS
-
-// --
-{
-    PIO_STACK_LOCATION irpStack;
-    NTSTATUS            status;
-    PFILE_CONTEXT       fileContext;
-
-    UNREFERENCED_PARAMETER(DeviceObject);
-
+    UNREFERENCED_PARAMETER(Queue);
     PAGED_CODE();
 
-    irpStack = IoGetCurrentIrpStackLocation(Irp);
+    NTSTATUS nt;
+    PVOID out_buf = NULL;
+    size_t out_buf_len = 0;
+    PVOID in_buf = NULL;
+    size_t in_buf_len = 0;
 
-    ASSERT(irpStack->FileObject != NULL);
-
-    switch (irpStack->MajorFunction)
+    // Check: The function must be called at PASSIVE_LEVEL.
+    if (PASSIVE_LEVEL != KeGetCurrentIrql())
     {
-        case IRP_MJ_CREATE:
-            // DbgPrintEx("IRP_MJ_CREATE\n");
-
-            fileContext = ExAllocatePoolQuotaZero(NonPagedPool | POOL_QUOTA_FAIL_INSTEAD_OF_RAISE,
-                                                  sizeof(FILE_CONTEXT),
-                                                  SA_TAG);
-
-            if (NULL == fileContext) {
-                status =  STATUS_INSUFFICIENT_RESOURCES;
-                break;
-            }
-
-            IoInitializeRemoveLock(&fileContext->FileRundownLock, SA_TAG, 0, 0);
-
-            //
-            // Make sure nobody is using the FsContext scratch area.
-            //
-            ASSERT(irpStack->FileObject->FsContext == NULL);
-
-            //
-            // Store the context in the FileObject's scratch area.
-            //
-            irpStack->FileObject->FsContext = (PVOID) fileContext;
-
-            status = STATUS_SUCCESS;
-            break;
-
-        case IRP_MJ_CLOSE:
-            // DbgPrintEx("IRP_MJ_CLOSE\n");
-
-            fileContext = irpStack->FileObject->FsContext;
-
-            ExFreePoolWithTag(fileContext, SA_TAG);
-
-            status = STATUS_SUCCESS;
-            break;
-
-        default:
-            ASSERT(FALSE);  // should never hit this
-            status = STATUS_NOT_IMPLEMENTED;
-            break;
+        DRV_ERR("IOCTL must be called at PASSIVE_LEVEL!\n");
+        return;
     }
 
-    Irp->IoStatus.Status = status;
-    Irp->IoStatus.Information = 0;
-    IoCompleteRequest(Irp, IO_NO_INCREMENT);
-    return status;
+    // METHOD_BUFFERED: both retrieve calls usually return the same SystemBuffer pointer.
+    nt = WdfRequestRetrieveInputBuffer(Request, 0, &in_buf, &in_buf_len);
+    if (!NT_SUCCESS(nt))
+    {
+        WdfRequestComplete(Request, nt);
+        return;
+    }
 
+    nt = WdfRequestRetrieveOutputBuffer(Request, 0, &out_buf, &out_buf_len);
+    if (!NT_SUCCESS(nt))
+    {
+        WdfRequestComplete(Request, nt);
+        return;
+    }
+
+    // Use the framework-provided lengths (InputBufferLength/OutputBufferLength),
+    // but also clamp to retrieved buffer sizes to be safe.
+    size_t in_len = (size_t)min((ULONG_PTR)InputBufferLength, (ULONG_PTR)in_buf_len);
+    size_t out_len = (size_t)min((ULONG_PTR)OutputBufferLength, (ULONG_PTR)out_buf_len);
+    PSA_REQ_CTX ctx = NULL;
+
+    __try {
+        ctx = SaGetReqCtx(Request);  // will be NULL if not allocated
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        ctx = NULL;
+    }
+
+    // For METHOD_BUFFERED we want the single in/out system buffer.
+    // Prefer out_buf (same as in_buf) as the inout buffer.
+    size_t bytes = 0;
+    nt = sa_process_ioctl_buffered(IoControlCode, out_buf, in_len, out_len, &bytes, ctx);
+
+    WdfRequestCompleteWithInformation(Request, nt, bytes);
 }
 
-NTSTATUS SecAgent_Cleanup(
-    PDEVICE_OBJECT DeviceObject,
-    PIRP Irp
-    )
-
-// ++
-
-// Routine Description:
-
-//     This device control dispatcher handles Cleanup IRP.
-
-// Arguments:
-
-//     DeviceObject - Context for the activity.
-//     Irp          - The device control argument block.
-
-// Return Value:
-
-//     NTSTATUS
-
-// --
+/// @brief Driver unload callback: cleanup resources
+/// @param Driver WDF driver handle
+static VOID sa_evt_driver_unload(IN WDFDRIVER Driver)
 {
-    PIO_STACK_LOCATION  irpStack;
-    NTSTATUS            status ;
-    // PNOTIFY_RECORD      notifyRecord;
-    PDEVICE_EXTENSION   deviceExtension;
-    PFILE_CONTEXT       fileContext;
+    PAGED_CODE();
+    UNREFERENCED_PARAMETER(Driver);
 
-    // DRV_INFO("==>EventCleanup\n");
+    // Your cleanup order (same as your WDM version)
+    secagent_fini();
+    win_intr_fini();
 
-    deviceExtension = DeviceObject->DeviceExtension;
-    irpStack = IoGetCurrentIrpStackLocation(Irp);
-
-    ASSERT(irpStack->FileObject != NULL);
-
-    fileContext = irpStack->FileObject->FsContext;
-
-    //
-    // This acquire cannot fail because you cannot get more than one
-    // cleanup for the same handle.
-    //
-    status = IoAcquireRemoveLock(&fileContext->FileRundownLock, Irp);
-    ASSERT(NT_SUCCESS(status));
-
-    //
-    // Wait for all the threads that are currently dispatching to exit and
-    // prevent any threads dispatching I/O on the same handle beyond this point.
-    //
-    IoReleaseRemoveLockAndWait(&fileContext->FileRundownLock, Irp);
-
-    //
-    // Finally complete the cleanup Irp
-    //
-    Irp->IoStatus.Status = status = STATUS_SUCCESS;
-    Irp->IoStatus.Information = 0;
-    IoCompleteRequest(Irp, IO_NO_INCREMENT);
-
-    // DRV_INFO("<== EventCleanup\n");
-    return status;
-
+    // For a control device, deleting the device is OK; framework removes symlink too.
+    if (g_wdf_device != NULL)
+    {
+        WdfObjectDelete(g_wdf_device);
+        g_wdf_device = NULL;
+    }
 }
 
-NTSTATUS DriverUnload(IN PDRIVER_OBJECT DriverObject)
+/// @brief Driver context cleanup callback (WDF cleanup)
+/// @param DriverObject WDF driver object
+static VOID sa_evt_driver_context_cleanup(IN WDFOBJECT DriverObject)
 {
-	PAGED_CODE();
-
-	secagent_fini();
-
-	win_intr_fini();
-	
-    __UnregisterDriver();
-
-	// Delete Device
-	IoDeleteDevice(DriverObject->DeviceObject);
-	return STATUS_SUCCESS;
-}
-
-NTSTATUS DriverEntry(
-    IN PDRIVER_OBJECT DriverObject,
-    IN PUNICODE_STRING RegistryPath
-)
-{
-	PDEVICE_OBJECT DeviceObject = NULL;
-	OSSTATUS status = OS_SUCCESS;
-
-	// UNREFERENCED_PARAMETER(DeviceObject);
-	UNREFERENCED_PARAMETER(status);
-	// UNREFERENCED_PARAMETER(DriverObject);
-	UNREFERENCED_PARAMETER(RegistryPath);
-	PAGED_CODE();
-
-	DeviceObject = __RegisterDriver(DriverObject);
-	if(!DeviceObject)
-		goto err;
-	
-	win_intr_init(DriverObject, DeviceObject);
-	
-	status = secagent_init();
-	if(SA_FAIL(status))
-		goto err;
-
-	DriverObject->MajorFunction[IRP_MJ_CREATE]          = SecAgent_CreateClose;
-    DriverObject->MajorFunction[IRP_MJ_CLOSE]           = SecAgent_CreateClose;
-	DriverObject->MajorFunction[IRP_MJ_CLEANUP]         = SecAgent_Cleanup;
-  	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] 	= HandleIOCTL;
-	DriverObject->DriverUnload 							= DriverUnload;
-
-	return STATUS_SUCCESS;
-
-
-err:
-	// SecAgent still needs to handle IOCTL in this case; e.g., unloading the driver on requests.
-	DriverObject->MajorFunction[IRP_MJ_CREATE]          = SecAgent_CreateClose;
-    DriverObject->MajorFunction[IRP_MJ_CLOSE]           = SecAgent_CreateClose;
-	DriverObject->MajorFunction[IRP_MJ_CLEANUP]         = SecAgent_Cleanup;
-  	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] 	= HandleIOCTL;
-	DriverObject->DriverUnload 							= DriverUnload;
-
-	secagent_mark_not_running();
-
-	// Returning STATUS_SUCCESS allows us to reload the driver, though SecAgent fails in fact.
-	return STATUS_SUCCESS;
-}
-
-
-
-
-
-
-
-/*NTSTATUS DriverUnload(IN PDRIVER_OBJECT DriverObject)
-{
-    UNREFERENCED_PARAMETER(DriverObject);
     PAGED_CODE();
 
-    DbgPrint("Bye World!");
-    //KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Bye World!"));
-
-    return STATUS_SUCCESS;
+    // WPP cleanup (optional)
+    WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)DriverObject));
 }
 
-NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject,
-    IN PUNICODE_STRING RegistryPath)
+/// @brief Create the control device for IOCTL handling (Non-PnP)
+/// @param Driver WDF driver handle
+/// @return NTSTATUS (STATUS_SUCCESS on success, error code on failure)
+static NTSTATUS
+sa_create_control_device(IN WDFDRIVER Driver)
 {
-    PDEVICE_OBJECT DeviceObject = NULL;
-	OSSTATUS status = OS_SUCCESS;
-
-	UNREFERENCED_PARAMETER(DeviceObject);
-	UNREFERENCED_PARAMETER(status);
-	UNREFERENCED_PARAMETER(DriverObject);
-	UNREFERENCED_PARAMETER(RegistryPath);
-	PAGED_CODE();
-
-    DbgPrint("Hello World!");
-    //KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_INFO_LEVEL, "Hello World!"));
-
-    // DriverObject->DriverUnload = DriverUnload;
-	DriverObject->MajorFunction[IRP_MJ_CREATE]          = SecAgent_CreateClose;
-    DriverObject->MajorFunction[IRP_MJ_CLOSE]           = SecAgent_CreateClose;
-	DriverObject->MajorFunction[IRP_MJ_CLEANUP]         = SecAgent_Cleanup;
-  	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] 	= HandleIOCTL;
-	DriverObject->DriverUnload 							= DriverUnload;
-
-    return STATUS_SUCCESS;
-}*/
-
-
-
-
-// // [TODO][Issue 104] When XMHF runs, IoDisconnectInterrupt hangs the Dell 7050 PC but works fine on Qemu
-// #define IRQ_VECTOR 80
-// #define IRQ_LEVEL 2
-
-// BOOLEAN InterruptHandler(IN PKINTERRUPT Interrupt, IN PVOID Context)
-// {
-//     PDEVICE_EXTENSION devExt = (PDEVICE_EXTENSION)Context;
-//     IoRequestDpc(devExt->DeviceObject, NULL, NULL);
-//     return TRUE;
-// }
-
-// VOID DpcRoutine(IN PKDPC Dpc, IN PVOID DeferredContext, IN PVOID SystemArgument1, IN PVOID SystemArgument2)
-// {
-//     // Your bottom half ISR code here
-// }
-
-// NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
-// {
-//     UNREFERENCED_PARAMETER(RegistryPath);
-
-//     NTSTATUS status;
-//     PDEVICE_OBJECT deviceObject;
-//     PDEVICE_EXTENSION devExt;
-
-//     // Create a device object for our driver
-//     status = IoCreateDevice(DriverObject, sizeof(DEVICE_EXTENSION), NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &deviceObject);
-
-//     if (!NT_SUCCESS(status)) {
-// 		DbgPrint("[Superymk] <DriverEntry> 1\n");
-//         return status;
-//     }
-
-//     devExt = (PDEVICE_EXTENSION)deviceObject->DeviceExtension;
-//     devExt->DeviceObject = deviceObject;
-
-
-
-
-// 	KAFFINITY				Affinity;
-
-// 	Affinity = KeQueryActiveProcessors();
-//  	IoInitializeDpcRequest(deviceObject, DpcRoutine);
-
-// 	status = IoConnectInterrupt(&devExt->InterruptObject, 	// InterruptObject
-//   					    InterruptHandler,	   	// ServiceRoutine
-//   					    devExt,		// ServiceContext
-//  					    NULL,			// SpinLock
-// 					    (ULONG)IRQ_VECTOR,		// Vector
-//   					    PASSIVE_LEVEL,			// Irql
-// 						PASSIVE_LEVEL,			// SynchronizeIrql
-// 					    Latched,			// InterruptMode
-//   					    FALSE,			// ShareVector
-// 					    Affinity,	// ProcessorEnableMask
-// 					    FALSE);			// FloatingSave
-
-//   	if (!NT_SUCCESS (status)) 
-//   	{
-// 		DbgPrint("IoConnectInterrupt Failed! intr:%u status:0x%X\n", IRQ_VECTOR, status);
-// 		return status;
-//   	}
-
-// 	DriverObject->DriverUnload 							= DriverUnload;
-
-// 	DbgPrint("[Superymk] <DriverEntry> Succeed!\n");
-
-//     return STATUS_SUCCESS;
-// }
-
-// NTSTATUS DriverUnload(IN PDRIVER_OBJECT DriverObject)
-// {
-//     PDEVICE_EXTENSION devExt = (PDEVICE_EXTENSION)DriverObject->DeviceObject->DeviceExtension;
-
-// 	IoDisconnectInterrupt(devExt->InterruptObject);
-
-//     // Delete the device object
-//     IoDeleteDevice(DriverObject->DeviceObject);
-
-// 	DbgPrint("[Superymk] <DriverUnload> Succeed!\n");
-// 	return STATUS_SUCCESS;
-// }
-// // [TODO][Issue 104] End
-
-
-
-
-
-/*
-static PDEVICE_OBJECT DeviceObject = NULL;
-static intr_t sos_os_intr = INVALID_INTR;
-
-#define AVAIL_INTR_START	(0x20)
-#define AVAIL_INTR_END		(0xF0)
-
-
-VOID _InterruptDpcRoutine(IN PKDPC Dpc, PDEVICE_OBJECT pDeviceObject, IN PIRP Irp, IN PVOID Context);
-_Use_decl_annotations_ BOOLEAN _InterruptIsr(IN PKINTERRUPT Interrupt, IN OUT PVOID Context);
-
-static OSSTATUS _win_intr_register(intr_t intr, bool suppress_err_msg)
-{
-	NTSTATUS status;
-   	PDEVICE_EXTENSION DeviceExtension = DeviceObject->DeviceExtension;
-	KAFFINITY Affinity;
-   	// KIRQL Irql;
-
-	// Check: No double registration of interrupts
-	if(DeviceExtension->InterruptObject)
-	{
-		DbgPrint("<win_intr_register> failed: Double registration!\n");
-		return E_INV_ARG;
-	}
-
-	// Check: <intr> must be in [AVAIL_INTR_START, AVAIL_INTR_END)
- 	if (!VALUE_IN_RANGE(intr, AVAIL_INTR_START, AVAIL_INTR_END)) 
- 	{
-		if(!suppress_err_msg)
-			DbgPrint("<win_intr_register> failed! intr:%u\n", intr);
-		return E_INV_ARG;
- 	}
-
-	Affinity = KeQueryActiveProcessors();
- 	IoInitializeDpcRequest(DeviceObject, _InterruptDpcRoutine);
-
-  	status = IoConnectInterrupt(&DeviceExtension->InterruptObject, 	// InterruptObject
-  					    _InterruptIsr,	   	// ServiceRoutine
-  					    DeviceObject,		// ServiceContext
- 					    NULL,			// SpinLock
-					    (ULONG)intr,		// Vector
-  					    PASSIVE_LEVEL,			// Irql
-						PASSIVE_LEVEL,			// SynchronizeIrql
-					    Latched,			// InterruptMode
-  					    FALSE,			// ShareVector
-					    Affinity,	// ProcessorEnableMask
-					    FALSE);			// FloatingSave
-
-  	if (!NT_SUCCESS (status)) 
-  	{
-		if(!suppress_err_msg)
-			DbgPrint("IoConnectInterrupt Failed! intr:%u status:0x%X\n", intr, status);
-		return E_INTERNAL_ERROR;
-  	}
-
-	DbgPrint("[Superymk] IoConnectInterrupt Succeed! intr:%u status:0x%X, DeviceExtension->InterruptObject:0x%llX\n", 
-		intr, status, (uint64_t)DeviceExtension->InterruptObject);
-
-	return OS_SUCCESS;
-}
-
-static void _win_intr_unregister(intr_t intr)
-{
-	PDEVICE_EXTENSION DeviceExtension = DeviceObject->DeviceExtension;
-
-	UNREFERENCED_PARAMETER(intr);
-
-	// Disconnect Interrupt
-	DbgPrint("[Superymk] <_win_intr_unregister> DeviceExtension->InterruptObject:0x%llX\n", (uint64_t)DeviceExtension->InterruptObject);
-	IoDisconnectInterrupt(DeviceExtension->InterruptObject);
-	DeviceExtension->InterruptObject = NULL;
-}
-
-static OSSTATUS win_sos_os_intr_probe_and_register(void)
-{
-	OSSTATUS status = OS_SUCCESS;
-	intr_t result = INVALID_INTR;
-	bool success = false;
-	uint32_t os_cpu_id = 0;
-
-	if(sos_os_intr != INVALID_INTR)
-	{
-		DbgPrint("Probe SecOS-OS IRQ Error! Double probe without unregistering the previous SecOS-OS interrupt vector\n"); 
-		return E_INV_ARG;
-	}
-
-	// Probe available interrupt vectors
-	FOREACH_S(result, AVAIL_INTR_END, INTR_VECTOR_MAX, AVAIL_INTR_START, 1)
-	{
-		status = _win_intr_register(result, false);
-		if(SA_PASS(status))
-		{
-			// Probe success!
-			success = true;
-			break;
-		}
-	}
-
-	if(!success)
-	{
-		DbgPrint("Probe SecOS-OS IRQ Error!\n"); 
-		return E_INTERNAL_ERROR;
-	}
-
-	// On success
-	sos_os_intr = result;
-
-	// [TODO] currently interrupt handler hardcoded to CPU 3
-	os_cpu_id = 3;
-
-	// if (!__x86_os_cpu_lapic_mapping_find(os_cpu_id, &sos_os_intr_os_lapic_id)) {
-	// 	DbgPrint("Probe SecOS-OS IRQ Error! Cannot find LAPIC ID of the OS's CPU:%u\n", os_cpu_id);
-	// 	return E_INTERNAL_ERROR;
-	// }
-
-	return OS_SUCCESS;
-}
-
-static void win_sos_os_intr_unregister(void)
-{
-    if(sos_os_intr != INVALID_INTR)
-	{
-		_win_intr_unregister(sos_os_intr);
-		sos_os_intr = INVALID_INTR;
-	}
-}
-
-
-
-
-
-
-
-//static PDEVICE_OBJECT DeviceObject = NULL;
-NTSTATUS DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
-{
-    UNREFERENCED_PARAMETER(RegistryPath);
-
-    NTSTATUS status;
-    PDEVICE_OBJECT deviceObject;
-    // PDEVICE_EXTENSION devExt;
-
-    // Create a device object for our driver
-    status = IoCreateDevice(DriverObject, sizeof(DEVICE_EXTENSION), NULL, FILE_DEVICE_UNKNOWN, 0, FALSE, &deviceObject);
-
-    if (!NT_SUCCESS(status)) {
-		DbgPrint("[Superymk] <DriverEntry> 1\n");
-        return status;
+    NTSTATUS nt = STATUS_SUCCESS;
+    PWDFDEVICE_INIT dev_init = NULL;
+    WDF_IO_QUEUE_CONFIG q_cfg;
+    WDF_OBJECT_ATTRIBUTES dev_attrs;
+    WDF_OBJECT_ATTRIBUTES q_attrs;
+    WDFQUEUE queue = NULL;
+
+    PAGED_CODE();
+
+    DECLARE_CONST_UNICODE_STRING(ntDeviceName, SA_NTDEVICE_NAME_STRING);
+    DECLARE_CONST_UNICODE_STRING(symLinkName, SA_SYMBOLIC_NAME_STRING);
+
+    // Allocate init for a control device
+    dev_init = WdfControlDeviceInitAllocate(
+        Driver,
+        &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RW_RES_R);
+    if (dev_init == NULL)
+    {
+        return STATUS_INSUFFICIENT_RESOURCES;
     }
 
-	DeviceObject = deviceObject;
-	{
-		win_sos_os_intr_probe_and_register();
-	}
+    // Register IoInCallerContext callback
+    WdfDeviceInitSetIoInCallerContextCallback(dev_init, sa_evt_io_in_caller_context);
 
+    // Enforce buffered I/O because your IOCTL path expects a SystemBuffer-like buffer.
+    WdfDeviceInitSetIoType(dev_init, WdfDeviceIoBuffered);
 
-	// {
-	// 	// win_intr_init(DriverObject, deviceObject);
+    // Optional: exclusive open
+    // WdfDeviceInitSetExclusive(dev_init, TRUE);
 
-	// 	// Initialize required OS functions
-	// 	// os_init();
+    nt = WdfDeviceInitAssignName(dev_init, &ntDeviceName);
+    if (!NT_SUCCESS(nt))
+    {
+        WdfDeviceInitFree(dev_init);
+        return nt;
+    }
 
-	// 	win_sos_os_intr_probe_and_register(DeviceObject);
-	// }
+    // No FileCreate/FileClose: we do NOT set file object config.
+    // WDF will default-complete create/close/cleanup successfully.
 
-	DriverObject->DriverUnload 							= DriverUnload;
+    // Create device
+    WDF_OBJECT_ATTRIBUTES_INIT(&dev_attrs);
 
-	DbgPrint("[Superymk] <DriverEntry> Succeed!\n");
+    nt = WdfDeviceCreate(&dev_init, &dev_attrs, &g_wdf_device);
+    if (!NT_SUCCESS(nt))
+    {
+        if (dev_init != NULL)
+            WdfDeviceInitFree(dev_init);
+        return nt;
+    }
 
+    // Create symbolic link for user-mode opens
+    nt = WdfDeviceCreateSymbolicLink(g_wdf_device, &symLinkName);
+    if (!NT_SUCCESS(nt))
+    {
+        return nt;
+    }
+
+    // Create default queue (IOCTL-only)
+    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&q_cfg, WdfIoQueueDispatchSequential);
+    q_cfg.EvtIoDeviceControl = sa_evt_io_device_control;
+
+    // Control devices are typically not power-managed
+    q_cfg.PowerManaged = WdfFalse;
+
+    WDF_OBJECT_ATTRIBUTES_INIT(&q_attrs);
+
+    // Ensure IOCTL callback runs at PASSIVE_LEVEL (matches your original assumptions)
+    q_attrs.ExecutionLevel = WdfExecutionLevelPassive;
+
+    nt = WdfIoQueueCreate(g_wdf_device, &q_cfg, &q_attrs, &queue);
+    if (!NT_SUCCESS(nt))
+    {
+        return nt;
+    }
+
+    // Finish initialization so I/O is accepted
+    WdfControlFinishInitializing(g_wdf_device);
     return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverUnload(IN PDRIVER_OBJECT DriverObject)
+// -----------------------
+// DriverEntry
+// -----------------------
+NTSTATUS
+DriverEntry(IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING RegistryPath)
 {
-	{
-		win_sos_os_intr_unregister();
-	}
+    NTSTATUS nt = STATUS_SUCCESS;
+    WDF_DRIVER_CONFIG cfg;
+    WDF_OBJECT_ATTRIBUTES drv_attrs;
+    WDFDRIVER wdf_driver = NULL;
+    PDEVICE_OBJECT wdm_dev_obj = NULL;
+    OSSTATUS st = OS_SUCCESS;
 
-	// {
-	// 	win_sos_os_intr_unregister(DeviceObject);
-	// 	// win_intr_fini();
-	// }
+    PAGED_CODE();
 
-    // Delete the device object
-    IoDeleteDevice(DriverObject->DeviceObject);
+    // Configure as Non-PnP KMDF driver
+    WDF_DRIVER_CONFIG_INIT(&cfg, WDF_NO_EVENT_CALLBACK);
+    cfg.DriverInitFlags |= WdfDriverInitNonPnpDriver;
+    cfg.EvtDriverUnload = sa_evt_driver_unload;
 
-	DbgPrint("[Superymk] <DriverUnload> Succeed!\n");
-	return STATUS_SUCCESS;
+    WDF_OBJECT_ATTRIBUTES_INIT(&drv_attrs);
+    drv_attrs.EvtCleanupCallback = sa_evt_driver_context_cleanup;
+
+    nt = WdfDriverCreate(DriverObject, RegistryPath, &drv_attrs, &cfg, &wdf_driver);
+    if (!NT_SUCCESS(nt))
+    {
+        secagent_mark_not_running();
+        // Keep your legacy behavior if you insist: load succeeds even if init fails
+        return STATUS_SUCCESS;
+    }
+
+    // Start WPP after WdfDriverCreate (matches sample guidance)
+    WPP_INIT_TRACING(DriverObject, RegistryPath);
+
+    // 1) Create WDF control device
+    nt = sa_create_control_device(wdf_driver);
+    if (!NT_SUCCESS(nt))
+    {
+        secagent_mark_not_running();
+        return STATUS_SUCCESS; // legacy behavior
+    }
+
+    // 2) Initialize interrupts + SecAgent core AFTER WDF device exists
+    //    (this matches your requirement ordering)
+    wdm_dev_obj = WdfDeviceWdmGetDeviceObject(g_wdf_device);
+    win_intr_init(DriverObject, wdm_dev_obj, &g_wdf_device);
+
+    st = secagent_init();
+    if (SA_FAIL(st))
+    {
+        // Keep device alive so IOCTLs can still be used (e.g., unload command).
+        secagent_mark_not_running();
+        return STATUS_SUCCESS; // legacy behavior
+    }
+
+    return STATUS_SUCCESS;
 }
-*/

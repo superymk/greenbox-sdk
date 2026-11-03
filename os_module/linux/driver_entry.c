@@ -26,16 +26,17 @@ static struct class *driver_class;
 static dev_t tz_client_device_number;
 static struct cdev tz_client_cdev;
 
+/// @brief Handle IOCTL for SecAgent client
+/// @param file File pointer
+/// @param cmd IOCTL command
+/// @param arg IOCTL argument
+/// @return OSSTATUS on success, error code on failure
 static long tz_client_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
     OSSTATUS status = EINVAL;
 	int copy_retval = 1;
     void *argp = (void __user *) arg;
     struct tz_cmd_packet *cmd_packet = NULL;
-
-    // Check: <argp> must be a valid pointer
-    if(!argp)
-        return EINVAL;
 
     cmd_packet = (struct tz_cmd_packet*) os->mm_malloc_zeroed(sizeof(struct tz_cmd_packet));
     if(!cmd_packet){
@@ -69,11 +70,19 @@ finish:
     return status;
 }
 
+/// @brief Open SecAgent client device
+/// @param inode Inode
+/// @param file File pointer
+/// @return 0 on success
 static int tz_client_open(struct inode *inode, struct file *file)
 {
     return 0;
 }
 
+/// @brief Release SecAgent client device
+/// @param inode Inode
+/// @param file File pointer
+/// @return 0 on success
 static int tz_client_release(struct inode *inode, struct file *file)
 {
     return 0;
@@ -86,6 +95,8 @@ static int tz_client_release(struct inode *inode, struct file *file)
     .release = tz_client_release
  };
 
+/// @brief Initialize SecAgent client device
+/// @return 0 on success, error code on failure
 static int tz_client_init(void)
 {
     int ret_code = 0;
@@ -146,6 +157,7 @@ alloc_chrdev_region_err:
     return ret_code;
 }
 
+/// @brief Finalize SecAgent client device
 static void tz_client_exit(void)
 {
 	secagent_fini();

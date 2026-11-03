@@ -454,6 +454,7 @@ void RDGUIMain::rd_proc_init(void)
     // set up the process
     _rd_proc = new QProcess(this);
 
+#ifdef Q_OS_WIN
     // tell CreateProcess to hide the console window
     _rd_proc->setCreateProcessArgumentsModifier(
         [](QProcess::CreateProcessArguments *args)
@@ -465,6 +466,11 @@ void RDGUIMain::rd_proc_init(void)
             // args->startupInfo->dwFlags    |= STARTF_USESHOWWINDOW;
             // args->startupInfo->wShowWindow = SW_HIDE;
         });
+#else
+    // Linux/macOS/etc.
+    // Keep channels separate, or merge them if you prefer:
+    _rd_proc->setProcessChannelMode(QProcess::MergedChannels);
+#endif
 }
 
 void RDGUIMain::rd_proc_fini(void)

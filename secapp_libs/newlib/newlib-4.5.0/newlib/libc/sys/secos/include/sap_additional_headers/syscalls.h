@@ -325,8 +325,11 @@ extern VKSTATUS sos_sys_platform_get_nonsensitive_info(SECBASE_PLATFORM_NONSENSI
 
 
 /********* Syscalls - System quirks *********/
+
+#ifdef GREENBOX_USE_UXMHF64_V1
 //// [TODO] These quirks should be fixed in the future
 extern VKSTATUS sos_sys_quirks_get_info(SECOS_QUIRKS_INFO* out_info);
+#endif // GREENBOX_USE_UXMHF64_V1
 
 #endif // __ASSEMBLY__
 #endif // PAL_GLIBC_SYSCALL_H

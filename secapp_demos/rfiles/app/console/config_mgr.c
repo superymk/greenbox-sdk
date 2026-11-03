@@ -194,17 +194,32 @@ static SL_STATUS _cfg_parse_local_fs(cJSON *root_json, SAP_CONFIG *out_cfg)
         return SL_EINVAL;
 
     {
+        node_json = cJSON_GetObjectItemCaseSensitive(info_top_json, "certs_filepath");
+
+        if (cJSON_IsString(node_json))
+        {
+            strncpy(out_cfg->fs_local_info.certs_filepath, node_json->valuestring, RFILES_DIR_FILEPATH_MAXLEN);
+            out_cfg->fs_local_info.certs_filepath[RFILES_DIR_FILEPATH_MAXLEN - 1] = '\0';
+        }
+        else
+        {
+            memset(out_cfg->fs_local_info.certs_filepath, 0, RFILES_DIR_FILEPATH_MAXLEN);
+            out_cfg->fs_local_info.certs_filepath[RFILES_DIR_FILEPATH_MAXLEN - 1] = '\0';
+        }
+    }
+
+    {
         node_json = cJSON_GetObjectItemCaseSensitive(info_top_json, "home_dir");
 
         if (cJSON_IsString(node_json))
         {
-            strncpy(out_cfg->fs_local_info.home_dir, node_json->valuestring, RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN);
-            out_cfg->fs_local_info.home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN] = '\0';
+            strncpy(out_cfg->fs_local_info.home_dir, node_json->valuestring, RFILES_DIR_FILEPATH_MAXLEN);
+            out_cfg->fs_local_info.home_dir[RFILES_DIR_FILEPATH_MAXLEN - 1] = '\0';
         }
         else
         {
-            memset(out_cfg->fs_local_info.home_dir, 0, RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN);
-            out_cfg->fs_local_info.home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN] = '\0';
+            memset(out_cfg->fs_local_info.home_dir, 0, RFILES_DIR_FILEPATH_MAXLEN);
+            out_cfg->fs_local_info.home_dir[RFILES_DIR_FILEPATH_MAXLEN - 1] = '\0';
         }
     }
 

@@ -131,8 +131,10 @@ size_t handle_libc_function(struct libc_msg *msg, bool *out_valid_msg)
 /********* Debug Functions *********/
 void _libc_backend_dbg_print_cmd(uint32_t cmd)
 {
-    if ((cmd != CMD_FILE_READ) 
-        && (cmd != CMD_FILE_SELECT) && (cmd != CMD_FILE_POLL)
+    if (
+        (cmd != CMD_FILE_READ) && 
+        (cmd != CMD_FILE_SELECT) && 
+        (cmd != CMD_FILE_POLL)
     )
     {
         APP_DEBUG("[Superymk] <handle_libc_function> msg->cmd:%u\n", (cmd));

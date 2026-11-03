@@ -1,12 +1,19 @@
 {
 	"folders": [
 		{
-			"path": "code/os_module"
+			"name": "os_module",
+			"path": "os_module"
 		}
-    ],
+	],
 	"settings": {
 		"files.associations": {
-			"functional": "c"
+			"win_intr.h": "c",
+			"win_cpu.h": "c",
+			"sa_headers.h": "c",
+			"compilers.h": "c",
+			"*.c_old": "c",
+			"os_types.h": "c",
+			"driver_entry.h": "c"
 		}
 	}
 }

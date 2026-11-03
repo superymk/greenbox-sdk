@@ -4,6 +4,23 @@
 
 #include <sa_headers.h>
 
+#ifndef GREENBOX_USE_UXMHF64_V1
+OSSTATUS do_CMD_SECBASE_BOOT_TINYOS(struct tz_cmd_packet *cmd_packet)
+{
+    ulong_t ret = 0;
+
+	UNUSED(cmd_packet);
+	
+    ret = os->hypercall_0arg(NS_HC_BOOT_TINYOS);
+    if (ret)
+    {
+        DRV_ERR("Failed to boot TinyOS!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    return OS_SUCCESS;
+}
+#endif // !GREENBOX_USE_UXMHF64_V1
 
 OSSTATUS do_CMD_SECBASE_INIT_ONDEMAND_PER_CPU(struct tz_cmd_packet *cmd_packet)
 {

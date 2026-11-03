@@ -109,7 +109,7 @@ typedef struct
 } wnd_list_t;
 
 /// @brief LVGL filepath of the home folder of the local computer.
-static char _lv_fs_local_home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN] = {0};
+static char _lv_fs_local_home_dir[RFILES_DIR_FILEPATH_MAXLEN] = {0};
 
 /* --------------------------- Forward decls -------------------------------- */
 static void set_status(wnd_list_t *w, const char *fmt, ...);
@@ -802,7 +802,7 @@ static void on_upload_clicked(lv_event_t *e)
     {
         lv_bar_set_value(w->status_bar, 0, LV_ANIM_OFF);
         set_status(w, "Upload failed.");
-        _msgbox_show_info("Upload Failed", "File size >= 4MB or connection error!");
+        _msgbox_show_info("Upload Failed", "File size >= 64MB or connection error!");
     }
 }
 
@@ -830,13 +830,15 @@ static void on_download_clicked(lv_event_t *e)
     }
 
     const gdrive_entry_t *einfo = &w->cache[w->sel_row - 2];
-    set_status(w, "Downloading %s ...", einfo->name ? einfo->name : "(item)");
+    char* rfile_name = einfo->name ? einfo->name : "(item)";
+
+    set_status(w, "Downloading %s ...", rfile_name);
     lv_bar_set_value(w->status_bar, 10, LV_ANIM_OFF);
 
     if (gdrive_download_to(einfo->id, local_dir) == 0)
     {
         lv_bar_set_value(w->status_bar, 100, LV_ANIM_OFF);
-        set_status(w, "Saved to %s", local_dir);
+        set_status(w, "Saved %s to %s", rfile_name, local_dir);
 
         // Refresh file explorer of the local files.
         refresh_local_fe(w);
@@ -1067,7 +1069,8 @@ SAP_STATUS wnd_rfiles_list_init_cfgs(SAP_CONFIG* sap_cfg)
     if (!sap_cfg)
         return EINVAL;
 
-    _fs_abs_path_to_lvgl_abs_path(_lv_fs_local_home_dir, sap_cfg->fs_local_info.home_dir, RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN);
+    // Initialize LVGL file system paths.
+    _fs_abs_path_to_lvgl_abs_path(_lv_fs_local_home_dir, sap_cfg->fs_local_info.home_dir, RFILES_DIR_FILEPATH_MAXLEN);
 
     // On success
     return SUCCESS;

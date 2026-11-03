@@ -20,8 +20,15 @@
 #include "../gloss/_libc_cmds.h"
 #include "../gloss/_libc_ops.h"
 
+extern void _do_sp_exit(SP_UTASK *sp_params);
+
 void _exit(int status)
 {
+	sp_mm_fini();
+
+	pal_mm_destroy_pool();
+	libc_fini();
+	
     sos_sys_sp_exit((SAP_STATUS)status);
 }
 

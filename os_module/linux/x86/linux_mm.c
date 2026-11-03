@@ -44,7 +44,9 @@ void linux_mm_free(void* ptr)
 	kfree(ptr);
 }
 
-// Return the upper value of integer N, where N = log2(value)
+/// @brief Return the upper value of integer N, where N = log2(value)
+/// @param value Input value
+/// @return Upper log2 value
 static uint32_t upper_order_base2(uint32_t value)
 {
 	uint32_t result = 0;
@@ -219,67 +221,40 @@ void linux_mm_fence(void)
 	__asm__ __volatile__("mfence": : :"memory");
 }
 
-/* Compat shims for v4/v5 kernels that don't have mmap_*_lock helpers */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,8,0)
-# define mmap_read_lock(mm)        down_read(&(mm)->mmap_sem)
-# define mmap_read_unlock(mm)      up_read(&(mm)->mmap_sem)
-# define mmap_write_lock(mm)       down_write(&(mm)->mmap_sem)
-# define mmap_write_unlock(mm)     up_write(&(mm)->mmap_sem)
-#endif
-
-// Returns OS_SUCCESS and sets *out_allowed_read_write = true iff EVERY byte in [uvaddr, uvaddr+size) is RW
-OSSTATUS linux_mm_check_current_process_page_permission(unsigned long uvaddr,
-                                                        size_t size,
-                                                        bool *out_allowed_read_write)
+OSSTATUS linux_mm_check_current_process_page_permission(ulong_t uvaddr, size_t size, bool* out_allowed_read_write)
 {
-    struct mm_struct *mm;
+	ulong_t offset = 0;
+	struct task_struct *task = current;   // Current process's task_struct
+    struct mm_struct *mm = task->mm;
     struct vm_area_struct *vma;
-    unsigned long start, end;
-    bool ok = false;
 
-    if (!size || !out_allowed_read_write)
-        return E_INV_ARG;
-    if (uvaddr + size < uvaddr) // overflow 
-        return E_INV_ARG;
+	// Check: parameters must be valid
+	if(!uvaddr || !size || !out_allowed_read_write)
+		return E_INV_ARG;
 
-    *out_allowed_read_write = false;
+	if (size > 0xFFFFFFFFu)
+		return E_INV_ARG;
 
-    mm = get_task_mm(current);      // current->mm may be NULL for kthreads
-    if (!mm)
-        return E_INV_ARG;
+	for(offset = 0; offset < size; offset += PAGE_SIZE)
+	{
+		ulong_t cur_uvaddr_aligned = (uvaddr + offset) & PAGE_MASK;
 
-    start = uvaddr;
-    end   = uvaddr + size;
+		// Find the VM area that contains the virtual address
+		vma = find_vma(mm, cur_uvaddr_aligned);
+		if (vma && cur_uvaddr_aligned >= vma->vm_start && cur_uvaddr_aligned < vma->vm_end) 
+		{
+			// Check read and write permissions from the VMA
+			if (!(vma->vm_flags & (VM_READ | VM_WRITE)))
+			{
+				// If found a page that the current process does not have RW permission, then set <out_allowed_read_write> 
+				// to be false and return.
+				*out_allowed_read_write = false;
+				return OS_SUCCESS;
+			}
+		}
+	}
 
-    mmap_read_lock(mm);
-
-    // First VMA that intersects or follows 'start'
-    vma = find_vma(mm, start);
-    if (!vma || vma->vm_start > start)         // hole before first VMA
-        goto out_unlock;
-
-    while (start < end) {
-        // Require effective permissions now (not MAY*): both READ and WRITE
-        if (!(vma->vm_flags & VM_READ) || !(vma->vm_flags & VM_WRITE))
-            goto out_unlock;
-
-        // Consume up to the end of this VMA (or end of the requested range)
-        start = min(vma->vm_end, end);
-
-        if (start < end) {
-            // Need a VMA beginning exactly at 'start'; any gap => not allowed
-            vma = find_vma(mm, start);
-            if (!vma || vma->vm_start > start)
-                goto out_unlock;
-        }
-    }
-
-    ok = true;
-
-out_unlock:
-    mmap_read_unlock(mm);
-    mmput(mm);
-
-    *out_allowed_read_write = ok;
-    return OS_SUCCESS;
+	// The current process has RW permission to all the memory [uvaddr, uvaddr + size)
+	*out_allowed_read_write = true;
+	return OS_SUCCESS;
 }

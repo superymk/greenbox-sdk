@@ -47,11 +47,21 @@ struct comm_os_channel
 	msg_id_t		next_msg_id;
 };
 
+/// @brief Initialize SecOS-OS communication channel
+/// @param os_send_ctl Send control block vaddr
+/// @param os_send_buf Send buffer vaddr
+/// @param os_recv_ctl Receive control block vaddr
+/// @param os_recv_buf Receive buffer vaddr
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS comm_sos_init(vaddr_t os_send_ctl, vaddr_t os_send_buf, vaddr_t os_recv_ctl, vaddr_t os_recv_buf);
 
+/// @brief Finalize SecOS-OS communication channel
 extern void comm_sos_fini(void);
 
-extern OSSTATUS comm_sos_handle_queued_msgs(void);
+/// @brief Handle queued messages from SecOS
+/// @param out_has_reqs [Optional] Set to true if received SecOS requests
+/// @return OS_SUCCESS on success, error code on failure
+extern OSSTATUS comm_sos_handle_queued_msgs(bool* out_has_reqs);
 
 typedef enum 
 {
@@ -59,18 +69,25 @@ typedef enum
 	MSG_TO_SECAPP
 } COMM_REQ_DEST;
 
-/// @brief Send a message to the SecOS, but does not wait on response
-///
-/// This function also triggers the SecOS to handle the message
-/// @return Return OS_SUCCESS on success
+/// @brief Send a message to the SecOS without waiting for response
+/// [NOTE] This function also triggers the SecOS to handle the message
+/// @param msg Message to send
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS comm_sos_send_msg_nowait(struct comm_os_msg* msg);
 
-/// @brief Send a message to the SecOS and block wait on response for milliseconds <ms>.
-///
-/// This function also triggers the SecOS to handle the message
+/// @brief Send a message to the SecOS and wait for response
+/// [NOTE] This function also triggers the SecOS to handle the message
+/// @param request Request message
+/// @param response Response message
+/// @param ms Timeout in milliseconds
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg* request, struct comm_os_msg* response, uint32_t ms);
 
-/// @brief Prepare the header of a <struct comm_os_msg> message
+/// @brief Prepare the header of a comm_os_msg message
+/// @param msg Message to prepare
+/// @param req_response Whether response is required
+/// @param dest_id Destination ID
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS comm_sos_prepare_request(struct comm_os_msg* msg, bool req_response,  uint32_t dest_id);
 
 #endif // __ASSEMBLY__

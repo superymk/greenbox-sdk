@@ -33,7 +33,7 @@ __attribute__((unused)) static int _secapp_init_resc(struct sp_resc* resc)
     strncpy(resc->filepath, apploader_get_exe_directory(), MAX_PATH_LEN);
     strcat(resc->filepath, "rfiles.sap");
 	resc->dma_size = 0;
-	resc->heap_size = MB(64);
+	resc->heap_size = MB(16);
 	resc->shared_mem_size = MB(2);
 	
 	resc->alloc_sp_app_comm = true;

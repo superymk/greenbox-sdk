@@ -31,12 +31,12 @@ static uint32_t os_oa_cntr;
 static uint32_t os_fbc_cntr;
 static uint32_t os_vga_cntr;
 
+/// @brief Pause Intel Gen9 GPU and save state
+/// @param i965_gpu GPU private info
+/// @param gpu_regs GPU MMIO base
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_pause(struct intel_gpu_intl *i965_gpu, vaddr_t gpu_regs)
 {
-    // Sanity checks
-    if (!gpu_regs)
-        return E_INV_ARG;
-
     // Backup OS's GPU register contents
     os_gpu_render_rb_ctl = gpu_read_reg(gpu_regs, RING_CTL(RENDER_RING_BASE));
     os_gpu_vcs0_rb_ctl = gpu_read_reg(gpu_regs, RING_CTL(VIDEO_CS0_RING_BASE));
@@ -101,12 +101,12 @@ static OSSTATUS _gpu_pause(struct intel_gpu_intl *i965_gpu, vaddr_t gpu_regs)
     return OS_SUCCESS;
 }
 
+/// @brief Resume Intel Gen9 GPU and restore state
+/// @param i965_gpu GPU private info
+/// @param gpu_regs GPU MMIO base
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _gpu_resume(struct intel_gpu_intl *i965_gpu, vaddr_t gpu_regs)
 {
-    // Sanity checks
-    if (!gpu_regs)
-        return E_INV_ARG;
-
     // Resume GPU
     //// Resume ring buffers
     gpu_write_reg(gpu_regs, RING_CTL(RENDER_RING_BASE), os_gpu_render_rb_ctl);
@@ -213,6 +213,9 @@ extern OSSTATUS i965_gen9_gpu_resume(struct gpu_pdev *gpu)
 }
 
 /********* Debug Functions *********/
+/// @brief Dump GPU registers for debug
+/// @param gpu_regs GPU MMIO base
+/// @param prefix Log prefix
 static void _gpu_regs_dump(vaddr_t gpu_regs, char *prefix)
 {
     DRV_DEBUG("%s\n", prefix);

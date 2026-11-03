@@ -17,8 +17,7 @@ ifeq ($(OS), windows_msys2)
 endif
  
 .PHONY: all
-# all: console ui FORCE
-all: console FORCE
+all: console ui FORCE
 	
 .PHONY: console
 console: 

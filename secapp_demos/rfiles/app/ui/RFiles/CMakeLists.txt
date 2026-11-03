@@ -16,9 +16,9 @@ set(TS_FILES RFiles_en_US.ts)
 
 set(PROJECT_SOURCES
         main.cpp
-        rdgui_main.cpp
-        rdgui_main.h
-        rdgui_main.ui
+        rfgui_main.cpp
+        rfgui_main.h
+        rfgui_main.ui
         ${TS_FILES}
 )
 

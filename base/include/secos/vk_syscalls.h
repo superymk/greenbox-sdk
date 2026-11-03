@@ -3,7 +3,7 @@
 // Author: Virgil Gligor (Carnegie Mellon University)
 
 /*
- * Public API Header — Limited License
+ * Public API Header - Limited License
  * Copyright (c) 2021 - 2026 Miao Yu, Virgil Gligor
  *
  * Permission is granted to use, copy, and redistribute this header file
@@ -63,24 +63,6 @@
 #define SYS_SP_ACK_MHV_EVENT							10
 // #define SYS_MEMOBJ_MEDIATE_ACCESS						13 // [TODO] need it?
 #define SYS_SP_YIELD_CPU								12
-
-/// @brief Enable SecProcess scheduling on the current CPU
-/// [NOTE] All SecProcesses are allowed to invoke this system call, because even SecApps (not just SecServices) could have
-/// critical sections. For example, when SecApp A calls SecApp B, B needs to disable scheduling first, or A may be 
-/// scheduled before B finishes its service and causes B or A crashes.
-///
-/// @return Return SUCCESS on success. 
-///         Return EINVAL if the current CPU structure cannot be found
-#define SYS_SP_SCHEDULING_ENABLE						14
-
-/// @brief Disable SecProcess scheduling on the current CPU
-/// [NOTE] All SecProcesses are allowed to invoke this system call, because even SecApps (not just SecServices) could have
-/// critical sections. For example, when SecApp A calls SecApp B, B needs to disable scheduling first, or A may be 
-/// scheduled before B finishes its service and causes B or A crashes.
-///
-/// @return Return SUCCESS on success. 
-///         Return EINVAL if the current CPU structure cannot be found
-#define SYS_SP_SCHEDULING_DISABLE						15
 
 /// @brief Notify SecOS about the SECSRV-INIT's initialization status.
 /// @param arg1 TRUE if SECSRV-INIT is intialized successfully. Otherwise false.
@@ -521,6 +503,10 @@
 
 
 /********* Syscalls - IOMMU *********/
+/// @brief Return true iff the IOMMU is available to GreenBox.
+/// @return Return true iff the IOMMU is available to GreenBox.
+#define SYS_IOMMU_IS_OWNED							2200
+
 /// @brief Create an empty IOMMU page table for devices exclusively owned by the secure domain.
 /// This page table translates paddrs in the secure domain to spaddrs to ease the implementation of drivers in secure 
 /// domain
@@ -590,9 +576,10 @@
 
 
 /********* Syscalls - System quirks *********/
+#ifdef GREENBOX_USE_UXMHF64_V1
 //// [TODO] These quirks should be fixed in the future
 #define SYS_QUIRKS_GET_INFO								4800
-
+#endif // GREENBOX_USE_UXMHF64_V1
 
 
 

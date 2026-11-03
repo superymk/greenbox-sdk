@@ -287,26 +287,7 @@ void lv_roller_get_selected_str(const lv_obj_t * obj, char * buf, uint32_t buf_s
     LV_ASSERT_OBJ(obj, MY_CLASS);
 
     lv_roller_t * roller = (lv_roller_t *)obj;
-    lv_obj_t * label = get_label(obj);
-    uint32_t i;
-    uint32_t line        = 0;
-    const char * opt_txt = lv_label_get_text(label);
-    size_t txt_len     = lv_strlen(opt_txt);
-
-    for(i = 0; i < txt_len && line != roller->sel_opt_id; i++) {
-        if(opt_txt[i] == '\n') line++;
-    }
-
-    uint32_t c;
-    for(c = 0; i < txt_len && opt_txt[i] != '\n'; c++, i++) {
-        if(buf_size && c >= buf_size - 1) {
-            LV_LOG_WARN("the buffer was too small");
-            break;
-        }
-        buf[c] = opt_txt[i];
-    }
-
-    buf[c] = '\0';
+    lv_roller_get_option_str(obj, roller->sel_opt_id, buf, buf_size);
 }
 
 /**
@@ -352,6 +333,37 @@ lv_observer_t * lv_roller_bind_value(lv_obj_t * obj, lv_subject_t * subject)
     return observer;
 }
 #endif /*LV_USE_OBSERVER*/
+
+lv_result_t lv_roller_get_option_str(const lv_obj_t * obj, uint32_t option, char * buf, uint32_t buf_size)
+{
+    LV_ASSERT_OBJ(obj, MY_CLASS);
+
+    lv_obj_t * label = get_label(obj);
+    uint32_t i;
+    uint32_t line        = 0;
+    const char * opt_txt = lv_label_get_text(label);
+    size_t txt_len     = lv_strlen(opt_txt);
+
+    for(i = 0; i < txt_len && line != option; i++) {
+        if(opt_txt[i] == '\n') line++;
+    }
+
+    if(line != option) {
+        return LV_RESULT_INVALID;
+    }
+
+    uint32_t c;
+    for(c = 0; i < txt_len && opt_txt[i] != '\n'; c++, i++) {
+        if(buf_size && c >= buf_size - 1) {
+            LV_LOG_WARN("the buffer was too small");
+            break;
+        }
+        buf[c] = opt_txt[i];
+    }
+
+    buf[c] = '\0';
+    return LV_RESULT_OK;
+}
 
 /**********************
  *   STATIC FUNCTIONS
@@ -581,7 +593,7 @@ static void draw_main(lv_event_t * e)
 
             /*Get the size of the "selected text"*/
             lv_point_t label_sel_size;
-            lv_text_get_size(&label_sel_size, lv_label_get_text(label), label_dsc.font, &attributes);
+            lv_text_get_size_attributes(&label_sel_size, lv_label_get_text(label), label_dsc.font, &attributes);
 
             /*Move the selected label proportionally with the background label*/
             int32_t roller_h = lv_obj_get_height(obj);
@@ -896,7 +908,7 @@ static int32_t get_selected_label_width(const lv_obj_t * obj)
 
     const char * txt = lv_label_get_text(label);
     lv_point_t size;
-    lv_text_get_size(&size, txt, font, &attributes);
+    lv_text_get_size_attributes(&size, txt, font, &attributes);
     return size.x;
 }
 

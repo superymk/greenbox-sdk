@@ -4,15 +4,7 @@
 
 #include <sa_headers.h>
 
-/// @brief Init the boot params of SecOS
 static OSSTATUS _sparams_init_sos_boot_params(struct sos_boot_params *boot_params);
-
-/// @brief Add memory sections to be registered in SecBase. These memory regions will be moved to the Secure Domain soon.
-/// @param scode_info
-/// @param type
-/// @param start_addr
-/// @param len
-/// @param dest_gpaddr
 static void sb_mem_sections_add(
     struct hv_reg_sections *scode_info,
     int type,
@@ -34,7 +26,8 @@ static vaddr_t sos_params_start_va = INVALID_VADDR;
 
 OSSTATUS sparams_build_sos_initdata(struct sos_sect_addrs *in_sos_addrs)
 {
-    vaddr_t init_pt_base, vaddr;
+    vaddr_t init_pt_base = INVALID_VADDR;
+    vaddr_t vaddr = INVALID_VADDR;
 
     uint32_t sos_initdata_pages = SOS_INITDATA_SIZE / PAGE_SIZE_4K;
     sos_initdata_vaddr = os->mm_alloc_pages(sos_initdata_pages, ALLOC_ORDINARY_MEMORY);
@@ -71,12 +64,12 @@ OSSTATUS sparams_build_sos_initdata(struct sos_sect_addrs *in_sos_addrs)
 
 OSSTATUS sparams_build_sos_initdata(struct sos_sect_addrs *in_sos_addrs)
 {
-    vaddr_t init_pt_base;
-    vaddr_t pdp_base;
-    vaddr_t pd_base;
-    uint64_t offset_last_1g_mem;
+    vaddr_t init_pt_base = INVALID_VADDR;
+    vaddr_t pdp_base = INVALID_VADDR;
+    vaddr_t pd_base = INVALID_VADDR;
+    uint64_t offset_last_1g_mem = 0;
 
-    uint32_t sos_initdata_pages;
+    uint32_t sos_initdata_pages = 0;
 
     // Check: SOS_KERN_BASE must be the last 1GB of the vaddr space. Otherwise, the following setup of init page table
     // is incorrect.
@@ -171,12 +164,18 @@ OSSTATUS sparams_build_sos_params(struct sos_sect_addrs *in_sos_addrs)
     status = _sparams_init_sos_boot_params(&boot_params);
     if (SA_FAIL(status))
     {
-        DRV_ERR("Initialize SecOS's boot params error! status:%lu\n", status);
+        DRV_ERR("SecOS Parameters: Initialize SecOS's boot params error! status:%lu\n", status);
         return E_INTERNAL_ERROR;
     }
 
     //// Register the memory region of SecOS parameters
     sos_params_start_va = os->mm_alloc_pages(sos_param_pages, ALLOC_ORDINARY_MEMORY);
+    if (sos_params_start_va == INVALID_VADDR)
+    {
+        DRV_ERR("SecOS Parameters: Allocate SecOS's params error!\n");
+        return E_NO_MEM;
+    }
+
     in_sos_addrs->param_start = sos_params_start_va;
     in_sos_addrs->param_end = in_sos_addrs->param_start + SOS_PARAM_PAGE_SIZE;
     in_sos_addrs->param_dest_gpa = K_VIRT_TO_PHYS(SOS_PARAM_PAGE_BASE);
@@ -289,16 +288,26 @@ void sparams_print_sos_segments(struct sos_sect_addrs *sos_sect_addrs)
 
 void hv_reg_secos_sections(struct hv_reg_sections *scode_info, struct sos_sect_addrs *in_sos_addrs)
 {
-    vaddr_t sos_image_start, sos_image_end;
-    vaddr_t sos_initdata_start, sos_initdata_end;
-    vaddr_t sos_mempool_end, sos_mempool_start;
-    vaddr_t sos_sharemem_end, sos_sharemem_start;
-    vaddr_t param_start, param_end;
-    vaddr_t sos_signature_start, sos_signature_end;
-    vaddr_t comm_os_rx_chanbuf_va, comm_os_rx_chanbuf_va_end;
-    vaddr_t comm_os_rx_chanctl_va, comm_os_rx_chanctl_va_end;
-    vaddr_t comm_os_tx_chanbuf_va, comm_os_tx_chanbuf_va_end;
-    vaddr_t comm_os_tx_chanctl_va, comm_os_tx_chanctl_va_end;
+    vaddr_t sos_image_start = INVALID_VADDR;
+    vaddr_t sos_image_end = INVALID_VADDR;
+    vaddr_t sos_initdata_start = INVALID_VADDR;
+    vaddr_t sos_initdata_end = INVALID_VADDR;
+    vaddr_t sos_mempool_end = INVALID_VADDR;
+    vaddr_t sos_mempool_start = INVALID_VADDR;
+    vaddr_t sos_sharemem_end = INVALID_VADDR;
+    vaddr_t sos_sharemem_start = INVALID_VADDR;
+    vaddr_t param_start = INVALID_VADDR;
+    vaddr_t param_end = INVALID_VADDR;
+    vaddr_t sos_signature_start = INVALID_VADDR;
+    vaddr_t sos_signature_end = INVALID_VADDR;
+    vaddr_t comm_os_rx_chanbuf_va = INVALID_VADDR;
+    vaddr_t comm_os_rx_chanbuf_va_end = INVALID_VADDR;
+    vaddr_t comm_os_rx_chanctl_va = INVALID_VADDR;
+    vaddr_t comm_os_rx_chanctl_va_end = INVALID_VADDR;
+    vaddr_t comm_os_tx_chanbuf_va = INVALID_VADDR;
+    vaddr_t comm_os_tx_chanbuf_va_end = INVALID_VADDR;
+    vaddr_t comm_os_tx_chanctl_va = INVALID_VADDR;
+    vaddr_t comm_os_tx_chanctl_va_end = INVALID_VADDR;
 
     scode_info->num_sections = 0;
 
@@ -400,7 +409,6 @@ void hv_reg_secos_sections(struct hv_reg_sections *scode_info, struct sos_sect_a
     }
 }
 
-//! Debug function - Dump <scode_info>
 void hv_dump_sos_sections(struct hv_reg_sections *scode_info)
 {
     uint32_t i = 0;
@@ -414,7 +422,9 @@ void hv_dump_sos_sections(struct hv_reg_sections *scode_info)
 }
 
 /********* Private Functions *********/
-//! @brief Init the boot params of SecOS
+/// @brief Init the boot params of SecOS
+/// @param boot_params Boot params to initialize
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _sparams_init_sos_boot_params(struct sos_boot_params *boot_params)
 {
     boot_params->vk_comm_intr = vk_manifest.ipc_vector;
@@ -431,6 +441,12 @@ static OSSTATUS _sparams_init_sos_boot_params(struct sos_boot_params *boot_param
     return OS_SUCCESS;
 }
 
+/// @brief Add memory sections to be registered in SecBase
+/// @param scode_info Section list
+/// @param type Section type
+/// @param start_addr Section start
+/// @param len Section length in bytes
+/// @param dest_gpaddr Destination GPA
 static void sb_mem_sections_add(struct hv_reg_sections *scode_info,
                                 int type,
                                 vaddr_t start_addr, size_t len, paddr_t dest_gpaddr)
@@ -450,6 +466,10 @@ static void sb_mem_sections_add(struct hv_reg_sections *scode_info,
     scode_info->num_sections++;
 }
 
+/// @brief Calculate pointer difference
+/// @param end End address
+/// @param start Start address
+/// @return Difference in bytes
 static size_t tv_ptr_diff(vaddr_t end, vaddr_t start)
 {
     return end - start;

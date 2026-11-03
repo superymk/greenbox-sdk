@@ -37,6 +37,7 @@ secagent-objs := \
 ../common/sos_sp_params.o \
 ../common/sos.o \
 ../common/stl_dlist.o \
+../common/tos.o \
 ../common/untrusted_loader_info.o \
 ../common/untrusted_loader_utils.o \
 ../common/debug.o \
@@ -56,27 +57,35 @@ endif
 
 # Compile flags
 ifeq ($(TARGET_PLATFORM), i386)
-	EXTRA_CFLAGS += -D__x86__ -D__i386__
+	ccflags-y += -D__x86__ -D__i386__
 else ifeq ($(TARGET_PLATFORM), amd64)
-	EXTRA_CFLAGS += -D__x86__ -D__amd64__
+	ccflags-y += -D__x86__ -D__amd64__
 endif
 
 ifeq ($(DEBUG), y)
-	EXTRA_CFLAGS += -g -DDEBUG
+	ccflags-y += -g -DDEBUG
 else ifeq ($(DEBUG), n)
-	EXTRA_CFLAGS += -O2 -DNDEBUG
+	ccflags-y += -O2 -DNDEBUG
 endif
 
 ifdef XMHF_LOG_BUF_SIZE
-	EXTRA_CFLAGS += -DXMHF_LOG_BUF_SIZE=$(XMHF_LOG_BUF_SIZE)
+	ccflags-y += -DXMHF_LOG_BUF_SIZE=$(XMHF_LOG_BUF_SIZE)
 endif
 
 SECAGENT_HEADERS := $(SECAGENT_PATH)/include
 
-EXTRA_CFLAGS += -I$(APP_HEADERS)/secagent -I$(SECBASE_PUBLIC_HEADERS) -I$(SECOS_PUBLIC_HEADERS) -I$(SECAGENT_HEADERS) -I./include -I.
+ccflags-y += -I$(APP_HEADERS)/secagent -I$(SECBASE_PUBLIC_HEADERS) -I$(SECOS_PUBLIC_HEADERS) -I$(SECAGENT_HEADERS) -I$(src)/include -I$(src)
 
 KERNEL_SRC   := /lib/modules/$(shell uname -r)/build
 PWD	:= $(shell pwd)
+
+export SECAGENT_PATH
+export APP_HEADERS
+export SECBASE_PUBLIC_HEADERS
+export SECOS_PUBLIC_HEADERS
+export TARGET_PLATFORM
+export DEBUG
+export XMHF_LOG_BUF_SIZE
 
 #~ .PHONY: all clean
 all:

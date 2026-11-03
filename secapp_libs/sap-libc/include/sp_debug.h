@@ -9,6 +9,7 @@
 
 #ifndef __ASSEMBLY__
 
+extern void sp_dbg_print_hex(const char *prefix, const void *prtptr, size_t size);
 extern void debug_sp_print_memory(void* ptr, size_t sz);
 extern void debug_sp_utask_dump(SP_UTASK* params);
 

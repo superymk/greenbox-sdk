@@ -72,9 +72,12 @@ typedef uint32_t spid_t;
 
 typedef uint64_t perf_counter_t;
 
-
 #ifndef NULL
 	#define NULL ((void*)0)
+#endif
+
+#ifndef __cplusplus
+#include <stdbool.h>
 #endif
 
 #define TO_PTR(x) (void*)(x)

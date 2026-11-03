@@ -6,18 +6,26 @@
 
 #define IOAPIC_NUM_ENTRIES   (24)
 
-extern void os_send_ipi_to_cpu(u8 vector, lapic_id_t apic_id);
+extern void os_send_ipi_to_cpu(uint8_t vector, lapic_id_t apic_id);
 
 // static int sos_os_irq = INVALID_IRQ;
 static lapic_id_t secos_lapic_id = INVALID_LAPIC_ID;
 struct IO_APIC_entry os_ioapic_entries[IOAPIC_NUM_ENTRIES] = {{0}};
 
+/// @brief Read IOAPIC register
+/// @param ioapic IOAPIC base
+/// @param reg Register offset
+/// @return Register value
 static uint32_t os_x86_ioapic_read(struct io_apic *ioapic, uint32_t reg)
 {
     sa_write32((vaddr_t)&ioapic->index, reg);
     return sa_read32((vaddr_t)&ioapic->data);
 }
 
+/// @brief Write IOAPIC register
+/// @param ioapic IOAPIC base
+/// @param reg Register offset
+/// @param value Value to write
 static void os_x86_ioapic_write(struct io_apic *ioapic, uint32_t reg, uint32_t value)
 {
 	sa_write32((vaddr_t)&ioapic->index, reg);
@@ -25,6 +33,10 @@ static void os_x86_ioapic_write(struct io_apic *ioapic, uint32_t reg, uint32_t v
 }
 
 
+/// @brief Read IOAPIC entry
+/// @param ioapic IOAPIC base
+/// @param pin IRQ pin
+/// @return IOAPIC entry
 static struct IO_APIC_entry os_ioapic_read_entry(struct io_apic *ioapic, int pin)
 {
     union entry_union eu;
@@ -35,6 +47,10 @@ static struct IO_APIC_entry os_ioapic_read_entry(struct io_apic *ioapic, int pin
     return eu.entry;
 }
 
+/// @brief Write IOAPIC entry
+/// @param ioapic IOAPIC base
+/// @param pin IRQ pin
+/// @param entry Entry to write
 static void os_ioapic_write_entry(struct io_apic *ioapic, int pin, struct IO_APIC_entry *entry)
 {
 	union entry_union *eu = (union entry_union *)entry;
@@ -63,8 +79,6 @@ static void os_ioapic_write_entry(struct io_apic *ioapic, int pin, struct IO_API
 //     os->mm_iounmap(ioapic, PAGE_SIZE);
 // }
 
-//! Get the physical address of the IOAPIC registers page
-//! make sure you map it to virtual memory
 paddr_t ioapic_get_base(void)
 {
     return 0xfec00000;
@@ -158,6 +172,8 @@ void ioapic_dump_entries(void)
 #define	APIC_TASKPRI	0x80
 #define	APIC_PROCPRI	0xA0
 
+/// @brief Check if LAPIC is in x2APIC mode
+/// @return true if x2APIC, false otherwise
 static bool _lapic_is_x2apic(void)
 {
     uint64_t msr = 0;
@@ -169,6 +185,8 @@ static bool _lapic_is_x2apic(void)
     return false;
 }
 
+/// @brief Check if LAPIC is in xAPIC mode
+/// @return true if xAPIC, false otherwise
 static bool _lapic_is_xapic(void)
 {
     uint64_t msr = 0;
@@ -180,7 +198,7 @@ static bool _lapic_is_xapic(void)
     return false;
 }
 
-void os_send_ipi_to_cpu(u8 vector, lapic_id_t apic_id)
+void os_send_ipi_to_cpu(uint8_t vector, lapic_id_t apic_id)
 {
     volatile uint32_t timeout = 0x00100000;
     paddr_t lapic_base_paddr;
@@ -245,11 +263,9 @@ static void _os_intr_restore_affinity_in_ioapic(void)
 	}
 }
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 
-
-
-/********* Public Functions *********/
-OSSTATUS sa_init_secos_os_comm_intr(void)
+static OSSTATUS _sa_init_secos_os_comm_intr(void)
 {
     ulong_t ret = 0;
     ulong_t val = 0;
@@ -271,13 +287,64 @@ OSSTATUS sa_init_secos_os_comm_intr(void)
     return OS_SUCCESS;
 }
 
-void sa_fini_secos_os_comm_intr(void)
+static void _sa_fini_secos_os_comm_intr(void)
 {
     secos_lapic_id = INVALID_LAPIC_ID;
 
     // // Restore interrupt affinity to this core
     // os->os_intr_restore_affinity();
     // _os_intr_restore_affinity_in_ioapic();
+}
+
+#else
+
+static OSSTATUS _sa_init_secos_os_comm_intr(void)
+{
+    OSSTATUS status = OS_SUCCESS;
+    NS_HC_RESP_GET_TINYOS_INFO tos_info = {0};
+
+    // Read OS's configuration of IOAPIC
+    _os_intr_read_ioapic_affinity_in_ioapic();
+
+    // Get the LAPIC ID of the CPU running TinyOS as it will run SecOS.
+    status = sb_get_tos_info(&tos_info);
+    if (SA_FAIL(status))
+    {
+        DRV_ERR("Init SecOS-OS Comm: Failed to get TinyOS's info! status:%lu\n", status);
+        return E_INTERNAL_ERROR;
+    }
+
+    if(tos_info.running_status != TINYOS_STATUS_RUNNING)
+    {
+        DRV_ERR("Init SecOS-OS Comm: TinyOS is not running!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    secos_lapic_id = (lapic_id_t)tos_info.tos_lapic_id;
+    DRV_INFO("Init SecOS-OS Comm: SecOS LAPIC id: 0x%08X\n", secos_lapic_id);
+    return OS_SUCCESS;
+}
+
+static void _sa_fini_secos_os_comm_intr(void)
+{
+    secos_lapic_id = INVALID_LAPIC_ID;
+
+    // Restore interrupt affinity to this core
+    _os_intr_restore_affinity_in_ioapic();
+}
+
+#endif // GREENBOX_USE_UXMHF64_V1
+
+
+/********* Public Functions *********/
+OSSTATUS sa_init_secos_os_comm_intr(void)
+{
+    return _sa_init_secos_os_comm_intr();
+}
+
+void sa_fini_secos_os_comm_intr(void)
+{
+    _sa_fini_secos_os_comm_intr();
 }
 
 // OSSTATUS sa_register_sos_os_irq(void)
@@ -345,8 +412,15 @@ void notify_secos(void)
 
     // Send IPI to SecOS if its status is <SECOS_INFO_RETURN_FROM_PREEMPTION>
     status = sos_get_status(&sos_status);
+
+#ifdef GREENBOX_USE_UXMHF64_V1
     if(SA_PASS(status) && (sos_status == SECOS_INFO_RETURN_FROM_PREEMPTION))
         os_send_ipi_to_cpu(vector, secos_lapic_id);
+#else
+    if(SA_PASS(status) && (sos_status == SECOS_INFO_PREEMPTED))
+        os_send_ipi_to_cpu(vector, secos_lapic_id);
+#endif // GREENBOX_USE_UXMHF64_V1
+
 }
 
 OSSTATUS x86_ioapic_read_entire_table(struct IO_APIC_entry *out_entries)
@@ -394,8 +468,8 @@ OSSTATUS ioapic_remove_allintrs_affinity(uint32_t logical_apic_id)
 {
     struct io_apic *ioapic;
     paddr_t ioapic_paddr = ioapic_get_base();
-	u8 mask = 0;
-	u8 i = 0;
+    uint8_t mask = 0;
+    int i = 0;
 	struct IO_APIC_entry entry;
 
 	if (logical_apic_id >= 8)
@@ -432,8 +506,8 @@ OSSTATUS ioapic_add_allintrs_affinity(uint32_t logical_apic_id)
 {
     struct io_apic *ioapic;
     paddr_t ioapic_paddr = ioapic_get_base();
-	u8 mask = 0;
-	u8 i = 0;
+    uint8_t mask = 0;
+    int i = 0;
 	struct IO_APIC_entry entry;
 
 	if (logical_apic_id >= 8)

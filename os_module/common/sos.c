@@ -4,24 +4,26 @@
 
 #include <sa_headers.h>
 
+/// @brief Trigger interrupts based on bitmap
+/// @param intr_bitmap Pointer to interrupt bitmap array
 static void _trigger_intrs(uint32_t* intr_bitmap)
 {
-	int idx;
-	int shift;
-	
-	for (idx = 1; idx < 8; idx++)
-	{
-		u32 intr_map_value = intr_bitmap[idx];
-		for(shift = 0; shift < (sizeof(u32)*8); shift++)
-		{
-			if(intr_map_value & (1<<shift))
-			{
-				uint32_t vector = idx * 32 + shift;
-				os->intr_trigger_interrupt(vector);
-				DRV_DEBUG("trigger interrupt: 0x%x!\n", vector);
-			}
-		}
-	}
+    uint32_t idx = 0;
+    uint32_t shift = 0;
+
+    for (idx = 1; idx < 8; idx++)
+    {
+        uint32_t intr_map_value = intr_bitmap[idx];
+        for (shift = 0; shift < (sizeof(uint32_t) * 8); shift++)
+        {
+            if (intr_map_value & (1U << shift))
+            {
+                uint32_t vector = (uint32_t)(idx * 32 + shift);
+                os->intr_trigger_interrupt(vector);
+                DRV_DEBUG("trigger interrupt: 0x%x!\n", vector);
+            }
+        }
+    }
 }
 
 /********* Public Functions *********/
@@ -76,6 +78,9 @@ OSSTATUS sos_get_status(VKSTATUS* out_status)
     return OS_SUCCESS;
 }
 
+/// @brief Get returned interrupt bitmap from SecOS
+/// @param out_intr Output pointer to interrupt bitmap
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS sos_get_ret_intr(uint32_t** out_intr)
 {
     volatile struct sos_boot_params* boot_params = (volatile struct sos_boot_params*)sos_addrs.param_start;
@@ -90,7 +95,6 @@ static OSSTATUS sos_get_ret_intr(uint32_t** out_intr)
         return E_INV_ARG;
     }
 
-
     // Flush cache to read fresh data
     os->cache_flush_range((vaddr_t)boot_params, sizeof(struct sos_boot_params));
 
@@ -101,7 +105,7 @@ static OSSTATUS sos_get_ret_intr(uint32_t** out_intr)
 OSSTATUS do_CMD_PROBE_SECOS_STATUS(struct tz_cmd_packet *cmd_packet)
 {
     OSSTATUS status = OS_SUCCESS;
-    VKSTATUS sos_status;
+    VKSTATUS sos_status = SUCCESS;
 
     // Check: SecOS must have been registered 
     if(!sos_is_registered)
@@ -116,13 +120,17 @@ OSSTATUS do_CMD_PROBE_SECOS_STATUS(struct tz_cmd_packet *cmd_packet)
 
     if(cmd_packet->arg1 == SECOS_INFO_PREEMPTED)
         sos_is_running = true;
+#ifdef GREENBOX_USE_UXMHF64_V1
     else if (cmd_packet->arg1 == SECOS_INFO_RETURN_FROM_PREEMPTION) 
         sos_is_running = true;
+#endif // GREENBOX_USE_UXMHF64_V1
     else
         sos_is_running = false;
 
     return OS_SUCCESS;
 }
+
+#ifdef GREENBOX_USE_UXMHF64_V1
 
 OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
 {
@@ -145,6 +153,94 @@ OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
 
     return OS_SUCCESS;
 }
+
+#else
+
+OSSTATUS do_CMD_RUN_SECOS(struct tz_cmd_packet *cmd_packet)
+{
+    OSSTATUS status = OS_SUCCESS;
+    ulong_t hyp_ret = 0;
+    struct sos_boot_params* boot_params = (struct sos_boot_params*)sos_addrs.param_start;
+    uint32_t timeout_ms = 5000;
+
+    DRV_INFO("Starting SecOS\n");
+
+    // Initialize inter-processor-interrupt (IPI) to TinyOS.
+    {
+        bool tos_is_running = false;
+
+        status = tos_probe_configs(&tos_is_running);
+        if(SA_FAIL(status) || !tos_is_running)
+        {
+            DRV_ERR("[IOCTL-CMD_RUN_SECOS] Failed to probe TinyOS!\n");
+            return E_INV_ARG;
+        }
+    }
+
+    // Call TinyOS to boot SecOS
+    //// Notify TinyOS to handle any pending requests.
+    status = tos_notify_ipi();
+    if(SA_FAIL(status))
+    {
+        DRV_ERR("[IOCTL-CMD_RUN_SECOS] Notify TinyOS to process pending requests error!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    //// Request TinyOS to boot SecOS
+    hyp_ret = os->hypercall_4args(NS_HC_REQUEST_TINYOS, REQ_TINYOS_CMD_BOOT_SECOS, 0, 0, 0);
+    if (hyp_ret)
+    {
+        DRV_ERR("[IOCTL-CMD_RUN_SECOS] Failed to request TinyOS to run SecOS! status:%lu\n", hyp_ret);
+        return E_INTERNAL_ERROR;
+    }
+
+    //// Notify TinyOS to handle the new request.
+    status = tos_notify_ipi();
+    if(SA_FAIL(status))
+    {
+        DRV_ERR("[IOCTL-CMD_RUN_SECOS] Notify TinyOS to process the current request error!\n");
+        return E_INTERNAL_ERROR;
+    }
+
+    // // Get returned SecOS status
+    // //// Flush cache to read fresh data
+    // os->cache_flush_range((vaddr_t)boot_params, sizeof(struct sos_boot_params));
+    
+    // cmd_packet->arg1 = boot_params->status.status;
+
+    {
+        sos_is_running = false;
+        while(1)
+        {
+            if(!timeout_ms)
+            {
+                // Timeout
+                status = E_TIMEOUT;
+                break;
+            }
+
+            // Get returned SecOS status
+            //// Flush cache to read fresh data
+            os->cache_flush_range((vaddr_t)boot_params, sizeof(struct sos_boot_params));
+
+            if(boot_params->status.status)
+            {
+                sos_is_running = true;
+                status = OS_SUCCESS;
+                break;
+            }
+
+            os->udelay(1000);
+            timeout_ms--;
+        }
+    }
+
+    cmd_packet->arg1 = boot_params->status.status;
+
+    return status;
+}
+
+#endif // GREENBOX_USE_UXMHF64_V1
 
 OSSTATUS do_CMD_REGISTER_SECOS_PREPARE(struct tz_cmd_packet *cmd_packet)
 {
@@ -172,7 +268,6 @@ OSSTATUS do_CMD_REGISTER_SECOS_PREPARE(struct tz_cmd_packet *cmd_packet)
 
     // On success
     return OS_SUCCESS;
-
 
 sos_init_err:
 	sos_comm_resc_return();

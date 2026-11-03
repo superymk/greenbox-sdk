@@ -20,7 +20,7 @@ extern void sp_signal_handler(void);
 
 // The global programming entry of SecProcess for 3rd party.
 extern void sp_main(SP_UTASK* sp_params);
-extern void sp_exit(SP_UTASK* sp_params);
+extern void sp_on_exit(SP_UTASK* sp_params);
 extern void sp_handle_sp_request(SP_MESSAGE* event);
 extern bool sp_handle_app_request(struct ipc_msg* msg);
 extern void sp_handle_intr(intr_t vector);
@@ -279,7 +279,7 @@ void sp_signal_handler_entry(vaddr_t* sig_ret_ip, ulong_t is_intr, ulong_t info1
 		_sp_handle_sp_events(&sig_r_info);
 	else if(!is_intr && info1 == SIGNAL_REQEXIT_BY_APP)
 	{
-		sp_exit(current_sp);
+		sp_on_exit(current_sp);
         _do_sp_exit(current_sp);
 	}
 	else if(!is_intr && info1 == SIGNAL_CALLED_BY_APP)

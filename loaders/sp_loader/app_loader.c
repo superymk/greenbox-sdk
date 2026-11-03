@@ -184,7 +184,7 @@ static int _apploader_register_sp_mem(struct sp_scope_addrs *pal_addrs)
 {
     struct hv_reg_sections scode_info;
     int ret = 0;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     // Fill the information of memory sections
     sp_reg_sections(&scode_info, pal_addrs);
@@ -697,7 +697,7 @@ int apploader_register_secapp(SP_USTRUCT *params)
 {
     int ret = 0;
     OSSTATUS status = OS_SUCCESS;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
     struct sp_scope_addrs reg_addrs = {0};
 
     // Check: Parameters must be valid
@@ -800,7 +800,7 @@ int apploader_run_sp(spid_t sp_id)
 {
     int ret = 0;
     OSSTATUS status = OS_SUCCESS;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     // Mute the untrusted OS because the sound glitches when registering/running the SecApp.
     ret = os_sound_mute(apploader_run_sp, &os_already_muted);
@@ -837,7 +837,7 @@ int apploader_force_terminate_sp(spid_t sp_id)
 {
     int ret = 0;
     OSSTATUS status = OS_SUCCESS;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     // Mute the untrusted OS because the sound glitches when registering/running the SecApp.
     ret = os_sound_mute(apploader_force_terminate_sp, &os_already_muted);
@@ -874,7 +874,7 @@ int apploader_soft_terminate_sp(spid_t sp_id)
 {
     int ret = 0;
     OSSTATUS status = OS_SUCCESS;
-    uint8_t os_already_muted = (uint8_t)false;
+    bool os_already_muted = false;
 
     // Mute the untrusted OS because the sound glitches when registering/running the SecApp.
     ret = os_sound_mute(apploader_soft_terminate_sp, &os_already_muted);

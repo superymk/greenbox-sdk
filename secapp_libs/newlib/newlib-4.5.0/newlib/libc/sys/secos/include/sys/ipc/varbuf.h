@@ -138,6 +138,10 @@ extern bool varbuf_read_array(varbuf_t* varbuf, uint32_t* elems_count);
 /// @return 
 extern bool varbuf_util_read_result(varbuf_t* varbuf, uint64_t* result, int* err);
 
+/********* Public Functions - Utils for Types *********/
+extern bool varbuf_serialize_size_t(varbuf_t *varbuf, size_t size);
+extern bool varbuf_deserialize_size_t(varbuf_t *varbuf, size_t* out_size);
+
 #endif // __ASSEMBLY__
 
 #endif // VARIABLE_BUFFER_SERIALIZATION_DESERIALIZATION

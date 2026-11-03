@@ -26,6 +26,7 @@ struct app_event_map
 
 static struct app_event_map app_event_map[OS_APP_EVENT_SLOTS] = {{0}};
 
+/// @brief Clear application notification map
 static void _linux_os_app_notif_map_clear(void)
 {
 	uint32_t i = 0;
@@ -37,6 +38,9 @@ static void _linux_os_app_notif_map_clear(void)
 	}
 }
 
+/// @brief Find app event map entry by PID
+/// @param pid Process ID
+/// @return Entry pointer or NULL
 static struct app_event_map* _linux_os_app_notif_map_find(process_id pid)
 {
 	uint32_t i = 0;
@@ -91,6 +95,7 @@ OSSTATUS linux_os_app_notif_register(struct sa_app_notif_reginfo* info)
 	if(entry)
 	{
 		SACOMM_ERR("<linux_os_app_notif_register> Process (%lu) has registered an event!\n", cur_pid);
+		eventfd_ctx_put(efd_ctx);
 		return E_INV_ARG;
 	}
 
@@ -98,6 +103,7 @@ OSSTATUS linux_os_app_notif_register(struct sa_app_notif_reginfo* info)
 	if(!entry)
 	{
 		SACOMM_ERR("<linux_os_app_notif_register> No space to register Process (%lu)'s event!\n", cur_pid);
+		eventfd_ctx_put(efd_ctx);
 		return E_INTERNAL_ERROR;
 	}
 

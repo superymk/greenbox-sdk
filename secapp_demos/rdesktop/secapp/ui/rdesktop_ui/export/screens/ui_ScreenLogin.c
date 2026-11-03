@@ -43,7 +43,9 @@ void ui_ScreenLogin_screen_init(void)
     lv_obj_set_align(ui_Label1, LV_ALIGN_CENTER);
     lv_label_set_text(ui_Label1, "Connect to ...");
 
-    ui_TabView1 = lv_tabview_create(ui_PanelLogin, LV_DIR_TOP, 50);
+    ui_TabView1 = lv_tabview_create(ui_PanelLogin);
+    lv_tabview_set_tab_bar_position(ui_TabView1, LV_DIR_TOP);
+    lv_tabview_set_tab_bar_size(ui_TabView1, 50);
     lv_obj_set_width(ui_TabView1, lv_pct(100));
     lv_obj_set_height(ui_TabView1, lv_pct(90));
     lv_obj_set_align(ui_TabView1, LV_ALIGN_CENTER);

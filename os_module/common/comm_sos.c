@@ -61,6 +61,9 @@ void comm_sos_fini(void)
     os->spinlock_init(&os_recv_chan.chan_lock);
 }
 
+/// @brief Get producer slot from control block
+/// @param comm_ctl Control block
+/// @return Current producer slot
 static uint32_t _comm_ctl_get_p_slot(volatile struct comm_os_ctl *comm_ctl)
 {
     os->cache_flush_range((vaddr_t)&comm_ctl->p_slot, sizeof(comm_ctl->p_slot));
@@ -68,12 +71,18 @@ static uint32_t _comm_ctl_get_p_slot(volatile struct comm_os_ctl *comm_ctl)
     return comm_ctl->p_slot;
 }
 
+/// @brief Set producer slot in control block
+/// @param comm_ctl Control block
+/// @param new_p_slot New producer slot
 static void _comm_ctl_set_p_slot(volatile struct comm_os_ctl *comm_ctl, uint32_t new_p_slot)
 {
     comm_ctl->p_slot = new_p_slot;
     os->cache_flush_range((vaddr_t)&comm_ctl->p_slot, sizeof(comm_ctl->p_slot));
 }
 
+/// @brief Get consumer slot from control block
+/// @param comm_ctl Control block
+/// @return Current consumer slot
 static uint32_t _comm_ctl_get_c_slot(volatile struct comm_os_ctl *comm_ctl)
 {
     os->cache_flush_range((vaddr_t)&comm_ctl->c_slot, sizeof(comm_ctl->c_slot));
@@ -81,12 +90,18 @@ static uint32_t _comm_ctl_get_c_slot(volatile struct comm_os_ctl *comm_ctl)
     return comm_ctl->c_slot;
 }
 
+/// @brief Set consumer slot in control block
+/// @param comm_ctl Control block
+/// @param new_c_slot New consumer slot
 static void _comm_ctl_set_c_slot(volatile struct comm_os_ctl *comm_ctl, uint32_t new_c_slot)
 {
     comm_ctl->c_slot = new_c_slot;
     os->cache_flush_range((vaddr_t)&comm_ctl->c_slot, sizeof(comm_ctl->c_slot));
 }
 
+/// @brief Increment ring buffer index
+/// @param val Current index
+/// @return Next index
 static uint32_t _rb_increment(uint32_t val)
 {
     os->atomic_increase(&val);
@@ -94,6 +109,12 @@ static uint32_t _rb_increment(uint32_t val)
     return val % COMM_OS_CHAN_NUM_MSG_SLOTS;
 }
 
+/// @brief Copy message into communication buffer
+/// @param comm_buf Communication buffer
+/// @param p_slot Producer slot
+/// @param in_msg Input message
+/// @param msg_size Message size
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _copy_to_comm_buf(volatile struct comm_os_msg *comm_buf, uint32_t p_slot, struct comm_os_msg *in_msg, uint32_t msg_size)
 {
     if (p_slot >= COMM_OS_CHAN_NUM_MSG_SLOTS)
@@ -104,6 +125,12 @@ static OSSTATUS _copy_to_comm_buf(volatile struct comm_os_msg *comm_buf, uint32_
     return OS_SUCCESS;
 }
 
+/// @brief Copy message from communication buffer
+/// @param comm_buf Communication buffer
+/// @param c_slot Consumer slot
+/// @param buf Destination buffer
+/// @param buf_size Destination size
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _copy_from_comm_buf(volatile struct comm_os_msg *comm_buf, uint32_t c_slot, void *buf, uint32_t buf_size)
 {
     if (c_slot >= COMM_OS_CHAN_NUM_MSG_SLOTS)
@@ -114,6 +141,9 @@ static OSSTATUS _copy_from_comm_buf(volatile struct comm_os_msg *comm_buf, uint3
     return OS_SUCCESS;
 }
 
+/// @brief Try to enqueue a message to ring buffer
+/// @param in_msg Input message
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _try_rb_enqueue(struct comm_os_msg *in_msg)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -169,6 +199,10 @@ out:
     return status;
 }
 
+/// @brief Try to dequeue a message from ring buffer
+/// @param out_msg Output message buffer
+/// @param out_got_message Output flag indicating a message was dequeued
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _try_rb_dequeue(struct comm_os_msg *out_msg, bool *out_got_message)
 {
     OSSTATUS status = OS_SUCCESS;
@@ -241,11 +275,14 @@ out:
 }
 
 /// Triggered on a message arrival via SecOS-SecBase/OS communication channel
-OSSTATUS comm_sos_handle_queued_msgs(void)
+OSSTATUS comm_sos_handle_queued_msgs(bool* out_has_reqs)
 {
     OSSTATUS status = OS_SUCCESS;
     struct comm_os_msg *msg;
     bool msg_ready = false;
+
+    if (out_has_reqs)
+        *out_has_reqs = false;
 
     msg = (struct comm_os_msg *)os->mm_malloc_zeroed(sizeof(struct comm_os_msg));
     if (!msg)
@@ -262,6 +299,9 @@ OSSTATUS comm_sos_handle_queued_msgs(void)
 
         if (msg_ready)
         {
+            if (out_has_reqs)
+                *out_has_reqs = true;
+
             status = comm_sos_handle_msg(msg);
             if (SA_FAIL(status))
             {
@@ -328,10 +368,13 @@ OSSTATUS comm_sos_send_msg_nowait(struct comm_os_msg *msg)
 
 OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_msg *response, uint32_t ms)
 {
+    const ulong_t count_per_millisecond = 100; // 100 wait loops per 1ms wait time.
+    const ulong_t ping_interval_cnt = 200 * count_per_millisecond; // re-ping SecOS for every 200ms.
+
     OSSTATUS status = OS_SUCCESS;
     ListNode *wait_msg_node = NULL;
     volatile msg_id_t *response_id = NULL;
-    unsigned long cnt = ms * 100;
+    ulong_t cnt = ms * count_per_millisecond;
     msg_id_t request_id = 0;
 
     if (!request || !response)
@@ -363,7 +406,7 @@ OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_
             return E_TIMEOUT; // Time out
         }
 
-        status = comm_sos_handle_queued_msgs();
+        status = comm_sos_handle_queued_msgs(NULL);
         if (SA_FAIL(status))
         {
             DRV_ERR("Failed to process the response of the message (req_id:%u)! status:%lu\n", request_id, status);
@@ -372,6 +415,12 @@ OSSTATUS comm_sos_send_msg_and_wait(struct comm_os_msg *request, struct comm_os_
         }
 
         os->udelay(10);
+
+        if (!(cnt % ping_interval_cnt))
+        {
+            // Re-ping SecOS after every 200ms to make sure SecOS receive the SecOS-OS IPI interrupt.
+            notify_secos();
+        }
     }
 
     // On success

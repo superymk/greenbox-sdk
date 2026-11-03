@@ -35,8 +35,8 @@ uint64_t win_read_msr(uint32_t msr)
 
 void win_write_msr(uint32_t reg, uint32_t low, uint32_t high)
 {
-    uint64_t val = (((uint64_t)high << 32ULL) | low);
-    __writemsr(reg, val);
+    uint64_t msr_val = (((uint64_t)high << 32ULL) | low);
+    __writemsr(reg, msr_val);
 }
 
 void win_atomic_increase(uint32_t *var)
@@ -132,11 +132,11 @@ void win_outl(uint32_t value, uint16_t port)
 
 bool win_secbase_test_presence(void)
 {
-    int cpuInfo[4];
+    int cpu_info[4] = {0};
     uint32_t resp = 0;
 
-    __cpuid(cpuInfo, SECBASE_PRESENCE_REQ);
-    resp = (uint32_t)cpuInfo[3];
+    __cpuid(cpu_info, SECBASE_PRESENCE_REQ);
+    resp = (uint32_t)cpu_info[3];
     if (resp == SECBASE_PRESENCE_RESP)
         return true;
 
@@ -146,52 +146,69 @@ bool win_secbase_test_presence(void)
 ulong_t win_hypercall_0arg(ulong_t fn)
 {
     ulong_t temp = 0;
-
-    ulong_t result;
-    // os->int3_debug_break();
+    ulong_t result = 0;
     result = Intel_VMCALL_ret4(fn, &temp, &temp, &temp, &temp);
-    // os->int3_debug_break();
     return result;
 }
 
 ulong_t win_hypercall_1arg(ulong_t fn, ulong_t arg1)
 {
     ulong_t temp = 0;
-    ulong_t in_arg1 = arg1; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
+    // Note: We copy arguments because Intel_VMCALL_ret4 overwrites input parameters except <fn>
+    ulong_t in_arg1 = arg1;
     return Intel_VMCALL_ret4(fn, &in_arg1, &temp, &temp, &temp);
 }
 
 ulong_t win_hypercall_2args(ulong_t fn, ulong_t arg1, ulong_t arg2)
 {
     ulong_t temp = 0;
-    ulong_t in_arg1 = arg1; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
-    ulong_t in_arg2 = arg2; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
+    ulong_t in_arg1 = arg1;
+    ulong_t in_arg2 = arg2;
     return Intel_VMCALL_ret4(fn, &in_arg1, &in_arg2, &temp, &temp);
 }
 
 ulong_t win_hypercall_3args(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3)
 {
     ulong_t temp = 0;
-    ulong_t in_arg1 = arg1; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
-    ulong_t in_arg2 = arg2; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
-    ulong_t in_arg3 = arg3; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
+    ulong_t in_arg1 = arg1;
+    ulong_t in_arg2 = arg2;
+    ulong_t in_arg3 = arg3;
     return Intel_VMCALL_ret4(fn, &in_arg1, &in_arg2, &in_arg3, &temp);
 }
 
 ulong_t win_hypercall_4args(ulong_t fn, ulong_t arg1, ulong_t arg2, ulong_t arg3, ulong_t arg4)
 {
-    ulong_t in_arg1 = arg1; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
-    ulong_t in_arg2 = arg2; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
-    ulong_t in_arg3 = arg3; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
-    ulong_t in_arg4 = arg4; // We must copy the arguments, because Intel_VMCALL_ret4 overwrites input parameters except <fn>
+    ulong_t in_arg1 = arg1;
+    ulong_t in_arg2 = arg2;
+    ulong_t in_arg3 = arg3;
+    ulong_t in_arg4 = arg4;
     return Intel_VMCALL_ret4(fn, &in_arg1, &in_arg2, &in_arg3, &in_arg4);
 }
 
 extern void Int3(void);
+
 ulong_t win_hypercall_ret1(ulong_t fn, ulong_t *arg1)
 {
     ulong_t reserved = 0;
 
-    // Int3();
     return Intel_VMCALL_ret4(fn, arg1, &reserved, &reserved, &reserved);
+}
+
+ulong_t win_hypercall_ret2(ulong_t fn, ulong_t *arg1, ulong_t *arg2)
+{
+    ulong_t reserved = 0;
+
+    return Intel_VMCALL_ret4(fn, arg1, arg2, &reserved, &reserved);
+}
+
+ulong_t win_hypercall_ret3(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t *arg3)
+{
+    ulong_t reserved = 0;
+
+    return Intel_VMCALL_ret4(fn, arg1, arg2, arg3, &reserved);
+}
+
+ulong_t win_hypercall_ret4(ulong_t fn, ulong_t *arg1, ulong_t *arg2, ulong_t *arg3, ulong_t *arg4)
+{
+    return Intel_VMCALL_ret4(fn, arg1, arg2, arg3, arg4);
 }

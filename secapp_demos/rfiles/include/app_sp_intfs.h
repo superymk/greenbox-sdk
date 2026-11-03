@@ -7,7 +7,7 @@
 
 #ifndef __ASSEMBLY__
 
-#define RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN      (512)
+#define RFILES_DIR_FILEPATH_MAXLEN      (512)
 
 /// @brief Configurations of trusted path devices
 struct sap_window_conf
@@ -19,7 +19,8 @@ struct sap_window_conf
 
 struct sap_fs_local_conf
 {
-    char home_dir[RFILES_LOCAL_HOME_DIR_FILEPATH_MAXLEN];
+    char certs_filepath[RFILES_DIR_FILEPATH_MAXLEN];
+    char home_dir[RFILES_DIR_FILEPATH_MAXLEN];
 };
 
 typedef struct 

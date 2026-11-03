@@ -5,9 +5,7 @@
 #ifndef RFILES_GDRIVE_LIMITED_H
 #define RFILES_GDRIVE_LIMITED_H
 
-#include <sap_headers.h>
-#include <palddk.h>
-#include <rfiles_header.h>
+#include <rfiles.h>
 
 #ifndef __ASSEMBLY__
 
@@ -25,7 +23,7 @@ typedef struct {
     int   expires_in;                 // seconds
 } device_user_code_t;
 
-extern SAP_STATUS gdrive_init(void);
+extern SAP_STATUS gdrive_init(SAP_CONFIG* sap_cfg);
 extern void gdrive_fini(void);
 
 /// @brief Blocking function for getting GDrive device code and user code.
@@ -57,7 +55,7 @@ extern SAP_STATUS gdrive_login_poll_tokens_once(const device_user_code_t *duc, g
 extern SAP_STATUS gdrive_login(char* username, char* password);
 
 /********* Debug Functions *********/
-void gdrive_test(void);
+void gdrive_test(SAP_CONFIG* sap_cfg);
 
 #endif // __ASSEMBLY__
 #endif // RFILES_GDRIVE_LIMITED_H

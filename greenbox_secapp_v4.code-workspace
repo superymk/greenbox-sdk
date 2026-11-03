@@ -2,19 +2,19 @@
 	"folders": [
 		{
 			"name": "secapp_demos",
-			"path": "code/secapp_demos"
+			"path": "secapp_demos"
 		},
 		{
 			"name": "secapp_libs",
-			"path": "code/secapp_libs"
+			"path": "secapp_libs"
 		},
 		{
 			"name": "loaders",
-			"path": "code/loaders"
+			"path": "loaders"
 		},
 		{
 			"name": "os_module",
-			"path": "code/os_module"
+			"path": "os_module"
 		}
 	],
     "settings": {
@@ -36,7 +36,13 @@
 			"system_error": "c",
 			"xlocale": "c",
 			"dirent.h": "c",
-			"chrono": "c"
+			"chrono": "c",
+			"array": "c",
+			"span": "c",
+			"vector": "c",
+			"xstring": "c",
+			"xutility": "c",
+			"version": "c"
 		}
     }
 }

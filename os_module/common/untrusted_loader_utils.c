@@ -8,6 +8,7 @@
 /// @brief Spin lock store for <CMD_NSDOM_UTILS_GLOBAL_SPINLOCK_TRY_ACQUIRE>
 static volatile uint32_t _lock_store[GLOBAL_SPINLOCK_MAX_SELECTOR] = {0};
 
+/// @brief Clear global spinlock store
 static void _lock_store_clear(void)
 {
     uint32_t i = 0;

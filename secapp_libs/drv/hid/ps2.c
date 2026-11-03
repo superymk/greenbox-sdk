@@ -25,9 +25,10 @@
 // #include <stdio.h>
 
 
-
+#ifdef GREENBOX_USE_UXMHF64_V1
 // SecOS's and SecBase's quirks may affect how ps2.c handle interrupts
 static SECOS_QUIRKS_INFO sos_quirks_info = {0};
+#endif // GREENBOX_USE_UXMHF64_V1
 
 // Describes the available PS/2 controllers
 // static bool controllers[] = {true, true};
@@ -128,6 +129,9 @@ static SAP_STATUS _iosm_ps2_init(void)
     SAP_STATUS status = SUCCESS;
     VKSTATUS status2 = SUCCESS;
 
+    (void)status2;
+
+#ifdef GREENBOX_USE_UXMHF64_V1
     // Read the quirks of SecOS and SecBase
     status2 = sos_sys_quirks_get_info(&sos_quirks_info);
     if(FAIL(status2))
@@ -136,6 +140,7 @@ static SAP_STATUS _iosm_ps2_init(void)
         status = EINTERNAL;
         goto iosm_ps2_err;
     }
+#endif // GREENBOX_USE_UXMHF64_V1
 
     // Talk to IOSM-PS2, and
     // Register the current SecProcess as the sole user of the PS2 ports
@@ -685,6 +690,7 @@ void ps2_intr_poll(void)
         mouse_handle_polling(ps2_st);
 }
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 SAP_STATUS ps2_intr_handler(intr_t intr)
 {
     // If the code is draining devices' buffers, we ignore all interrupts (which are largely due to data ready).
@@ -716,3 +722,35 @@ SAP_STATUS ps2_intr_handler(intr_t intr)
     return SUCCESS;
 }
 
+#else
+
+SAP_STATUS ps2_intr_handler(intr_t intr)
+{
+    // If the code is draining devices' buffers, we ignore all interrupts (which are largely due to data ready).
+    if(is_draining_buffers)
+        return SUCCESS;
+
+    // If the code is not ready to receive interrupts, then ignore them.
+    if(!is_intr_initialized)
+        return SUCCESS;
+
+    // [TODO][Issue 181] SecOS and IOSMs do not support interrupts. Thus, we need to pull the key events.
+    if(false)
+    {
+        // SecOS and SecBase supports interrupt interception of the NS domain, so they calls this handler only if there
+        // is a real PS2 interrupt
+        if(intr == ps2_kbd_intr)
+            kbd_handler();
+        else if (intr == ps2_mouse_intr)
+            mouse_handle_interrupt();
+    }
+    else
+    {
+        ps2_intr_poll();
+    }
+
+    // On success
+    return SUCCESS;
+}
+
+#endif // GREENBOX_USE_UXMHF64_V1

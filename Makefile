@@ -20,6 +20,11 @@ endif
 
 CFLAGS += -DOS_SECOS
 
+## Use the legacy UXMHF64 v1 or not.
+ifeq ($(CONFIG_USE_LEGACY_UXMHF64_V1), y)
+CFLAGS += -DGREENBOX_USE_UXMHF64_V1
+endif
+
 # We only compile perf module when we need the output
 ifeq ($(VERBOSE_LVL), V_DEBUG)
 export CFLAGS += -DPERF
@@ -90,8 +95,8 @@ endif
 # Returns "true" if the directory exists, otherwise "false".
 if_dir_exists_bool = $(shell test -d $(1) && echo true || echo false)
 
-# Embed version number
-GREENBOX_VERSION_NUMBER := $(shell echo `date +'%Y%m%d%H%M%S'`)
+# Embed version number (+1 day to ensure SecApps' versions are newer than SecBase, SecOS, and SecServices)
+GREENBOX_VERSION_NUMBER := $(shell date -d '+1 day' +'%Y%m%d%H%M%S')
 SELFCONTAIN_FLAGS += -DGREENBOX_VERSION_NUMBER=$(GREENBOX_VERSION_NUMBER)
 
 export PLATFORM
@@ -211,6 +216,7 @@ _WIN_POST_BUILD_delete_linux_exe:
 	@$(RM) ./win/imgs/sap/app
 	@$(RM) ./win/imgs/sap/sl_demo_sp
 	@$(RM) ./win/imgs/sap/sl_rdesktop
+	@$(RM) ./win/imgs/sap/sl_rfiles
 	@$(RM) ./win/imgs/tools/debugger
 
 # Distribute binaries (no symbols) to $(DIST_PATH)

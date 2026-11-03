@@ -13,7 +13,7 @@
 extern void wnd_rfiles_close(void);
 
 /* Google Drive backend */
-extern int gdrive_begin_device_code_flow_async(gdrive_user_code_cb_t cb, void *user_ctx);
+extern int gdrive_begin_device_code_flow_async(SAP_CONFIG* sap_cfg, gdrive_user_code_cb_t cb, void *user_ctx);
 extern void gdrive_cancel_device_code_flow(void);
 
 /* Token poller (single attempt, returns EAGAIN to continue) dispatched async by backend */
@@ -78,9 +78,18 @@ typedef struct
     void *on_closed_ctx;
 } login_ui_t;
 
+static SAP_CONFIG* sap_cfg = NULL;
+
 /* ------------- helpers ------------- */
-static login_ui_t *get_ui(lv_obj_t *root) { return (login_ui_t *)lv_obj_get_user_data(root); }
-static void set_ui(lv_obj_t *root, login_ui_t *ui) { lv_obj_set_user_data(root, ui); }
+static login_ui_t *get_ui(lv_obj_t *root)
+{
+    return (login_ui_t *)lv_obj_get_user_data(root);
+}
+
+static void set_ui(lv_obj_t *root, login_ui_t *ui)
+{
+    lv_obj_set_user_data(root, ui);
+}
 
 static void remove_all_styles(lv_obj_t *o)
 {
@@ -255,7 +264,7 @@ static void gdrive_build_connecting(login_ui_t *ui)
     ui->spinner_start_ms = lv_tick_get();
     ui->cached_user_code[0] = ui->cached_ver_url[0] = ui->cached_ver_url_with_code[0] = 0;
 
-    if (gdrive_begin_device_code_flow_async(gdrive_backend_cb, ui) != 0)
+    if (gdrive_begin_device_code_flow_async(sap_cfg, gdrive_backend_cb, ui) != 0)
     {
         lv_label_set_text(ui->gd_label_status, "Failed to connect. Please try again.");
         apply_hint_style(ui->gd_label_status);
@@ -707,4 +716,12 @@ bool wnd_rfiles_login_is_root(lv_obj_t *obj)
 {
     login_ui_t *ui = get_ui(obj);
     return ui && ui->root == obj;
+}
+
+SAP_STATUS wnd_rfiles_login_init_cfgs(SAP_CONFIG *in_sap_cfg)
+{
+    sap_cfg = in_sap_cfg;
+
+    // On success
+    return SUCCESS;
 }

@@ -19,11 +19,11 @@ void gdrive_cancel_device_code_flow(void)
     gdrive_fini();
 }
 
-int gdrive_begin_device_code_flow_async(gdrive_user_code_cb_t cb, void *user_ctx)
+int gdrive_begin_device_code_flow_async(SAP_CONFIG* sap_cfg, gdrive_user_code_cb_t cb, void *user_ctx)
 {
     SAP_STATUS status = SUCCESS;
     
-    status = gdrive_init();
+    status = gdrive_init(sap_cfg);
     if (FAIL(status))
     {
         SAP_ERR("[GDrive] Init error! status:%lu\n", status);

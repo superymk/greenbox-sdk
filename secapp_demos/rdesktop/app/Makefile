@@ -5,15 +5,12 @@
 current_dir = $(shell pwd)
 APP_INCLUDE += -I$(current_dir)/../include
 
-# [TODO] Temporily limit the check on Windows only.
-ifeq ($(OS), windows_msys2)
-	# If the RDesktop QT project has multiple build configurations, they all should output to the Debug folder or 
-	# the Release folder.
-	ifeq ($(CONFIG_SOSLOADER_GUI_DEBUG), y)
-	QT_APP_DIRS := $(current_dir)/ui/RDesktop/build/Debug
-	else ifeq ($(CONFIG_SOSLOADER_GUI_DEBUG), n)
-	QT_APP_DIRS := $(current_dir)/ui/RDesktop/build/Release
-	endif
+# If the RDesktop QT project has multiple build configurations, they all should output to the Debug folder or 
+# the Release folder.
+ifeq ($(CONFIG_SOSLOADER_GUI_DEBUG), y)
+QT_APP_DIRS := $(current_dir)/ui/RDesktop/build/Debug
+else ifeq ($(CONFIG_SOSLOADER_GUI_DEBUG), n)
+QT_APP_DIRS := $(current_dir)/ui/RDesktop/build/Release
 endif
 
 # Debug Options
@@ -38,9 +35,9 @@ ifeq ($(OS), windows_msys2)
 	@$(CP) -rf $(QT_APP_DIRS)/RDesktop.exe $(DIST_SAP_PATH)/
 	@$(CP) -rf $(QT_APP_DIRS)/RDesktop.exe $(DIST_PRIV_SAP_PATH)/
 else
-	# [TODO] Temporily limit the check on Windows only.
-	# @$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_SAP_PATH)/
-	# @$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_PRIV_SAP_PATH)/
+	# Temporally enable for windows only.
+	#@$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_SAP_PATH)/
+	#@$(CP) -rf $(QT_APP_DIRS)/RDesktop $(DIST_PRIV_SAP_PATH)/
 endif
 	
 clean:

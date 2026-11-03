@@ -20,7 +20,9 @@ List* list_create(void)
 
 void list_destroy(List *list)
 {
-	ListNode *iter, *cur, *next;
+	ListNode *iter = NULL;
+	ListNode *cur = NULL;
+	ListNode *next = NULL;
 
 	if(!list)
 		return;
@@ -136,7 +138,7 @@ ListNode* list_push(List *list, void *value)
 
 void* list_pop(List *list)
 {
-	ListNode *node;
+	ListNode *node = NULL;
 	
 	if(!list)
 		return NULL;
@@ -154,7 +156,7 @@ void* list_pop(List *list)
 
 void* list_dequeue(List *list)
 {
-	ListNode *node;
+	ListNode *node = NULL;
 	
 	if(!list)
 		return NULL;
@@ -173,7 +175,7 @@ void* list_dequeue(List *list)
 
 ListNode* list_last(List *list)
 {
-	ListNode *node;
+	ListNode *node = NULL;
 	
 	if(!list)
 		return NULL;
@@ -184,7 +186,7 @@ ListNode* list_last(List *list)
 
 ListNode* list_first(List *list)
 {
-	ListNode *node;
+	ListNode *node = NULL;
 	
 	if(!list)
 		return NULL;
@@ -219,8 +221,8 @@ void* list_remove(List *list, ListNode *node)
         //check(list->last != NULL, "Invalid list, somehow got a next that is NULL.");
         list->last->next = NULL;
     } else {
-        ListNode *after = node->next;
-        ListNode *before = node->prev;
+		ListNode *after = node->next;
+		ListNode *before = node->prev;
         after->prev = before;
         before->next = after;
     }

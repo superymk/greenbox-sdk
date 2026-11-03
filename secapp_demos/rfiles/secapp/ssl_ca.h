@@ -20,7 +20,8 @@
  *
  *   Call this **once at startup**, before any OAuth/device-code or curl work.
  */
-void sslca_init(void);
+SAP_STATUS sslca_init(const char* certs_filepath);
+void sslca_fini(void);
 
 /*
  * sslca_curl_set(CURL *easy)

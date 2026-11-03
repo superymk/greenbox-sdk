@@ -4,663 +4,567 @@
 
 #include <sap_headers_libc.h>
 #include <palddk.h>
-
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <lib-iosm-usb.h>
-
-#include "debug.h"
 #include "usb-kbd.h"
 #include "usbhid.h"
 
-extern void libdrv_hid_kbd_event_enqueue(struct kbd_key_event *event);
 extern void libdrv_hid_call_kbd_listeners(struct kbd_key_event *event);
 
-static void _kbd_free_intrpipe(struct sp_usbpdev_pipe *pipe);
+#define MAX_KEYBOARD_INTR_PIPES 8u
+#define KBD_USAGE_COUNT 256u
+#define KBD_KEY_BITMAP_BYTES (KBD_USAGE_COUNT / 8u)
+#define KBD_EVENT_CAPACITY KBD_USAGE_COUNT
+#define LED_NUMLOCK 0x01u
+#define LED_CAPSLOCK 0x02u
+#define LED_SCROLLLOCK 0x04u
 
-#define MAX_KEYBOARD_INTR_PIPES (8)
-
-static struct sp_usbpdev_pipe *_kbd_intr_pipes[MAX_KEYBOARD_INTR_PIPES] = {0};
-
-static char *kbd_keydata = NULL;
-// static bool kbd_isr_enable = false;
-
-static bool capslock = false;
-static bool numlock = false;
-static bool scrollock = false;
-
-/********* Private Functions *********/
-static void _pipe_infos_clean(void)
+/* One registered keyboard interface owns its pipe, descriptor, input history,
+ * and pending events. A NULL interrupt_pipe identifies an unused array slot. */
+struct kbd_usb_dev
 {
-    uint32_t i = 0;
+    struct sp_usbpdev_pipe *interrupt_pipe;
+    struct hid_report_descriptor *report_descriptor;
+    uint8_t interface_number;
+    size_t packet_capacity;
+    uint8_t input_buffer[HID_REPORT_MAX_PACKET];
 
-    FOREACH_S(i, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
-    {
-        _kbd_intr_pipes[i] = NULL;
-    }
-}
+    /* Each descriptor report index owns one key bitmap. Their union is the
+     * held-key set, so independent report IDs cannot release each other. */
+    uint8_t report_pressed_keys[HID_REPORT_MAX_IDS][KBD_KEY_BITMAP_BYTES];
+    uint8_t pressed_keys[KBD_KEY_BITMAP_BYTES];
+    uint8_t lock_leds;
 
-static int _pipe_infos_find(struct sp_usbpdev_pipe *pipe)
+    /* A failed control request may leave endpoint zero halted. Stop LED
+     * retries until reinitialization so later lock presses do not time out. */
+    bool led_updates_disabled;
+
+    /* Drain a report's changes before polling another packet. Each usage
+     * changes at most once, so the entire report fits in 256 event entries. */
+    struct kbd_key_event queued_events[KBD_EVENT_CAPACITY];
+    unsigned next_event_index;
+    unsigned pending_event_count;
+};
+
+static struct kbd_usb_dev keyboard_devices[MAX_KEYBOARD_INTR_PIPES];
+/* Resume packet polling after the last keyboard that supplied an event. */
+static unsigned next_keyboard_index;
+
+static int find_keyboard_device_index(struct sp_usbpdev_pipe *pipe)
 {
-    uint32_t i = 0;
+    unsigned keyboard_index;
 
-    FOREACH_S(i, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
+    FOREACH_S(keyboard_index, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
     {
-        if (_kbd_intr_pipes[i] == pipe)
-            return i;
+        if (keyboard_devices[keyboard_index].interrupt_pipe == pipe)
+        {
+            return (int)keyboard_index;
+        }
     }
 
     return -1;
 }
 
-// Find the first endpoint of a given type in an interface description.
-struct usb_endpoint_descriptor *_kbd_find_ep(
-    struct sp_usbpdev_s *usbdev, int type, int dir, struct usb_interface_descriptor *iface)
+static void initialize_empty_event(struct kbd_key_event *event)
 {
-    uint32_t i = 0;
-
-    // Check: Parameters must be valid
-    if (!usbdev)
-        return NULL;
-
-    FOREACH_S(i, usbdev->data_eps_num, USBPDEV_MAX_DATA_ENDPOINTS_NUM, 0, 1)
+    if (event)
     {
-        struct usbpdev_endpoint_descriptor *ep = &usbdev->data_eps[i];
+        memset(event, 0, sizeof(*event));
+        event->action = LIBDRV_HID_KBD_NO_EVENT;
+    }
+}
 
-        if (ep && ep->iface && ep->epdesc)
+static bool key_usage_is_pressed(const uint8_t *pressed_keys, unsigned key_usage)
+{
+    return (pressed_keys[key_usage / 8u] & (1u << (key_usage % 8u))) != 0;
+}
+
+static uint8_t key_usage_to_event_key(unsigned key_usage)
+{
+    static const uint8_t modifier_key_codes[8] = {
+        LIBDRV_HID_KEY_LEFT_CTRL, LIBDRV_HID_KEY_LEFT_SHIFT,
+        LIBDRV_HID_KEY_LEFT_ALT, LIBDRV_HID_KEY_LEFT_GUI,
+        LIBDRV_HID_KEY_RIGHT_CTRL, LIBDRV_HID_KEY_RIGHT_SHIFT,
+        LIBDRV_HID_KEY_RIGHT_ALT, LIBDRV_HID_KEY_RIGHT_GUI
+    };
+
+    if (key_usage >= 0xe0u && key_usage <= 0xe7u)
+    {
+        return modifier_key_codes[key_usage - 0xe0u];
+    }
+
+    /* Match the physical-key identifiers used by the PS/2 driver. The SDK
+     * distinguishes square brackets/backtick from braces/tilde; Shift stays
+     * in event->modifier and must not change the press/release identifier. */
+    switch (key_usage)
+    {
+        case 0x2fu:
+            return LIBDRV_HID_KEY_LEFT_SQUARE;
+        case 0x30u:
+            return LIBDRV_HID_KEY_RIGHT_SQUARE;
+        case 0x35u:
+            return LIBDRV_HID_KEY_BACKTICK;
+        default:
+            return (uint8_t)key_usage;
+    }
+}
+
+static uint32_t pressed_key_modifiers(const uint8_t *pressed_keys)
+{
+    static const uint32_t modifier_flags[8] = {
+        LIBDRV_HID_MOD_LEFT_CTRL, LIBDRV_HID_MOD_LEFT_SHIFT,
+        LIBDRV_HID_MOD_LEFT_ALT, LIBDRV_HID_MOD_LEFT_GUI,
+        LIBDRV_HID_MOD_RIGHT_CTRL, LIBDRV_HID_MOD_RIGHT_SHIFT,
+        LIBDRV_HID_MOD_RIGHT_ALT, LIBDRV_HID_MOD_RIGHT_GUI
+    };
+    uint32_t modifier_mask = 0;
+    unsigned modifier_index;
+
+    FOREACH_S(modifier_index, sizeof(modifier_flags) / sizeof(modifier_flags[0]), 8u, 0, 1)
+    {
+        if (key_usage_is_pressed(pressed_keys, 0xe0u + modifier_index))
         {
-            if (((ep->epdesc->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == dir) &&
-                ((ep->epdesc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == type) &&
-                ((ep->iface) == iface))
-                return ep->epdesc;
+            modifier_mask |= modifier_flags[modifier_index];
         }
     }
 
-    return NULL;
+    return modifier_mask;
 }
 
-#define LED_NUMLOCK (0x1)
-#define LED_CAPSLOCK (0x2)
-#define LED_SCROLLLOCK (0x4)
-
-static SAP_STATUS _send_led(struct sp_usbpdev_s *usbkbd_dev, uint8_t led)
+static uint32_t lock_state_modifiers(uint8_t lock_leds)
 {
-    SAP_STATUS status = SUCCESS;
-    struct usb_device_request *req = NULL;
-    uint8_t *data = NULL;
+    uint32_t modifier_mask = 0;
 
-    req = (struct usb_device_request *)usbbuf_alloc(USBBUF_MEM_DMA, sizeof(struct usb_device_request));
-    if (!req)
+    if (lock_leds & LED_NUMLOCK)
     {
-        status = ENOMEM;
-        goto mem_err;
+        modifier_mask |= LIBDRV_HID_MOD_NUM_LOCK;
     }
 
-    data = (uint8_t *)usbbuf_alloc(USBBUF_MEM_DMA, 1);
-    if (!data)
+    if (lock_leds & LED_CAPSLOCK)
     {
-        status = ENOMEM;
-        goto mem_err;
+        modifier_mask |= LIBDRV_HID_MOD_CAPS_LOCK;
     }
-    *data = led;
 
-    req->bmRequestType = UT_WRITE_CLASS_INTERFACE;
-    req->bRequest = 9;
-    USETW(req->wValue, 0x0200);
-    USETW(req->wIndex, 0);
-    USETW(req->wLength, 1);
+    if (lock_leds & LED_SCROLLLOCK)
+    {
+        modifier_mask |= LIBDRV_HID_MOD_SCROLL_LOCK;
+    }
 
-    status = iosm_usb_send_default_control(usbkbd_dev, req, data, USB_TRANSFER_DEFAULT_TIMEOUT_MS);
-    usbbuf_dealloc(USBBUF_MEM_DMA, data);
-    usbbuf_dealloc(USBBUF_MEM_DMA, req);
-    if (FAIL(status))
-        return EINTERNAL;
-
-    // On success
-    return SUCCESS;
-
-mem_err:
-    if (data)
-        usbbuf_dealloc(USBBUF_MEM_DMA, data);
-    if (req)
-        usbbuf_dealloc(USBBUF_MEM_DMA, req);
-    return status;
+    return modifier_mask;
 }
 
-/********* Public Functions *********/
-#define KBD_KEYDATA_SIZE (8)
+/* LED transport failure must not disable software lock state or key events.
+ * The first failed request can still wait for the USB control timeout. */
+static void update_keyboard_leds(struct kbd_usb_dev *keyboard)
+{
+    SAP_STATUS status;
+
+    if (keyboard->led_updates_disabled)
+    {
+        return;
+    }
+
+    status = usbhid_send_leds(keyboard->interrupt_pipe->dev,
+        keyboard->interface_number, keyboard->report_descriptor, keyboard->lock_leds);
+    if (FAIL(status))
+    {
+        keyboard->led_updates_disabled = true;
+        SAP_ERR("USB HID keyboard interface %u: LED SET_REPORT failed (status:%lu); "
+            "LED updates disabled until reinitialization\n", keyboard->interface_number, status);
+    }
+}
+
+static void queue_key_transition(struct kbd_usb_dev *keyboard, unsigned key_usage,
+    uint8_t action, uint32_t modifier_mask)
+{
+    struct kbd_key_event *event = &keyboard->queued_events[keyboard->pending_event_count++];
+
+    initialize_empty_event(event);
+    event->key = key_usage_to_event_key(key_usage);
+    event->action = action;
+
+    if (action == LIBDRV_HID_KBD_KEY_PRESSED)
+    {
+        if (event->key == LIBDRV_HID_KEY_NUM_LOCK)
+        {
+            keyboard->lock_leds ^= LED_NUMLOCK;
+        }
+        else if (event->key == LIBDRV_HID_KEY_CAPS_LOCK)
+        {
+            keyboard->lock_leds ^= LED_CAPSLOCK;
+        }
+        else if (event->key == LIBDRV_HID_KEY_SCROLL_LOCK)
+        {
+            keyboard->lock_leds ^= LED_SCROLLLOCK;
+        }
+    }
+
+    event->modifier = modifier_mask | lock_state_modifiers(keyboard->lock_leds);
+}
+
+static void queue_report_transitions(struct kbd_usb_dev *keyboard,
+    const uint8_t *report_keys, unsigned report_index)
+{
+    uint8_t combined_pressed_keys[KBD_KEY_BITMAP_BYTES];
+    uint8_t previous_lock_leds = keyboard->lock_leds;
+    uint32_t modifier_mask;
+    unsigned other_report_index;
+    unsigned key_byte_index;
+    unsigned key_usage;
+
+    /* ErrorRollOver, POSTFail and ErrorUndefined leave held keys unchanged. */
+    if (report_index >= keyboard->report_descriptor->report_id_count ||
+        report_index >= HID_REPORT_MAX_IDS || (report_keys[0] & 0x0eu))
+    {
+        return;
+    }
+
+    memcpy(combined_pressed_keys, report_keys, sizeof(combined_pressed_keys));
+    combined_pressed_keys[0] &= 0xf0u;
+    FOREACH_S(other_report_index, keyboard->report_descriptor->report_id_count, HID_REPORT_MAX_IDS, 0, 1)
+    {
+        if (other_report_index != report_index)
+        {
+            FOREACH_S(key_byte_index, sizeof(combined_pressed_keys), KBD_KEY_BITMAP_BYTES, 0, 1)
+            {
+                combined_pressed_keys[key_byte_index] |=
+                    keyboard->report_pressed_keys[other_report_index][key_byte_index];
+            }
+        }
+    }
+
+    keyboard->next_event_index = 0;
+    keyboard->pending_event_count = 0;
+    modifier_mask = pressed_key_modifiers(combined_pressed_keys);
+
+    /* Replacements release old keys before pressing new ones. Modifier bits
+     * describe the new union, including independent modifier report IDs. */
+    FOREACH_S(key_usage, KBD_USAGE_COUNT, KBD_USAGE_COUNT, 4, 1)
+    {
+        if (key_usage_is_pressed(keyboard->pressed_keys, key_usage) &&
+            !key_usage_is_pressed(combined_pressed_keys, key_usage))
+        {
+            queue_key_transition(keyboard, key_usage, LIBDRV_HID_KBD_KEY_RELEASED, modifier_mask);
+        }
+    }
+
+    FOREACH_S(key_usage, KBD_USAGE_COUNT, KBD_USAGE_COUNT, 4, 1)
+    {
+        if (!key_usage_is_pressed(keyboard->pressed_keys, key_usage) &&
+            key_usage_is_pressed(combined_pressed_keys, key_usage))
+        {
+            queue_key_transition(keyboard, key_usage, LIBDRV_HID_KBD_KEY_PRESSED, modifier_mask);
+        }
+    }
+
+    memcpy(keyboard->report_pressed_keys[report_index], report_keys, KBD_KEY_BITMAP_BYTES);
+    keyboard->report_pressed_keys[report_index][0] &= 0xf0u;
+    memcpy(keyboard->pressed_keys, combined_pressed_keys, KBD_KEY_BITMAP_BYTES);
+
+    if (previous_lock_leds != keyboard->lock_leds)
+    {
+        update_keyboard_leds(keyboard);
+    }
+}
+
+static bool dequeue_key_event(struct kbd_usb_dev *keyboard, struct kbd_key_event *event)
+{
+    if (!keyboard || !keyboard->interrupt_pipe || !keyboard->pending_event_count)
+    {
+        return false;
+    }
+
+    *event = keyboard->queued_events[keyboard->next_event_index++];
+    if (!--keyboard->pending_event_count)
+    {
+        keyboard->next_event_index = 0;
+    }
+
+    return true;
+}
+
+/* Visit every pipe at most once, resuming after the last pipe served. */
+static SAP_STATUS poll_keyboard_interfaces(struct kbd_usb_dev **output_keyboard)
+{
+    SAP_STATUS first_error = SUCCESS;
+    unsigned interfaces_visited;
+    unsigned keyboard_index;
+
+    *output_keyboard = NULL;
+
+    /* Reads return only one or two events. Keep the remaining events with
+     * their device and finish that report before accepting another packet. */
+    FOREACH_S(keyboard_index, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
+    {
+        if (keyboard_devices[keyboard_index].interrupt_pipe &&
+            keyboard_devices[keyboard_index].pending_event_count)
+        {
+            *output_keyboard = &keyboard_devices[keyboard_index];
+            return SUCCESS;
+        }
+    }
+
+    FOREACH_S(interfaces_visited, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
+    {
+        struct kbd_usb_dev *keyboard = &keyboard_devices[next_keyboard_index];
+        uint8_t report_keys[KBD_KEY_BITMAP_BYTES];
+        unsigned report_index;
+        SAP_STATUS status;
+
+        next_keyboard_index = (next_keyboard_index + 1u) % MAX_KEYBOARD_INTR_PIPES;
+        if (!keyboard->interrupt_pipe)
+        {
+            continue;
+        }
+
+        memset(keyboard->input_buffer, 0, sizeof(keyboard->input_buffer));
+        status = iosm_usb_poll_intr(keyboard->interrupt_pipe, keyboard->input_buffer,
+            keyboard->packet_capacity);
+        if (status == E_USBTD_IS_ACTIVE)
+        {
+            continue;
+        }
+
+        if (FAIL(status))
+        {
+            if (PASS(first_error))
+            {
+                first_error = status;
+            }
+
+            continue;
+        }
+
+        /* The SDK has no completed byte count, and xHCI copies stale DMA tail
+         * bytes on short transfers. The parser receives capacity; rejecting
+         * truncation requires the transport to supply the actual length. */
+        if (hid_report_decode_keyboard(keyboard->report_descriptor, keyboard->input_buffer,
+            keyboard->packet_capacity, report_keys, &report_index) != HID_PARSE_OK)
+        {
+            continue;
+        }
+
+        queue_report_transitions(keyboard, report_keys, report_index);
+        if (keyboard->pending_event_count)
+        {
+            *output_keyboard = keyboard;
+            return SUCCESS;
+        }
+    }
+
+    return first_error;
+}
+
 SAP_STATUS usb_kbd_mgr_init(void)
 {
-    _pipe_infos_clean();
+    usb_kbd_mgr_fini();
 
-    // Allocate kbd_keydata
-    if (!kbd_keydata)
-    {
-        kbd_keydata = (char *)malloc(KBD_KEYDATA_SIZE);
-        if (!kbd_keydata)
-        {
-            SAP_ERR("Allocate USB keyboard data error!\n");
-            return ENOMEM;
-        }
-    }
-
-    // On success
     return SUCCESS;
 }
 
 void usb_kbd_mgr_fini(void)
 {
-    if (kbd_keydata)
+    unsigned keyboard_index;
+
+    FOREACH_S(keyboard_index, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
     {
-        free(kbd_keydata);
-        kbd_keydata = NULL;
+        usb_kbd_fini(keyboard_devices[keyboard_index].interrupt_pipe);
     }
 
-    _pipe_infos_clean();
+    next_keyboard_index = 0;
 }
 
-struct sp_usbpdev_pipe *usb_kbd_init(struct sp_usbpdev_s *usbkbd_dev, struct usb_interface_descriptor *iface)
+struct sp_usbpdev_pipe *usb_kbd_init_from_descriptor(struct sp_usbpdev_s *device,
+    struct usbpdev_endpoint_descriptor *endpoint, struct hid_report_descriptor *descriptor,
+    bool boot_protocol)
 {
-    SAP_STATUS status = SUCCESS;
-    struct sp_usbpdev_pipe *_usbkbd_intr_pipe = NULL;
+    struct sp_usbpdev_pipe *interrupt_pipe = NULL;
+    size_t packet_capacity;
+    unsigned keyboard_index;
+    int pipe_index;
+    struct kbd_usb_dev *keyboard;
 
-    // Sanity checks
-    if (!usbkbd_dev || !iface)
+    if (!device || !endpoint || !endpoint->iface || !endpoint->epdesc || !descriptor ||
+        descriptor->input_types != HID_REPORT_KEYBOARD)
     {
-        SAP_ERR("<usb_kbd_init> usbkbd_dev has not been initialized yet!\n");
-        return NULL;
+        goto fail;
     }
 
-    // Init the interrupt pipe
-    struct usb_endpoint_descriptor *epdesc = _kbd_find_ep(
-        usbkbd_dev, USB_ENDPOINT_XFER_INT, UE_DIR_IN, iface);
-    if (!epdesc)
+    packet_capacity = UGETW(endpoint->epdesc->wMaxPacketSize);
+    if (!packet_capacity || packet_capacity > HID_REPORT_MAX_PACKET ||
+        !descriptor->max_input_bytes || descriptor->max_input_bytes > packet_capacity ||
+        !descriptor->report_id_count || descriptor->report_id_count > HID_REPORT_MAX_IDS)
     {
-        SAP_ERR("epdesc is NULL!\n");
-        goto get_ep_desc_err;
-    }
-    if (UGETW(epdesc->wMaxPacketSize) < 8)
-    {
-        SAP_ERR("Unsupported wMaxPacketSize (%u) of the keyboard!\n", UGETW(epdesc->wMaxPacketSize));
-        goto get_ep_desc_err;
+        goto fail;
     }
 
-    SAP_INFO("<usb_kbd_init>: Alloc Keyboard Interrupt Pipe\n");
-    _usbkbd_intr_pipe = iosm_usb_usbpdev_alloc_intr_pipe(usbkbd_dev, epdesc);
-    if (!_usbkbd_intr_pipe)
+    FOREACH_S(keyboard_index, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
     {
-        SAP_ERR("Allocate USB keyboard interrupt pipe error!\n");
-        goto alloc_intr_pipe_err;
-    }
-    SAP_INFO("Finish allocating keyboard interrupt pipe\n");
-
-    if (usbkbd_dev->bus_type == USB3)
-    {
-        // [TODO] Use BOOT protocol for now. We should switch to REPORT protocol
-        if (iface->bInterfaceSubClass == 1)
+        if (keyboard_devices[keyboard_index].interrupt_pipe &&
+            keyboard_devices[keyboard_index].interrupt_pipe->dev == device &&
+            keyboard_devices[keyboard_index].interface_number == endpoint->iface->bInterfaceNumber)
         {
-            // The device supports BOOT protocol, see "Detecting HID devices" on https://wiki.osdev.org/USB_Human_Interface_Devices
-            status = set_protocol(usbkbd_dev, 0, iface->bInterfaceNumber);
-            if (FAIL(status))
-            {
-                SAP_ERR("USB Keyboard init HID error: failed to set protocol! status:%lu\n", status);
-                goto usb_hid_err;
-            }
-
-            status = set_idle(usbkbd_dev, 0);
-            if (FAIL(status))
-            {
-                // [TODO][Quirk] Some devices (e.g., Logitech G502) cannot handle <set_idle> here. So this function
-                // continues on error.
-                SAP_ERR("USB Keyboard init HID error: failed to set idle! status:%lu\n", status);
-                // goto usb_hid_err;
-            }
-        }
-        else
-        {
-            SAP_ERR("USB Keyboard init HID error: Device (interface:%u) does not support BOOT protocol!\n", iface->bInterfaceNumber);
-            goto usb_hid_err;
+            free(descriptor);
+            return keyboard_devices[keyboard_index].interrupt_pipe;
         }
     }
 
-    // // Enable ISR
-    // kbd_isr_enable = true;
-
-    // Record the interrupt pipe
+    pipe_index = find_keyboard_device_index(NULL);
+    if (pipe_index < 0)
     {
-        int idx = _pipe_infos_find(NULL);
-
-        if (idx == -1)
-            goto record_pipe_err;
-
-        _kbd_intr_pipes[idx] = _usbkbd_intr_pipe;
+        goto fail;
     }
 
-    // Reset keyboard lights. Only NUMLOCK is on.
-    status = _send_led(usbkbd_dev, LED_NUMLOCK);
-    if (FAIL(status))
-        SAP_ERR("USB Keyboard init HID error: failed to clear lights!\n");
-
-    // On success
-    return _usbkbd_intr_pipe;
-
-record_pipe_err:
-usb_hid_err:
-    if (_usbkbd_intr_pipe)
+    interrupt_pipe = iosm_usb_usbpdev_alloc_intr_pipe(device, endpoint->epdesc);
+    if (!interrupt_pipe)
     {
-        _kbd_free_intrpipe(_usbkbd_intr_pipe);
-        _usbkbd_intr_pipe = NULL;
+        goto fail;
     }
 
-alloc_intr_pipe_err:
-get_ep_desc_err:
+    keyboard_index = (unsigned)pipe_index;
+    keyboard = &keyboard_devices[keyboard_index];
+    memset(keyboard, 0, sizeof(*keyboard));
+    keyboard->report_descriptor = descriptor;
+    keyboard->interface_number = endpoint->iface->bInterfaceNumber;
+    keyboard->packet_capacity = packet_capacity;
+    keyboard->interrupt_pipe = interrupt_pipe;
+
+    update_keyboard_leds(keyboard);
+
+    SAP_INFO("USB HID keyboard interface %u: running in %s protocol\n",
+        keyboard->interface_number, boot_protocol ? "BOOT" : "REPORT");
+
+    return interrupt_pipe;
+
+fail:
+    /* The allocation may not yet have a registry slot. Free it directly. */
+    if (interrupt_pipe)
+    {
+        SAP_STATUS status = iosm_usb_usbpdev_free_pipe(interrupt_pipe);
+
+        if (FAIL(status))
+        {
+            SAP_ERR("USB keyboard: free interrupt pipe failed (status:%lu)\n", status);
+        }
+    }
+
+    free(descriptor);
     return NULL;
 }
 
-void usb_kbd_fini(struct sp_usbpdev_pipe *pipe)
+struct sp_usbpdev_pipe *usb_kbd_init(struct sp_usbpdev_s *device,
+    struct usb_interface_descriptor *interface_descriptor)
 {
-    // // Disable ISR
-    // kbd_isr_enable = false;
+    struct usbpdev_endpoint_descriptor *endpoint = NULL;
+    struct hid_report_descriptor *descriptor = NULL;
+    bool boot_protocol = false;
+    unsigned keyboard_index;
 
-    // Free kbd USB intr pipe
-    _kbd_free_intrpipe(pipe);
+    if (!device || !interface_descriptor)
+    {
+        return NULL;
+    }
 
-    SAP_INFO("Finalized USB Keyboard Specific USB pipes %p\n", pipe);
+    FOREACH_S(keyboard_index, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
+    {
+        if (keyboard_devices[keyboard_index].interrupt_pipe &&
+            keyboard_devices[keyboard_index].interrupt_pipe->dev == device &&
+            keyboard_devices[keyboard_index].interface_number == interface_descriptor->bInterfaceNumber)
+        {
+            return keyboard_devices[keyboard_index].interrupt_pipe;
+        }
+    }
+
+    if (FAIL(usbhid_prepare_interface(device, interface_descriptor, HID_REPORT_KEYBOARD,
+        &endpoint, &descriptor, &boot_protocol)))
+    {
+        return NULL;
+    }
+
+    return usb_kbd_init_from_descriptor(device, endpoint, descriptor, boot_protocol);
 }
 
-#define USBKBD_MOD_LEFT_CTRL 0x001
-#define USBKBD_MOD_LEFT_SHIFT 0x002
-#define USBKBD_MOD_LEFT_ALT 0x004
-#define USBKBD_MOD_LEFT_GUI 0x008
-#define USBKBD_MOD_RIGHT_CTRL 0x010
-#define USBKBD_MOD_RIGHT_SHIFT 0x020
-#define USBKBD_MOD_RIGHT_ALT 0x040
-#define USBKBD_MOD_RIGHT_GUI 0x080
-
-static void _get_key_of_one_modifier_diff(uint8_t diff, uint8_t *out_key)
+void usb_kbd_fini(struct sp_usbpdev_pipe *interrupt_pipe)
 {
-    if (diff & USBKBD_MOD_LEFT_CTRL)
-        *out_key = LIBDRV_HID_KEY_LEFT_CTRL;
-    else if (diff & USBKBD_MOD_LEFT_SHIFT)
-        *out_key = LIBDRV_HID_KEY_LEFT_SHIFT;
-    else if (diff & USBKBD_MOD_LEFT_ALT)
-        *out_key = LIBDRV_HID_KEY_LEFT_ALT;
-    else if (diff & USBKBD_MOD_LEFT_GUI)
-        *out_key = LIBDRV_HID_KEY_LEFT_GUI;
-    else if (diff & USBKBD_MOD_RIGHT_CTRL)
-        *out_key = LIBDRV_HID_KEY_RIGHT_CTRL;
-    else if (diff & USBKBD_MOD_RIGHT_SHIFT)
-        *out_key = LIBDRV_HID_KEY_RIGHT_SHIFT;
-    else if (diff & USBKBD_MOD_RIGHT_ALT)
-        *out_key = LIBDRV_HID_KEY_RIGHT_ALT;
-    else if (diff & USBKBD_MOD_RIGHT_GUI)
-        *out_key = LIBDRV_HID_KEY_RIGHT_GUI;
+    SAP_STATUS status;
+    int pipe_index;
+    struct kbd_usb_dev *keyboard;
+
+    if (!interrupt_pipe)
+    {
+        return;
+    }
+
+    pipe_index = find_keyboard_device_index(interrupt_pipe);
+    if (pipe_index < 0)
+    {
+        return;
+    }
+
+    keyboard = &keyboard_devices[pipe_index];
+    keyboard->interrupt_pipe = NULL;
+
+    status = iosm_usb_usbpdev_free_pipe(interrupt_pipe);
+    if (FAIL(status))
+    {
+        SAP_ERR("USB keyboard: free interrupt pipe failed (status:%lu)\n", status);
+    }
+
+    free(keyboard->report_descriptor);
+    memset(keyboard, 0, sizeof(*keyboard));
 }
 
-#define USBKBD_KEY_NO_SCANCODE (0)
-#define USBKBD_KEY_PHANTOM_CONDITION (1)
-#define USBKBD_KEY_SELF_TEST_FAILURE (2)
-#define USBKBD_KEY_UNDEFINED_ERROR (3)
-
-#define USBKBD_KEY_INVALID (0xFF)
-
-/// @brief Compare the new keyboard input values <usbkbd_modifier> and <usbkbd_character> with their history and output
-/// the corresponding one or two keyboard events.
-/// [NOTE] This function may return two events if <usbkbd_character> (i.e., keyboard data at byte [2]) is different from
-/// its history and both of them are not USBKBD_KEY_NO_SCANCODE, see https://wiki.osdev.org/USB_Human_Interface_Devices
-/// [TODO] We assume that users always newly press or release only one modifier key.
-/// @param usbkbd_last_modifier
-/// @param usbkbd_last_character
-/// @param usbkbd_modifier
-/// @param usbkbd_character
-/// @param out_1st_action
-/// @param out_1st_key
-/// @param out_2nd_action
-/// @param out_2nd_key
-static void _parse_kbd_input(uint8_t usbkbd_last_modifier, uint8_t usbkbd_last_character, uint8_t usbkbd_modifier, uint8_t usbkbd_character, uint8_t *out_1st_action, uint8_t *out_1st_key, uint8_t *out_2nd_action, uint8_t *out_2nd_key)
+SAP_STATUS usb_kbd_read_nonblock(struct kbd_key_event *out_1st_key_event,
+    struct kbd_key_event *out_2nd_key_event)
 {
-    // If the last key modifiers and keypress are not changed, then there is no keypress changes
-    if ((usbkbd_last_modifier == usbkbd_modifier) && (usbkbd_last_character == usbkbd_character))
-    {
-        *out_1st_action = LIBDRV_HID_KBD_NO_EVENT;
-        *out_1st_key = USBKBD_KEY_NO_SCANCODE;
+    SAP_STATUS status;
+    struct kbd_usb_dev *keyboard = NULL;
 
-        *out_2nd_action = LIBDRV_HID_KBD_NO_EVENT;
-
-        return;
-    }
-
-    // Handle error report in <usbkbd_character>
-    if ((usbkbd_character == USBKBD_KEY_PHANTOM_CONDITION) || (usbkbd_character == USBKBD_KEY_SELF_TEST_FAILURE) || (usbkbd_character == USBKBD_KEY_UNDEFINED_ERROR))
-    {
-        *out_1st_action = LIBDRV_HID_KBD_NO_EVENT;
-        *out_1st_key = USBKBD_KEY_NO_SCANCODE;
-
-        *out_2nd_action = LIBDRV_HID_KBD_NO_EVENT;
-
-        return;
-    }
-
-    // Handle press/release of modifiers.
-    // [TODO] We assume one modifier key press/release at a time only
-    if (usbkbd_last_modifier < usbkbd_modifier)
-    {
-        // A modifier is pressed
-        uint8_t diff = usbkbd_last_modifier ^ usbkbd_modifier;
-
-        *out_1st_action = LIBDRV_HID_KBD_KEY_PRESSED;
-        _get_key_of_one_modifier_diff(diff, out_1st_key);
-
-        *out_2nd_action = LIBDRV_HID_KBD_NO_EVENT;
-
-        return;
-    }
-    else if (usbkbd_last_modifier > usbkbd_modifier)
-    {
-        // A modifier is released
-        uint8_t diff = usbkbd_last_modifier ^ usbkbd_modifier;
-
-        *out_1st_action = LIBDRV_HID_KBD_KEY_RELEASED;
-        _get_key_of_one_modifier_diff(diff, out_1st_key);
-
-        *out_2nd_action = LIBDRV_HID_KBD_NO_EVENT;
-
-        return;
-    }
-
-    // Handle press/release of keys
-    // The keys are queued in keyboard data from byte 2 to byte 7. This function checks <usbkbd_character> (i.e., byte 2)
-    // only. If there are further bytes in byte 3 to byte 7, they will overwrite <usbkbd_character> in the next and this
-    // function can handle them by observing changes in <usbkbd_character>.
-    if ((usbkbd_last_character == USBKBD_KEY_NO_SCANCODE) && (usbkbd_character != USBKBD_KEY_NO_SCANCODE))
-    {
-        // A key is pressed
-        *out_1st_action = LIBDRV_HID_KBD_KEY_PRESSED;
-        *out_1st_key = usbkbd_character;
-        *out_2nd_action = LIBDRV_HID_KBD_NO_EVENT;
-
-        return;
-    }
-    else if ((usbkbd_character == USBKBD_KEY_NO_SCANCODE) && (usbkbd_last_character != USBKBD_KEY_NO_SCANCODE))
-    {
-        // A key is released
-        *out_1st_action = LIBDRV_HID_KBD_KEY_RELEASED;
-        *out_1st_key = usbkbd_last_character;
-        *out_2nd_action = LIBDRV_HID_KBD_NO_EVENT;
-
-        return;
-    }
-    // No need to check "usbkbd_last_character == 0 && usbkbd_character == 0", because either a modifier is changed or
-    // there is no event at all. The function handles both cases earlier.
-    else if (usbkbd_character != usbkbd_last_character)
-    {
-        // The previous key is released and a new key is pressed.
-        *out_1st_action = LIBDRV_HID_KBD_KEY_RELEASED;
-        *out_1st_key = usbkbd_last_character;
-
-        *out_2nd_action = LIBDRV_HID_KBD_KEY_PRESSED;
-        *out_2nd_key = usbkbd_character;
-
-        return;
-    }
-
-    return;
-}
-
-static uint8_t last_modifier = 0;
-static uint8_t last_character = USBKBD_KEY_NO_SCANCODE;
-static char led_packet = 0x0;
-static SAP_STATUS _kbd_read_nonblock(struct sp_usbpdev_pipe *pipe, struct kbd_key_event *out_1st_key_event, struct kbd_key_event *out_2nd_key_event)
-{
-    SAP_STATUS status = SUCCESS;
-    // int ret = 0;
-    uint8_t modifier = 0;
-    uint8_t character = 0;
-    uint8_t key_action1 = LIBDRV_HID_KBD_NO_EVENT;
-    uint8_t key_action2 = LIBDRV_HID_KBD_NO_EVENT;
-    struct kbd_key_event key_event = {.action = LIBDRV_HID_KBD_NO_EVENT};
-
-    // Sanity checks
-    if (!pipe)
-    {
-        *out_1st_key_event = key_event;
-        return EINVAL;
-    }
-
-    {
-        for (;;)
-        {
-            status = iosm_usb_poll_intr(pipe, kbd_keydata, KBD_KEYDATA_SIZE);
-            if (PASS(status))
-                // Received key press/release
-                break;
-            else if (status == E_USBTD_IS_ACTIVE)
-            {
-                status = SUCCESS;
-                key_event.action = LIBDRV_HID_KBD_NO_EVENT;
-                goto out;
-            }
-            else
-            {
-                SAP_ERR("QTD error! status:%lu\n", status);
-                status = EINTERNAL;
-                key_event.action = LIBDRV_HID_KBD_NO_EVENT;
-                goto out;
-            }
-        }
-
-        modifier = kbd_keydata[0];
-        character = kbd_keydata[2];
-        memset(kbd_keydata, 0, KBD_KEYDATA_SIZE);
-
-        if (modifier)
-        {
-            uint32_t key_modifier = 0;
-
-            if (modifier & USBKBD_MOD_LEFT_CTRL)
-                key_modifier |= LIBDRV_HID_MOD_LEFT_CTRL;
-            if (modifier & USBKBD_MOD_LEFT_SHIFT)
-                key_modifier |= LIBDRV_HID_MOD_LEFT_SHIFT;
-            if (modifier & USBKBD_MOD_LEFT_ALT)
-                key_modifier |= LIBDRV_HID_MOD_LEFT_ALT;
-            if (modifier & USBKBD_MOD_LEFT_GUI)
-                key_modifier |= LIBDRV_HID_MOD_LEFT_GUI;
-            if (modifier & USBKBD_MOD_RIGHT_CTRL)
-                key_modifier |= LIBDRV_HID_MOD_RIGHT_CTRL;
-            if (modifier & USBKBD_MOD_RIGHT_SHIFT)
-                key_modifier |= LIBDRV_HID_MOD_RIGHT_SHIFT;
-            if (modifier & USBKBD_MOD_RIGHT_ALT)
-                key_modifier |= LIBDRV_HID_MOD_RIGHT_ALT;
-            if (modifier & USBKBD_MOD_RIGHT_GUI)
-                key_modifier |= LIBDRV_HID_MOD_RIGHT_GUI;
-
-            key_event.modifier = key_modifier;
-        }
-
-        _parse_kbd_input(last_modifier, last_character, modifier, character, &key_action1, &key_event.key, &key_action2, &out_2nd_key_event->key);
-        key_event.action = key_action1;
-        out_2nd_key_event->action = key_action2;
-
-        // Handle CAPSLOCK, NUMLOCK, SCREENLOCK
-        if (key_event.action == LIBDRV_HID_KBD_KEY_PRESSED)
-        {
-            // caps lock
-            if (key_event.key == LIBDRV_HID_KEY_CAPS_LOCK)
-            {
-                if (capslock)
-                {
-                    capslock = false;
-                    led_packet &= ~LED_CAPSLOCK;
-                }
-                else
-                {
-                    capslock = true;
-                    led_packet |= LED_CAPSLOCK;
-                }
-
-                status = _send_led(pipe->dev, led_packet);
-                if (FAIL(status))
-                    SAP_ERR("Update CAPSLOCK light error! led_packet:%u\n", led_packet);
-            }
-
-            // num lock
-            if (key_event.key == LIBDRV_HID_KEY_NUM_LOCK)
-            {
-                if (numlock)
-                {
-                    numlock = false;
-                    led_packet &= ~LED_NUMLOCK;
-                }
-                else
-                {
-                    numlock = true;
-                    led_packet |= LED_NUMLOCK;
-                }
-
-                status = _send_led(pipe->dev, led_packet);
-                if (FAIL(status))
-                    SAP_ERR("Update NUMLOCK light error! led_packet:%u\n", led_packet);
-            }
-
-            // scroll lock
-            if (key_event.key == LIBDRV_HID_KEY_SCROLL_LOCK)
-            {
-                if (scrollock)
-                {
-                    scrollock = false;
-                    led_packet &= ~LED_SCROLLLOCK;
-                }
-                else
-                {
-                    scrollock = true;
-                    led_packet |= LED_SCROLLLOCK;
-                }
-
-                status = _send_led(pipe->dev, led_packet);
-                if (FAIL(status))
-                    SAP_ERR("Update SCROLLLOCK light error! led_packet:%u\n", led_packet);
-            }
-        }
-
-        // Apply CAPSLOCK, NUMLOCK, SCREENLOCK modifiers to subsequent key presses/releases
-        if (key_event.action != LIBDRV_HID_KBD_NO_EVENT)
-        {
-            if (capslock)
-                key_event.modifier |= LIBDRV_HID_MOD_CAPS_LOCK;
-            else
-                key_event.modifier &= ~(LIBDRV_HID_MOD_CAPS_LOCK);
-
-            if (numlock)
-                key_event.modifier |= LIBDRV_HID_MOD_NUM_LOCK;
-            else
-                key_event.modifier &= ~(LIBDRV_HID_MOD_NUM_LOCK);
-
-            if (scrollock)
-                key_event.modifier |= LIBDRV_HID_MOD_SCROLL_LOCK;
-            else
-                key_event.modifier &= ~(LIBDRV_HID_MOD_SCROLL_LOCK);
-        }
-
-        out_2nd_key_event->modifier = key_event.modifier;
-
-        // Update <last_modifier> and <last_character> according to the key events parsed in <_parse_kbd_input>
-
-        // if(!*out_has_next_key)
-        if (out_2nd_key_event->action == LIBDRV_HID_KBD_NO_EVENT)
-        {
-            // If there is only one key event, then update the last event to be the current event
-            last_modifier = modifier;
-            last_character = character;
-        }
-        else if (out_2nd_key_event->action == LIBDRV_HID_KBD_KEY_PRESSED)
-        {
-            // If there is follow-up key event, then <last_character> must be an invalid value to handle the next
-            // <character>.
-            // [NOTE] The function must not set <last_character> to USBKBD_KEY_NO_SCANCODE. Otherwise, the function
-            // misses key releases that have no modifiers.
-            last_modifier = modifier;
-            // last_character = USBKBD_KEY_INVALID;
-            last_character = out_2nd_key_event->key;
-        }
-    }
-
-    // On success
-    status = SUCCESS;
-
-out:
-    *out_1st_key_event = key_event;
-    return status;
-}
-
-SAP_STATUS usb_kbd_read_nonblock(struct kbd_key_event *out_1st_key_event, struct kbd_key_event *out_2nd_key_event)
-{
-    SAP_STATUS status = SUCCESS;
-    uint32_t i = 0;
+    initialize_empty_event(out_1st_key_event);
+    initialize_empty_event(out_2nd_key_event);
 
     if (!out_1st_key_event || !out_2nd_key_event)
-        return EINVAL;
-
-    FOREACH_S(i, MAX_KEYBOARD_INTR_PIPES, MAX_KEYBOARD_INTR_PIPES, 0, 1)
     {
-        struct sp_usbpdev_pipe *pipe = _kbd_intr_pipes[i];
-        if (pipe)
-        {
-            status = _kbd_read_nonblock(pipe, out_1st_key_event, out_2nd_key_event);
-            if (FAIL(status))
-                return status;
-
-            if (out_1st_key_event->action != LIBDRV_HID_KBD_NO_EVENT)
-            {
-                // A keyboard triggers an event
-                return SUCCESS;
-            }
-        }
+        return EINVAL;
     }
 
-    // No keyboard triggers an event, just return SUCCESS.
+    status = poll_keyboard_interfaces(&keyboard);
+    if (FAIL(status))
+    {
+        return status;
+    }
+
+    (void)dequeue_key_event(keyboard, out_1st_key_event);
+    (void)dequeue_key_event(keyboard, out_2nd_key_event);
     return SUCCESS;
 }
 
+//! Read keyboard input. The function blocks if there is no key pressed/released.
 SAP_STATUS usb_kbd_read(struct kbd_key_event *out_key_event)
 {
-    SAP_STATUS status = SUCCESS;
-    struct kbd_key_event result = {.action = LIBDRV_HID_KBD_NO_EVENT};
-    struct kbd_key_event result2 = {.action = LIBDRV_HID_KBD_NO_EVENT};
+    SAP_STATUS status;
+    struct kbd_usb_dev *keyboard = NULL;
+
+    initialize_empty_event(out_key_event);
 
     if (!out_key_event)
-        return EINVAL;
-
-    // Block if there is no kbd input read.
-    while (PASS(status) && (result.action == LIBDRV_HID_KBD_NO_EVENT))
     {
-        status = usb_kbd_read_nonblock(&result, &result2);
-
-        if (FAIL(status))
-            return status;
+        return EINVAL;
     }
 
-    // Got the keyboard input.
-    *out_key_event = result;
-    return SUCCESS;
-}
-
-static void _kbd_free_intrpipe(struct sp_usbpdev_pipe *pipe)
-{
-    SAP_STATUS status = SUCCESS;
-
-    if (pipe)
+    // Block if there is no kbd input read.
+    while (true)
     {
-        int idx = _pipe_infos_find(pipe);
-
-        if (idx != -1)
+        status = poll_keyboard_interfaces(&keyboard);
+        if (FAIL(status))
         {
-            status = iosm_usb_usbpdev_free_pipe(pipe);
-            if (FAIL(status))
-                SAP_ERR("Free USB Interrupt Pipe Error! status:%lu\n", status);
+            return status;
+        }
 
-            _kbd_intr_pipes[idx] = NULL;
+        if (dequeue_key_event(keyboard, out_key_event))
+        {
+            return SUCCESS;
         }
     }
 }
@@ -668,53 +572,30 @@ static void _kbd_free_intrpipe(struct sp_usbpdev_pipe *pipe)
 //! \brief Read keyboard event due to periodically pull and/or mouse interrupts
 SAP_STATUS usb_kbd_handler(void)
 {
-    SAP_STATUS status = SUCCESS;
-    struct kbd_key_event *event = NULL;
-    struct kbd_key_event *event2 = NULL;
+    struct kbd_key_event event;
+    struct kbd_usb_dev *keyboard = NULL;
+    SAP_STATUS status;
+    unsigned event_index;
+    unsigned events_to_deliver;
 
-    event = smalloc(sizeof(struct kbd_key_event));
-    event2 = smalloc(sizeof(struct kbd_key_event));
-    if (!event || !event2)
+    status = poll_keyboard_interfaces(&keyboard);
+    if (FAIL(status))
     {
-        SAP_ERR("No memory to queue the new USB keyboard event!\n");
-        status = ENOMEM;
-        goto err;
+        return status;
     }
 
+    events_to_deliver = keyboard ? keyboard->pending_event_count : 0;
+
+    /* Copy before callbacks; a listener may detach the source pipe. */
+    FOREACH_S(event_index, events_to_deliver, KBD_EVENT_CAPACITY, 0, 1)
     {
-        status = usb_kbd_read_nonblock(event, event2);
-        if (FAIL(status))
+        if (!dequeue_key_event(keyboard, &event))
         {
-            goto err;
+            break;
         }
 
-        if (event->action != LIBDRV_HID_KBD_NO_EVENT)
-        {
-            print_kbd_key_event("USB", event);
-
-            // Call all listeners
-            libdrv_hid_call_kbd_listeners(event);
-        }
-
-        if (event2->action != LIBDRV_HID_KBD_NO_EVENT)
-        {
-            print_kbd_key_event("USB", event2);
-
-            // Call all listeners
-            libdrv_hid_call_kbd_listeners(event2);
-        }
+        libdrv_hid_call_kbd_listeners(&event);
     }
 
-    // On success
-    sfree(event, sizeof(struct kbd_key_event));
-    sfree(event2, sizeof(struct kbd_key_event));
     return SUCCESS;
-
-err:
-    if (event)
-        sfree(event, sizeof(struct kbd_key_event));
-    if (event2)
-        sfree(event2, sizeof(struct kbd_key_event));
-
-    return status;
 }

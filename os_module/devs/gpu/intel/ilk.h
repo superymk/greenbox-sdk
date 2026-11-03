@@ -9,7 +9,14 @@
 
 #ifndef __ASSEMBLY__
 
+/// @brief Pause ILK GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS i965_ilk_gpu_pause(struct gpu_pdev *gpu);
+
+/// @brief Resume ILK GPU
+/// @param gpu GPU device
+/// @return OS_SUCCESS on success, error code on failure
 extern OSSTATUS i965_ilk_gpu_resume(struct gpu_pdev *gpu);
 
 #endif //__ASSEMBLY__

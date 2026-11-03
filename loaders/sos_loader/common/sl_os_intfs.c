@@ -244,6 +244,34 @@ uint32_t secagent_sps_get_ids_and_names(struct sp_info_id_name_resp* resp_buf)
 
 
 /********* Other Functions in SecAgent*********/
+
+#ifndef GREENBOX_USE_UXMHF64_V1
+uint32_t secagent_secbase_boot_tinyos(void)
+{
+	OSSTATUS sa_status = OS_SUCCESS;
+	bool status = false;
+	struct tz_cmd_packet cmd;
+	int ret = 0;
+	
+	cmd.id = CMD_SECBASE_BOOT_TINYOS;
+	status = os_ioctl(&cmd, &ret);
+	if(!status)
+	{
+		SL_ERR("<secagent_secbase_boot_tinyos> error with code %d!\n", ret);
+		return 1;
+	}
+
+	sa_status = cmd.status;
+	if(SA_FAIL(sa_status))
+	{
+		SL_ERR("<secagent_secbase_boot_tinyos> SecAgent error: %d!\n", sa_status);
+		return 1;
+	}
+
+	return 0;
+}
+#endif // !GREENBOX_USE_UXMHF64_V1
+
 uint32_t secagent_init_secbase_ondemand_percpu(void)
 {
 	OSSTATUS sa_status = OS_SUCCESS;

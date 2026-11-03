@@ -10,8 +10,9 @@
 /*  Last Updated 11th November 2001                               */
 /******************************************************************/
 
-
 #include "win_intr.h"
+#include <wdf.h>
+#include <wdfdevice.h>
 
 struct IO_APIC_entry os_ioapic_entries[24];
 
@@ -255,712 +256,724 @@ extern void IntFD(void);
 extern void IntFE(void);
 extern void IntFF(void);
 
+/// @brief Arm poll timers for SecOS request polling
+/// @param nextMs Next poll interval in milliseconds
+static VOID _arm_poll_timer(ULONG nextMs);
+
+/// @brief Get dedicated OS CPU ID (BSP)
+/// @return CPU ID
+static uint32_t _win_os_dedicated_cpu_get_id(void);
 
 static PDRIVER_OBJECT DriverObject = NULL;
 static PDEVICE_OBJECT DeviceObject = NULL;
+static WDFDEVICE WDF_Device;
 static intr_t sos_os_intr = INVALID_INTR;
 static lapic_id_t sos_os_intr_os_lapic_id = INVALID_LAPIC_ID;
 
+// (If no OS interrupt vector to receive SecOS's requests) OS's timer to poll SecOS requests.
+#define HIRES_THRESHOLD_MS 16
+WDFTIMER gTimerHi = NULL;  // high-resolution
+WDFTIMER gTimerLo = NULL;  // normal
+static EVT_WDF_TIMER _evt_sos_requests_timer;
+
 void win_int3_debug_break(void)
 {
-	Int3();
+    Int3();
 }
 
 void win_intr_trigger_interrupt(uint32_t vector)
 {
-	switch(vector)
-	{
-		case 0x20:
-			Int20();
-			return;
-		case 0x21:
-			Int21();
-			return;
-		case 0x22:
-			Int22();
-			return;
-		case 0x23:
-			Int23();
-			return;
-		case 0x24:
-			Int24();
-			return;
-		case 0x25:
-			Int25();
-			return;
-		case 0x26:
-			Int26();
-			return;
-		case 0x27:
-			Int27();
-			return;
-		case 0x28:
-			Int28();
-			return;
-		case 0x29:
-			Int29();
-			return;
-		case 0x2A:
-			Int2A();
-			return;
-		case 0x2B:
-			Int2B();
-			return;
-		case 0x2C:
-			Int2C();
-			return;
-		case 0x2D:
-			Int2D();
-			return;
-		case 0x2E:
-			Int2E();
-			return;
-		case 0x2F:
-			Int2F();
-			return;
+    switch (vector)
+    {
+    case 0x20:
+        Int20();
+        return;
+    case 0x21:
+        Int21();
+        return;
+    case 0x22:
+        Int22();
+        return;
+    case 0x23:
+        Int23();
+        return;
+    case 0x24:
+        Int24();
+        return;
+    case 0x25:
+        Int25();
+        return;
+    case 0x26:
+        Int26();
+        return;
+    case 0x27:
+        Int27();
+        return;
+    case 0x28:
+        Int28();
+        return;
+    case 0x29:
+        Int29();
+        return;
+    case 0x2A:
+        Int2A();
+        return;
+    case 0x2B:
+        Int2B();
+        return;
+    case 0x2C:
+        Int2C();
+        return;
+    case 0x2D:
+        Int2D();
+        return;
+    case 0x2E:
+        Int2E();
+        return;
+    case 0x2F:
+        Int2F();
+        return;
 
-		case 0x30:
-			Int30();
-			return;
-		case 0x31:
-			Int31();
-			return;
-		case 0x32:
-			Int32();
-			return;
-		case 0x33:
-			Int33();
-			return;
-		case 0x34:
-			Int34();
-			return;
-		case 0x35:
-			Int35();
-			return;
-		case 0x36:
-			Int36();
-			return;
-		case 0x37:
-			Int37();
-			return;
-		case 0x38:
-			Int38();
-			return;
-		case 0x39:
-			Int39();
-			return;
-		case 0x3A:
-			Int3A();
-			return;
-		case 0x3B:
-			Int3B();
-			return;
-		case 0x3C:
-			Int3C();
-			return;
-		case 0x3D:
-			Int3D();
-			return;
-		case 0x3E:
-			Int3E();
-			return;
-		case 0x3F:
-			Int3F();
-			return;
-		
-		case 0x40:
-			Int40();
-			return;
-		case 0x41:
-			Int41();
-			return;
-		case 0x42:
-			Int42();
-			return;
-		case 0x43:
-			Int43();
-			return;
-		case 0x44:
-			Int44();
-			return;
-		case 0x45:
-			Int45();
-			return;
-		case 0x46:
-			Int46();
-			return;
-		case 0x47:
-			Int47();
-			return;
-		case 0x48:
-			Int48();
-			return;
-		case 0x49:
-			Int49();
-			return;
-		case 0x4A:
-			Int4A();
-			return;
-		case 0x4B:
-			Int4B();
-			return;
-		case 0x4C:
-			Int4C();
-			return;
-		case 0x4D:
-			Int4D();
-			return;
-		case 0x4E:
-			Int4E();
-			return;
-		case 0x4F:
-			Int4F();
-			return;
+    case 0x30:
+        Int30();
+        return;
+    case 0x31:
+        Int31();
+        return;
+    case 0x32:
+        Int32();
+        return;
+    case 0x33:
+        Int33();
+        return;
+    case 0x34:
+        Int34();
+        return;
+    case 0x35:
+        Int35();
+        return;
+    case 0x36:
+        Int36();
+        return;
+    case 0x37:
+        Int37();
+        return;
+    case 0x38:
+        Int38();
+        return;
+    case 0x39:
+        Int39();
+        return;
+    case 0x3A:
+        Int3A();
+        return;
+    case 0x3B:
+        Int3B();
+        return;
+    case 0x3C:
+        Int3C();
+        return;
+    case 0x3D:
+        Int3D();
+        return;
+    case 0x3E:
+        Int3E();
+        return;
+    case 0x3F:
+        Int3F();
+        return;
 
-		case 0x50:
-			Int50();
-			return;
-		case 0x51:
-			Int51();
-			return;
-		case 0x52:
-			Int52();
-			return;
-		case 0x53:
-			Int53();
-			return;
-		case 0x54:
-			Int54();
-			return;
-		case 0x55:
-			Int55();
-			return;
-		case 0x56:
-			Int56();
-			return;
-		case 0x57:
-			Int57();
-			return;
-		case 0x58:
-			Int58();
-			return;
-		case 0x59:
-			Int59();
-			return;
-		case 0x5A:
-			Int5A();
-			return;
-		case 0x5B:
-			Int5B();
-			return;
-		case 0x5C:
-			Int5C();
-			return;
-		case 0x5D:
-			Int5D();
-			return;
-		case 0x5E:
-			Int5E();
-			return;
-		case 0x5F:
-			Int5F();
-			return;
+    case 0x40:
+        Int40();
+        return;
+    case 0x41:
+        Int41();
+        return;
+    case 0x42:
+        Int42();
+        return;
+    case 0x43:
+        Int43();
+        return;
+    case 0x44:
+        Int44();
+        return;
+    case 0x45:
+        Int45();
+        return;
+    case 0x46:
+        Int46();
+        return;
+    case 0x47:
+        Int47();
+        return;
+    case 0x48:
+        Int48();
+        return;
+    case 0x49:
+        Int49();
+        return;
+    case 0x4A:
+        Int4A();
+        return;
+    case 0x4B:
+        Int4B();
+        return;
+    case 0x4C:
+        Int4C();
+        return;
+    case 0x4D:
+        Int4D();
+        return;
+    case 0x4E:
+        Int4E();
+        return;
+    case 0x4F:
+        Int4F();
+        return;
 
-		case 0x60:
-			Int60();
-			return;
-		case 0x61:
-			Int61();
-			return;
-		case 0x62:
-			Int62();
-			return;
-		case 0x63:
-			Int63();
-			return;
-		case 0x64:
-			Int64();
-			return;
-		case 0x65:
-			Int65();
-			return;
-		case 0x66:
-			Int66();
-			return;
-		case 0x67:
-			Int67();
-			return;
-		case 0x68:
-			Int68();
-			return;
-		case 0x69:
-			Int69();
-			return;
-		case 0x6A:
-			Int6A();
-			return;
-		case 0x6B:
-			Int6B();
-			return;
-		case 0x6C:
-			Int6C();
-			return;
-		case 0x6D:
-			Int6D();
-			return;
-		case 0x6E:
-			Int6E();
-			return;
-		case 0x6F:
-			Int6F();
-			return;
+    case 0x50:
+        Int50();
+        return;
+    case 0x51:
+        Int51();
+        return;
+    case 0x52:
+        Int52();
+        return;
+    case 0x53:
+        Int53();
+        return;
+    case 0x54:
+        Int54();
+        return;
+    case 0x55:
+        Int55();
+        return;
+    case 0x56:
+        Int56();
+        return;
+    case 0x57:
+        Int57();
+        return;
+    case 0x58:
+        Int58();
+        return;
+    case 0x59:
+        Int59();
+        return;
+    case 0x5A:
+        Int5A();
+        return;
+    case 0x5B:
+        Int5B();
+        return;
+    case 0x5C:
+        Int5C();
+        return;
+    case 0x5D:
+        Int5D();
+        return;
+    case 0x5E:
+        Int5E();
+        return;
+    case 0x5F:
+        Int5F();
+        return;
 
-		case 0x70:
-			Int70();
-			return;
-		case 0x71:
-			Int71();
-			return;
-		case 0x72:
-			Int72();
-			return;
-		case 0x73:
-			Int73();
-			return;
-		case 0x74:
-			Int74();
-			return;
-		case 0x75:
-			Int75();
-			return;
-		case 0x76:
-			Int76();
-			return;
-		case 0x77:
-			Int77();
-			return;
-		case 0x78:
-			Int78();
-			return;
-		case 0x79:
-			Int79();
-			return;
-		case 0x7A:
-			Int7A();
-			return;
-		case 0x7B:
-			Int7B();
-			return;
-		case 0x7C:
-			Int7C();
-			return;
-		case 0x7D:
-			Int7D();
-			return;
-		case 0x7E:
-			Int7E();
-			return;
-		case 0x7F:
-			Int7F();
-			return;
+    case 0x60:
+        Int60();
+        return;
+    case 0x61:
+        Int61();
+        return;
+    case 0x62:
+        Int62();
+        return;
+    case 0x63:
+        Int63();
+        return;
+    case 0x64:
+        Int64();
+        return;
+    case 0x65:
+        Int65();
+        return;
+    case 0x66:
+        Int66();
+        return;
+    case 0x67:
+        Int67();
+        return;
+    case 0x68:
+        Int68();
+        return;
+    case 0x69:
+        Int69();
+        return;
+    case 0x6A:
+        Int6A();
+        return;
+    case 0x6B:
+        Int6B();
+        return;
+    case 0x6C:
+        Int6C();
+        return;
+    case 0x6D:
+        Int6D();
+        return;
+    case 0x6E:
+        Int6E();
+        return;
+    case 0x6F:
+        Int6F();
+        return;
 
-		case 0x80:
-			Int80();
-			return;
-		case 0x81:
-			Int81();
-			return;
-		case 0x82:
-			Int82();
-			return;
-		case 0x83:
-			Int83();
-			return;
-		case 0x84:
-			Int84();
-			return;
-		case 0x85:
-			Int85();
-			return;
-		case 0x86:
-			Int86();
-			return;
-		case 0x87:
-			Int87();
-			return;
-		case 0x88:
-			Int88();
-			return;
-		case 0x89:
-			Int89();
-			return;
-		case 0x8A:
-			Int8A();
-			return;
-		case 0x8B:
-			Int8B();
-			return;
-		case 0x8C:
-			Int8C();
-			return;
-		case 0x8D:
-			Int8D();
-			return;
-		case 0x8E:
-			Int8E();
-			return;
-		case 0x8F:
-			Int8F();
-			return;
+    case 0x70:
+        Int70();
+        return;
+    case 0x71:
+        Int71();
+        return;
+    case 0x72:
+        Int72();
+        return;
+    case 0x73:
+        Int73();
+        return;
+    case 0x74:
+        Int74();
+        return;
+    case 0x75:
+        Int75();
+        return;
+    case 0x76:
+        Int76();
+        return;
+    case 0x77:
+        Int77();
+        return;
+    case 0x78:
+        Int78();
+        return;
+    case 0x79:
+        Int79();
+        return;
+    case 0x7A:
+        Int7A();
+        return;
+    case 0x7B:
+        Int7B();
+        return;
+    case 0x7C:
+        Int7C();
+        return;
+    case 0x7D:
+        Int7D();
+        return;
+    case 0x7E:
+        Int7E();
+        return;
+    case 0x7F:
+        Int7F();
+        return;
 
-		case 0x90:
-			Int90();
-			return;
-		case 0x91:
-			Int91();
-			return;
-		case 0x92:
-			Int92();
-			return;
-		case 0x93:
-			Int93();
-			return;
-		case 0x94:
-			Int94();
-			return;
-		case 0x95:
-			Int95();
-			return;
-		case 0x96:
-			Int96();
-			return;
-		case 0x97:
-			Int97();
-			return;
-		case 0x98:
-			Int98();
-			return;
-		case 0x99:
-			Int99();
-			return;
-		case 0x9A:
-			Int9A();
-			return;
-		case 0x9B:
-			Int9B();
-			return;
-		case 0x9C:
-			Int9C();
-			return;
-		case 0x9D:
-			Int9D();
-			return;
-		case 0x9E:
-			Int9E();
-			return;
-		case 0x9F:
-			Int9F();
-			return;
+    case 0x80:
+        Int80();
+        return;
+    case 0x81:
+        Int81();
+        return;
+    case 0x82:
+        Int82();
+        return;
+    case 0x83:
+        Int83();
+        return;
+    case 0x84:
+        Int84();
+        return;
+    case 0x85:
+        Int85();
+        return;
+    case 0x86:
+        Int86();
+        return;
+    case 0x87:
+        Int87();
+        return;
+    case 0x88:
+        Int88();
+        return;
+    case 0x89:
+        Int89();
+        return;
+    case 0x8A:
+        Int8A();
+        return;
+    case 0x8B:
+        Int8B();
+        return;
+    case 0x8C:
+        Int8C();
+        return;
+    case 0x8D:
+        Int8D();
+        return;
+    case 0x8E:
+        Int8E();
+        return;
+    case 0x8F:
+        Int8F();
+        return;
 
-		case 0xA0:
-			IntA0();
-			return;
-		case 0xA1:
-			IntA1();
-			return;
-		case 0xA2:
-			IntA2();
-			return;
-		case 0xA3:
-			IntA3();
-			return;
-		case 0xA4:
-			IntA4();
-			return;
-		case 0xA5:
-			IntA5();
-			return;
-		case 0xA6:
-			IntA6();
-			return;
-		case 0xA7:
-			IntA7();
-			return;
-		case 0xA8:
-			IntA8();
-			return;
-		case 0xA9:
-			IntA9();
-			return;
-		case 0xAA:
-			IntAA();
-			return;
-		case 0xAB:
-			IntAB();
-			return;
-		case 0xAC:
-			IntAC();
-			return;
-		case 0xAD:
-			IntAD();
-			return;
-		case 0xAE:
-			IntAE();
-			return;
-		case 0xAF:
-			IntAF();
-			return;
+    case 0x90:
+        Int90();
+        return;
+    case 0x91:
+        Int91();
+        return;
+    case 0x92:
+        Int92();
+        return;
+    case 0x93:
+        Int93();
+        return;
+    case 0x94:
+        Int94();
+        return;
+    case 0x95:
+        Int95();
+        return;
+    case 0x96:
+        Int96();
+        return;
+    case 0x97:
+        Int97();
+        return;
+    case 0x98:
+        Int98();
+        return;
+    case 0x99:
+        Int99();
+        return;
+    case 0x9A:
+        Int9A();
+        return;
+    case 0x9B:
+        Int9B();
+        return;
+    case 0x9C:
+        Int9C();
+        return;
+    case 0x9D:
+        Int9D();
+        return;
+    case 0x9E:
+        Int9E();
+        return;
+    case 0x9F:
+        Int9F();
+        return;
 
-		case 0xB0:
-			IntB0();
-			return;
-		case 0xB1:
-			IntB1();
-			return;
-		case 0xB2:
-			IntB2();
-			return;
-		case 0xB3:
-			IntB3();
-			return;
-		case 0xB4:
-			IntB4();
-			return;
-		case 0xB5:
-			IntB5();
-			return;
-		case 0xB6:
-			IntB6();
-			return;
-		case 0xB7:
-			IntB7();
-			return;
-		case 0xB8:
-			IntB8();
-			return;
-		case 0xB9:
-			IntB9();
-			return;
-		case 0xBA:
-			IntBA();
-			return;
-		case 0xBB:
-			IntBB();
-			return;
-		case 0xBC:
-			IntBC();
-			return;
-		case 0xBD:
-			IntBD();
-			return;
-		case 0xBE:
-			IntBE();
-			return;
-		case 0xBF:
-			IntBF();
-			return;
+    case 0xA0:
+        IntA0();
+        return;
+    case 0xA1:
+        IntA1();
+        return;
+    case 0xA2:
+        IntA2();
+        return;
+    case 0xA3:
+        IntA3();
+        return;
+    case 0xA4:
+        IntA4();
+        return;
+    case 0xA5:
+        IntA5();
+        return;
+    case 0xA6:
+        IntA6();
+        return;
+    case 0xA7:
+        IntA7();
+        return;
+    case 0xA8:
+        IntA8();
+        return;
+    case 0xA9:
+        IntA9();
+        return;
+    case 0xAA:
+        IntAA();
+        return;
+    case 0xAB:
+        IntAB();
+        return;
+    case 0xAC:
+        IntAC();
+        return;
+    case 0xAD:
+        IntAD();
+        return;
+    case 0xAE:
+        IntAE();
+        return;
+    case 0xAF:
+        IntAF();
+        return;
 
-		case 0xC0:
-			IntC0();
-			return;
-		case 0xC1:
-			IntC1();
-			return;
-		case 0xC2:
-			IntC2();
-			return;
-		case 0xC3:
-			IntC3();
-			return;
-		case 0xC4:
-			IntC4();
-			return;
-		case 0xC5:
-			IntC5();
-			return;
-		case 0xC6:
-			IntC6();
-			return;
-		case 0xC7:
-			IntC7();
-			return;
-		case 0xC8:
-			IntC8();
-			return;
-		case 0xC9:
-			IntC9();
-			return;
-		case 0xCA:
-			IntCA();
-			return;
-		case 0xCB:
-			IntCB();
-			return;
-		case 0xCC:
-			IntCC();
-			return;
-		case 0xCD:
-			IntCD();
-			return;
-		case 0xCE:
-			IntCE();
-			return;
-		case 0xCF:
-			IntCF();
-			return;
+    case 0xB0:
+        IntB0();
+        return;
+    case 0xB1:
+        IntB1();
+        return;
+    case 0xB2:
+        IntB2();
+        return;
+    case 0xB3:
+        IntB3();
+        return;
+    case 0xB4:
+        IntB4();
+        return;
+    case 0xB5:
+        IntB5();
+        return;
+    case 0xB6:
+        IntB6();
+        return;
+    case 0xB7:
+        IntB7();
+        return;
+    case 0xB8:
+        IntB8();
+        return;
+    case 0xB9:
+        IntB9();
+        return;
+    case 0xBA:
+        IntBA();
+        return;
+    case 0xBB:
+        IntBB();
+        return;
+    case 0xBC:
+        IntBC();
+        return;
+    case 0xBD:
+        IntBD();
+        return;
+    case 0xBE:
+        IntBE();
+        return;
+    case 0xBF:
+        IntBF();
+        return;
 
-		case 0xD0:
-			IntD0();
-			return;
-		case 0xD1:
-			IntD1();
-			return;
-		case 0xD2:
-			IntD2();
-			return;
-		case 0xD3:
-			IntD3();
-			return;
-		case 0xD4:
-			IntD4();
-			return;
-		case 0xD5:
-			IntD5();
-			return;
-		case 0xD6:
-			IntD6();
-			return;
-		case 0xD7:
-			IntD7();
-			return;
-		case 0xD8:
-			IntD8();
-			return;
-		case 0xD9:
-			IntD9();
-			return;
-		case 0xDA:
-			IntDA();
-			return;
-		case 0xDB:
-			IntDB();
-			return;
-		case 0xDC:
-			IntDC();
-			return;
-		case 0xDD:
-			IntDD();
-			return;
-		case 0xDE:
-			IntDE();
-			return;
-		case 0xDF:
-			IntDF();
-			return;
+    case 0xC0:
+        IntC0();
+        return;
+    case 0xC1:
+        IntC1();
+        return;
+    case 0xC2:
+        IntC2();
+        return;
+    case 0xC3:
+        IntC3();
+        return;
+    case 0xC4:
+        IntC4();
+        return;
+    case 0xC5:
+        IntC5();
+        return;
+    case 0xC6:
+        IntC6();
+        return;
+    case 0xC7:
+        IntC7();
+        return;
+    case 0xC8:
+        IntC8();
+        return;
+    case 0xC9:
+        IntC9();
+        return;
+    case 0xCA:
+        IntCA();
+        return;
+    case 0xCB:
+        IntCB();
+        return;
+    case 0xCC:
+        IntCC();
+        return;
+    case 0xCD:
+        IntCD();
+        return;
+    case 0xCE:
+        IntCE();
+        return;
+    case 0xCF:
+        IntCF();
+        return;
 
-		case 0xE0:
-			IntE0();
-			return;
-		case 0xE1:
-			IntE1();
-			return;
-		case 0xE2:
-			IntE2();
-			return;
-		case 0xE3:
-			IntE3();
-			return;
-		case 0xE4:
-			IntE4();
-			return;
-		case 0xE5:
-			IntE5();
-			return;
-		case 0xE6:
-			IntE6();
-			return;
-		case 0xE7:
-			IntE7();
-			return;
-		case 0xE8:
-			IntE8();
-			return;
-		case 0xE9:
-			IntE9();
-			return;
-		case 0xEA:
-			IntEA();
-			return;
-		case 0xEB:
-			IntEB();
-			return;
-		case 0xEC:
-			IntEC();
-			return;
-		case 0xED:
-			IntED();
-			return;
-		case 0xEE:
-			IntEE();
-			return;
-		case 0xEF:
-			IntEF();
-			return;
+    case 0xD0:
+        IntD0();
+        return;
+    case 0xD1:
+        IntD1();
+        return;
+    case 0xD2:
+        IntD2();
+        return;
+    case 0xD3:
+        IntD3();
+        return;
+    case 0xD4:
+        IntD4();
+        return;
+    case 0xD5:
+        IntD5();
+        return;
+    case 0xD6:
+        IntD6();
+        return;
+    case 0xD7:
+        IntD7();
+        return;
+    case 0xD8:
+        IntD8();
+        return;
+    case 0xD9:
+        IntD9();
+        return;
+    case 0xDA:
+        IntDA();
+        return;
+    case 0xDB:
+        IntDB();
+        return;
+    case 0xDC:
+        IntDC();
+        return;
+    case 0xDD:
+        IntDD();
+        return;
+    case 0xDE:
+        IntDE();
+        return;
+    case 0xDF:
+        IntDF();
+        return;
 
-		case 0xF0:
-			IntF0();
-			return;
-		case 0xF1:
-			IntF1();
-			return;
-		case 0xF2:
-			IntF2();
-			return;
-		case 0xF3:
-			IntF3();
-			return;
-		case 0xF4:
-			IntF4();
-			return;
-		case 0xF5:
-			IntF5();
-			return;
-		case 0xF6:
-			IntF6();
-			return;
-		case 0xF7:
-			IntF7();
-			return;
-		case 0xF8:
-			IntF8();
-			return;
-		case 0xF9:
-			IntF9();
-			return;
-		case 0xFA:
-			IntFA();
-			return;
-		case 0xFB:
-			IntFB();
-			return;
-		case 0xFC:
-			IntFC();
-			return;
-		case 0xFD:
-			IntFD();
-			return;
-		case 0xFE:
-			IntFE();
-			return;
-		case 0xFF:
-			IntFF();
-			return;
+    case 0xE0:
+        IntE0();
+        return;
+    case 0xE1:
+        IntE1();
+        return;
+    case 0xE2:
+        IntE2();
+        return;
+    case 0xE3:
+        IntE3();
+        return;
+    case 0xE4:
+        IntE4();
+        return;
+    case 0xE5:
+        IntE5();
+        return;
+    case 0xE6:
+        IntE6();
+        return;
+    case 0xE7:
+        IntE7();
+        return;
+    case 0xE8:
+        IntE8();
+        return;
+    case 0xE9:
+        IntE9();
+        return;
+    case 0xEA:
+        IntEA();
+        return;
+    case 0xEB:
+        IntEB();
+        return;
+    case 0xEC:
+        IntEC();
+        return;
+    case 0xED:
+        IntED();
+        return;
+    case 0xEE:
+        IntEE();
+        return;
+    case 0xEF:
+        IntEF();
+        return;
 
+    case 0xF0:
+        IntF0();
+        return;
+    case 0xF1:
+        IntF1();
+        return;
+    case 0xF2:
+        IntF2();
+        return;
+    case 0xF3:
+        IntF3();
+        return;
+    case 0xF4:
+        IntF4();
+        return;
+    case 0xF5:
+        IntF5();
+        return;
+    case 0xF6:
+        IntF6();
+        return;
+    case 0xF7:
+        IntF7();
+        return;
+    case 0xF8:
+        IntF8();
+        return;
+    case 0xF9:
+        IntF9();
+        return;
+    case 0xFA:
+        IntFA();
+        return;
+    case 0xFB:
+        IntFB();
+        return;
+    case 0xFC:
+        IntFC();
+        return;
+    case 0xFD:
+        IntFD();
+        return;
+    case 0xFE:
+        IntFE();
+        return;
+    case 0xFF:
+        IntFF();
+        return;
 
-		default:
-			return;
-		}
-	
+    default:
+        return;
+    }
 }
 
 // void win_intr_local_irq_enable(void)
@@ -972,7 +985,6 @@ void win_intr_trigger_interrupt(uint32_t vector)
 // {
 // 	__asm{sti};
 // }
-
 
 // NTSTATUS InterruptCreateDispatch(
 //     IN PDEVICE_OBJECT pDeviceObject,
@@ -986,141 +998,208 @@ void win_intr_trigger_interrupt(uint32_t vector)
 // 	return STATUS_SUCCESS;
 // }
 
+/// @brief Get LAPIC ID for dedicated OS CPU
+/// @return OS_SUCCESS on success, error code on failure
+static OSSTATUS _win_os_dedicated_cpu_get_lapic_id(void)
+{
+    uint32_t os_cpu_id = 0;
+
+    os_cpu_id = _win_os_dedicated_cpu_get_id();
+
+    if (!__x86_os_cpu_lapic_mapping_find(os_cpu_id, &sos_os_intr_os_lapic_id))
+    {
+        return E_INTERNAL_ERROR;
+    }
+
+    // On success
+    return OS_SUCCESS;
+}
+
+/// @brief Probe and handle pending SecOS requests
+/// @param out_has_reqs Output flag indicating pending requests
+static void _probe_and_handle_sos_requests(bool* out_has_reqs)
+{
+    SACOMM_DEBUG("<comm_sos_handle_queued_msgs> start!\n");
+    comm_sos_handle_queued_msgs(out_has_reqs);
+    SACOMM_DEBUG("<comm_sos_handle_queued_msgs> finished!\n");
+}
+
+/// @brief The max interval (in milliseconds) for SecAgent to poll SecOS requests.
+/// If OS receives a SecOS request, then the next poll interval is 1ms.
+#define COMM_SOS_POLL_REQ_INTERVAL_MS_MAX (32)
+static ULONG _comm_sos_poll_interval_prev = 1;
+
+/// @brief Timer callback to poll SecOS requests
+/// @param Timer WDF timer handle
+static void _evt_sos_requests_timer(WDFTIMER Timer)
+{
+    ULONG next_ms = 1;
+    bool has_sos_reqs = false;
+
+    UNREFERENCED_PARAMETER(Timer); // same logic regardless of which fired
+    _probe_and_handle_sos_requests(&has_sos_reqs);
+
+    // Simple adaptive policy
+    if (has_sos_reqs)
+    {
+        next_ms = _comm_sos_poll_interval_prev = 1;
+    }
+    else
+    {
+        next_ms = _comm_sos_poll_interval_prev = min(COMM_SOS_POLL_REQ_INTERVAL_MS_MAX, _comm_sos_poll_interval_prev ? _comm_sos_poll_interval_prev * 2 : 2);
+    }
+
+    _arm_poll_timer(next_ms);
+}
+
 _Use_decl_annotations_ BOOLEAN _InterruptIsr(IN PKINTERRUPT Interrupt, IN OUT PVOID Context)
 {
-	PDEVICE_OBJECT t_DeviceObject = Context;
+    PDEVICE_OBJECT t_device_object = Context;
 
-	UNREFERENCED_PARAMETER(Interrupt);
+    UNREFERENCED_PARAMETER(Interrupt);
 
-	// Top half of the ISR
-	IoRequestDpc(t_DeviceObject,
-	 		 t_DeviceObject->CurrentIrp,
-			 NULL);
+    // Top half of the ISR
+    IoRequestDpc(t_device_object,
+                 t_device_object->CurrentIrp,
+                 NULL);
 
-	return TRUE;
+    return TRUE;
 }
 
+/// @brief DPC routine for interrupt handling
+/// @param Dpc DPC object
+/// @param pDeviceObject Device object
+/// @param Irp IRP
+/// @param Context Context pointer
 static VOID _InterruptDpcRoutine(IN PKDPC Dpc, PDEVICE_OBJECT pDeviceObject, IN PIRP Irp, IN PVOID Context)
 {
-	PDEVICE_EXTENSION DeviceExtension;
-	PIRP pIrp;
+    PDEVICE_EXTENSION device_extension = NULL;
+    PIRP p_irp = NULL;
 
-	UNREFERENCED_PARAMETER(Dpc);
-	UNREFERENCED_PARAMETER(Irp);
-	UNREFERENCED_PARAMETER(Context);
+    UNREFERENCED_PARAMETER(Dpc);
+    UNREFERENCED_PARAMETER(Irp);
+    UNREFERENCED_PARAMETER(Context);
 
-	// bottom half of the ISR
-	pIrp = pDeviceObject->CurrentIrp;
-	DeviceExtension = pDeviceObject->DeviceExtension;
+    // bottom half of the ISR
+    p_irp = pDeviceObject->CurrentIrp;
+    device_extension = pDeviceObject->DeviceExtension;
 
-	UNREFERENCED_PARAMETER(pIrp);
-	UNREFERENCED_PARAMETER(DeviceExtension);
+    UNREFERENCED_PARAMETER(p_irp);
+    UNREFERENCED_PARAMETER(device_extension);
 
-	SACOMM_DEBUG("<comm_sos_handle_queued_msgs> start!\n");
-	comm_sos_handle_queued_msgs();
-	SACOMM_DEBUG("<comm_sos_handle_queued_msgs> finished!\n");
-	return;
+    _probe_and_handle_sos_requests(NULL);
+    return;
 }
 
-#define AVAIL_INTR_START	(0x20)
-#define AVAIL_INTR_END		(0xF0)
+#define AVAIL_INTR_START (0x20)
+#define AVAIL_INTR_END (0xF0)
 
 static PKINTERRUPT IntrObj = NULL;
 
+/// @brief Register a Windows interrupt vector
+/// @param intr Interrupt vector
+/// @param suppress_err_msg Suppress error logging if true
+/// @return OS_SUCCESS on success, error code on failure
 static OSSTATUS _win_intr_register(intr_t intr, bool suppress_err_msg)
 {
-	NTSTATUS status;
-   	PDEVICE_EXTENSION DeviceExtension = DeviceObject->DeviceExtension;
-	KAFFINITY Affinity;
-   	// KIRQL Irql;
+    NTSTATUS status = STATUS_SUCCESS;
+    PDEVICE_EXTENSION device_extension = DeviceObject->DeviceExtension;
+    KAFFINITY affinity = 0;
+    // KIRQL Irql;
 
-	// Check: No double registration of interrupts
-	// if(DeviceExtension->InterruptObject)
-	if(IntrObj)
-	{
-		DbgPrint("<win_intr_register> failed: Double registration!\n");
-		return E_INV_ARG;
-	}
+    // Check: No double registration of interrupts
+    // if(DeviceExtension->InterruptObject)
+    if (IntrObj)
+    {
+        DbgPrint("<win_intr_register> failed: Double registration!\n");
+        return E_INV_ARG;
+    }
 
-	// DeviceExtension->Level = irq;
-	/*DeviceExtension->Vector = DeviceExtension->Level;
+    // DeviceExtension->Level = irq;
+    /*DeviceExtension->Vector = DeviceExtension->Level;
 
-   	intr = HalGetInterruptVector(Isa,						
-                                           0,							
-                                           DeviceExtension->Level,		
-                                           DeviceExtension->Vector,	
-                                           &Irql,						
+    intr = HalGetInterruptVector(Isa,
+                                           0,
+                                           DeviceExtension->Level,
+                                           DeviceExtension->Vector,
+                                           &Irql,
                                            &DeviceExtension->Affinity);
 
-   	DRV_DEBUG("intr = 0x%08X\n",intr);
-   	DRV_DEBUG("Level = 0x%08X\n",DeviceExtension->Level);
-   	DRV_DEBUG("Vector = 0x%08X\n",DeviceExtension->Vector);
-   	DRV_DEBUG("Irql = 0x%08X\n",Irql);
-   	DRV_DEBUG("Affinity = 0x%08X\n",DeviceExtension->Affinity); */
+    DRV_DEBUG("intr = 0x%08X\n",intr);
+    DRV_DEBUG("Level = 0x%08X\n",DeviceExtension->Level);
+    DRV_DEBUG("Vector = 0x%08X\n",DeviceExtension->Vector);
+    DRV_DEBUG("Irql = 0x%08X\n",Irql);
+    DRV_DEBUG("Affinity = 0x%08X\n",DeviceExtension->Affinity); */
 
-	// intr = ioapic_get_vector(irq);
+    // intr = ioapic_get_vector(irq);
 
-	// Check: <intr> must be in [AVAIL_INTR_START, AVAIL_INTR_END)
- 	if (!VALUE_IN_RANGE(intr, AVAIL_INTR_START, AVAIL_INTR_END)) 
- 	{
-		if(!suppress_err_msg)
-			DRV_ERR("<win_intr_register> failed! intr:%u\n", intr);
-		return E_INV_ARG;
- 	}
+    // Check: <intr> must be in [AVAIL_INTR_START, AVAIL_INTR_END)
+    if (!VALUE_IN_RANGE(intr, AVAIL_INTR_START, AVAIL_INTR_END))
+    {
+        if (!suppress_err_msg)
+            DRV_ERR("<win_intr_register> failed! intr:%u\n", intr);
+        return E_INV_ARG;
+    }
 
-	Affinity = KeQueryActiveProcessors();
- 	IoInitializeDpcRequest(DeviceObject, _InterruptDpcRoutine);
+    UNREFERENCED_PARAMETER(device_extension);
+    affinity = KeQueryActiveProcessors();
+    IoInitializeDpcRequest(DeviceObject, _InterruptDpcRoutine);
 
-  	status = IoConnectInterrupt(&IntrObj, // &DeviceExtension->InterruptObject, 	// InterruptObject
-  					    _InterruptIsr,	   	// ServiceRoutine
-  					    DeviceObject,		// ServiceContext
- 					    NULL,			// SpinLock
-					    (ULONG)intr,		// Vector
-  					    PASSIVE_LEVEL,			// Irql
-						PASSIVE_LEVEL,			// SynchronizeIrql
-					    Latched,			// InterruptMode
-  					    FALSE,			// ShareVector
-					    Affinity,	// ProcessorEnableMask
-					    FALSE);			// FloatingSave
+    status = IoConnectInterrupt(&IntrObj,      // &DeviceExtension->InterruptObject, 	// InterruptObject
+                                _InterruptIsr, // ServiceRoutine
+                                DeviceObject,  // ServiceContext
+                                NULL,          // SpinLock
+                                (ULONG)intr,   // Vector
+                                PASSIVE_LEVEL, // Irql
+                                PASSIVE_LEVEL, // SynchronizeIrql
+                                Latched,       // InterruptMode
+                                FALSE,         // ShareVector
+                                affinity,      // ProcessorEnableMask
+                                FALSE);        // FloatingSave
 
-  	if (!NT_SUCCESS (status)) 
-  	{
-		if(!suppress_err_msg)
-			DRV_ERR("IoConnectInterrupt Failed! intr:%u status:0x%X\n", intr, status);
-		return E_INTERNAL_ERROR;
-  	}
+    if (!NT_SUCCESS(status))
+    {
+        if (!suppress_err_msg)
+            DRV_ERR("IoConnectInterrupt Failed! intr:%u status:0x%X\n", intr, status);
+        return E_INTERNAL_ERROR;
+    }
 
-	// DriverObject->MajorFunction[IRP_MJ_CREATE] = InterruptCreateDispatch;
+    // DriverObject->MajorFunction[IRP_MJ_CREATE] = InterruptCreateDispatch;
 
-	return OS_SUCCESS;
+    return OS_SUCCESS;
 }
 
+/// @brief Unregister a Windows interrupt vector
+/// @param intr Interrupt vector
 void _win_intr_unregister(intr_t intr)
 {
-    PDEVICE_EXTENSION extension = DriverObject->DeviceObject->DeviceExtension;
+    PDEVICE_EXTENSION device_extension = DriverObject->DeviceObject->DeviceExtension;
 
-	UNREFERENCED_PARAMETER(intr);
+    UNREFERENCED_PARAMETER(intr);
+    UNREFERENCED_PARAMETER(device_extension);
 
-	// Disconnect Interrupt
-	if(IntrObj)
-	{
-		// [TODO][Issue 104] When XMHF runs, IoDisconnectInterrupt hangs the Dell 7050 PC but works fine on Qemu
-		// // IoDisconnectInterrupt(extension->InterruptObject);
-		// IoDisconnectInterrupt(IntrObj);
-		// IntrObj = NULL;
-	}
+    // Disconnect Interrupt
+    if (IntrObj)
+    {
+        // [TODO][Issue 104] When XMHF runs, IoDisconnectInterrupt hangs the Dell 7050 PC but works fine on Qemu
+        // // IoDisconnectInterrupt(extension->InterruptObject);
+        // IoDisconnectInterrupt(IntrObj);
+        // IntrObj = NULL;
+    }
 }
 
-void win_intr_init(PDRIVER_OBJECT in_DriverObject, PDEVICE_OBJECT in_DeviceObject)
+void win_intr_init(PDRIVER_OBJECT in_DriverObject, PDEVICE_OBJECT in_DeviceObject, WDFDEVICE* in_WDFDevice)
 {
-	DriverObject = in_DriverObject;
-	DeviceObject = in_DeviceObject;
+    DriverObject = in_DriverObject;
+    DeviceObject = in_DeviceObject;
+    memcpy(&WDF_Device, in_WDFDevice, sizeof(WDFDEVICE));
 }
 
 void win_intr_fini(void)
 {
-	DriverObject = NULL;
-	DeviceObject = NULL;
+    DriverObject = NULL;
+    DeviceObject = NULL;
+    memset(&WDF_Device, 0, sizeof(WDFDEVICE));
 }
 
 // int win_find_sos_os_irq(void)
@@ -1141,114 +1220,252 @@ void win_intr_fini(void)
 // 	return INVALID_IRQ;
 // }
 
+#ifdef GREENBOX_USE_UXMHF64_V1
 void win_os_intr_remove_affinity(void)
 {
-	OSSTATUS status = OS_SUCCESS;
+    OSSTATUS status = OS_SUCCESS;
 
-	status = ioapic_remove_allintrs_affinity(1); // Remove the interrupt affinity from CPU 1
-	if(SA_FAIL(status))
-	{
-		DRV_ERR("Failed to remove affinity in IOAPIC of CPU 1\n");
-	}
+    status = ioapic_remove_allintrs_affinity(1); // Remove the interrupt affinity from CPU 1
+    if (SA_FAIL(status))
+    {
+        DRV_ERR("Failed to remove affinity in IOAPIC of CPU 1\n");
+    }
 }
 
 void win_os_intr_restore_affinity(void)
 {
-	// Do nothing
+    // Do nothing
 }
+#endif // GREENBOX_USE_UXMHF64_V1
 
+/// @brief Get dedicated OS CPU ID (BSP)
+/// @return CPU ID
 static uint32_t _win_os_dedicated_cpu_get_id(void)
 {
-	return 0;
+    // Return the CPU ID of the BSP.
+    return 0;
 }
+
+/// @brief Arm poll timers for SecOS request polling
+/// @param nextMs Next poll interval in milliseconds
+static VOID _arm_poll_timer(ULONG nextMs)
+{
+    if (!gTimerHi || !gTimerLo)
+        return;
+
+    WdfTimerStop(gTimerHi, FALSE);
+    WdfTimerStop(gTimerLo, FALSE);
+
+    // Make sure only one can be running
+    if (nextMs < HIRES_THRESHOLD_MS) {
+        WdfTimerStart(gTimerHi, WDF_REL_TIMEOUT_IN_MS(nextMs));
+    } else {
+        WdfTimerStart(gTimerLo, WDF_REL_TIMEOUT_IN_MS(nextMs));
+    }
+}
+
+/// @brief Default IPI vector used by SecOS to receive OS's requests. 
+/// [NOTE] SecOS does not need to export this definition. SecAgent can allocate any interrupt vector and SecOS can use  
+/// it happily.
+#define SECOS_DEFAULT_IPI_VECTOR_FOR_COMM   (0x41)
 
 OSSTATUS win_sos_os_intr_probe_and_register(void)
 {
-	OSSTATUS status = OS_SUCCESS;
-	intr_t result = INVALID_INTR;
-	bool success = false;
-	uint32_t os_cpu_id = 0;
+    OSSTATUS status = OS_SUCCESS;
 
-	if(sos_os_intr != INVALID_INTR)
-	{
-		// DRV_ERR("Probe SecOS-OS IRQ Error! Double probe without unregistering the previous SecOS-OS interrupt vector\n"); 
-		// return E_INV_ARG;
+    if (SA_CONFIG_ENABLE_ALLOC_COMM_INTR)
+    {
+        intr_t result = INVALID_INTR;
+        bool success = false;
 
-		// [TODO][Issue 104] Due to Issue 104, SecAgent only invokes IoDisconnectInterrupt during DriverUnload
-		return OS_SUCCESS;
-	}
+        if (sos_os_intr != INVALID_INTR)
+        {
+            // DRV_ERR("Probe SecOS-OS IRQ Error! Double probe without unregistering the previous SecOS-OS interrupt vector\n");
+            // return E_INV_ARG;
 
-	// Probe available interrupt vectors
-	FOREACH_S(result, AVAIL_INTR_END, INTR_VECTOR_MAX, AVAIL_INTR_START, 1)
-	{
-		status = _win_intr_register(result, true);
-		if(SA_PASS(status))
-		{
-			// Probe success!
-			success = true;
-			break;
-		}
-	}
+            // [TODO][Issue 104] Due to Issue 104, SecAgent only invokes IoDisconnectInterrupt during DriverUnload
+            return OS_SUCCESS;
+        }
 
-	if(!success)
-	{
-		DRV_ERR("Probe SecOS-OS IRQ Error!\n"); 
-		return E_INTERNAL_ERROR;
-	}
+        // Probe available interrupt vectors
+        FOREACH_S(result, AVAIL_INTR_END, INTR_VECTOR_MAX, AVAIL_INTR_START, 1)
+        {
+            status = _win_intr_register(result, true);
+            if (SA_PASS(status))
+            {
+                // Probe success!
+                success = true;
+                break;
+            }
+        }
 
-	// On success
-	sos_os_intr = result;
+        if (!success)
+        {
+            DRV_ERR("[SecOS-OS Comm][IRQ] Error!\n");
+            return E_INTERNAL_ERROR;
+        }
 
-	os_cpu_id = _win_os_dedicated_cpu_get_id();
+        // Get the LAPIC ID of the OS dedicated CPU.
+        status = _win_os_dedicated_cpu_get_lapic_id();
+        if (SA_FAIL(status))
+        {
+            DRV_ERR("[SecOS-OS Comm][IRQ] Probe Error: Cannot find LAPIC ID of the OS's CPU:%u\n", _win_os_dedicated_cpu_get_id());
+            return E_INTERNAL_ERROR;
+        }
 
-	if (!__x86_os_cpu_lapic_mapping_find(os_cpu_id, &sos_os_intr_os_lapic_id)) {
-		DRV_ERR("Probe SecOS-OS IRQ Error! Cannot find LAPIC ID of the OS's CPU:%u\n", os_cpu_id);
-		return E_INTERNAL_ERROR;
-	}
+        // On success
+        sos_os_intr = result;
+        DRV_INFO("[SecOS-OS Comm][IRQ] Assign IRQ for SecOS-OS communication. Interrupt vector:%u\n", sos_os_intr);
+    }
+    else
+    {
+        // If not allocate an interrupt vector to receive SecOS's requests, then SecAgent creates a timer to poll them 
+        // instead.
+        NTSTATUS ntstatus;
+        WDF_TIMER_CONFIG tc;
+        WDF_OBJECT_ATTRIBUTES oa;
 
-	return OS_SUCCESS;
+        // High-resolution timer
+        WDF_TIMER_CONFIG_INIT(&tc, _evt_sos_requests_timer);
+        tc.Period = 0;                 // one-shot; we re-arm manually
+        tc.TolerableDelay = 0;         // tight
+        tc.UseHighResolutionTimer = WdfTrue;
+        WDF_OBJECT_ATTRIBUTES_INIT(&oa);
+        oa.ParentObject = WDF_Device;
+        ntstatus = WdfTimerCreate(&tc, &oa, &gTimerHi);
+        if (!NT_SUCCESS(ntstatus))
+        {
+            DRV_ERR("Create high-resolution timer for polling SecOS requests error! status:0x%08X\n", ntstatus);
+            return E_INTERNAL_ERROR;
+        }
+
+        // Normal timer (allow coalescing). TolerableDelay is a hint set at create.
+        WDF_TIMER_CONFIG_INIT(&tc, _evt_sos_requests_timer);
+        tc.Period = 0;                 
+        tc.TolerableDelay = TolerableDelayUnlimited; // let OS coalesce when slow
+        tc.UseHighResolutionTimer = WdfFalse;
+        WDF_OBJECT_ATTRIBUTES_INIT(&oa);
+        oa.ParentObject = WDF_Device;
+        ntstatus = WdfTimerCreate(&tc, &oa, &gTimerLo);
+        if (!NT_SUCCESS(ntstatus))
+        {
+            DRV_ERR("Create standard timer for polling SecOS requests error! status:0x%08X\n", ntstatus);
+            return E_INTERNAL_ERROR;
+        }
+
+        // Get the LAPIC ID of the OS dedicated CPU.
+        status = _win_os_dedicated_cpu_get_lapic_id();
+        if (SA_FAIL(status))
+        {
+            DRV_ERR("[SecOS-OS Comm][Poll Timer] Cannot find LAPIC ID of the OS's CPU:%u\n", _win_os_dedicated_cpu_get_id());
+            return E_INTERNAL_ERROR;
+        }
+
+        // On success
+        sos_os_intr = SECOS_DEFAULT_IPI_VECTOR_FOR_COMM;
+        DRV_WARN("[SecOS-OS Comm][Poll Timer] Performance degrade: Receiving SecOS Requests with OS Poll timers, not IPIs.\n");
+        DRV_INFO("[SecOS-OS Comm][Poll Timer] SecOS uses interrupt %u for communications.\n", sos_os_intr);
+    }
+
+    // On success
+    return OS_SUCCESS;
 }
 
 void win_sos_os_intr_unregister(void)
 {
-    if(sos_os_intr != INVALID_INTR)
-	{
-		_win_intr_unregister(sos_os_intr);
-		sos_os_intr = INVALID_INTR;
-	}
+    if (SA_CONFIG_ENABLE_ALLOC_COMM_INTR)
+    {
+        // Release the IPI vector to poll SecOS's requests.
+        if (sos_os_intr != INVALID_INTR)
+        {
+            _win_intr_unregister(sos_os_intr);
+            sos_os_intr = INVALID_INTR;
+        }
+    }
+    else
+    {
+        // Clear the IPI vector.
+        if (sos_os_intr != INVALID_INTR)
+        {
+            sos_os_intr = INVALID_INTR;
+        }
+
+        // Destroy the timer to poll SecOS's requests.
+        if (gTimerHi)
+        {
+            WdfTimerStop(gTimerHi, TRUE); // wait for any running callback
+            gTimerHi = NULL;
+        }
+
+        if (gTimerLo)
+        {
+            WdfTimerStop(gTimerLo, TRUE); // wait for any running callback
+            gTimerLo = NULL;
+        }
+    }
+}
+
+void win_sos_os_intr_start(void)
+{
+    if (SA_CONFIG_ENABLE_ALLOC_COMM_INTR)
+    {
+        // Do nothing to enable the IPI interrupt
+    }
+    else
+    {
+        // Enable the poll timer
+        _arm_poll_timer(1);
+    }
+}
+
+void win_sos_os_intr_stop(void)
+{
+    if (SA_CONFIG_ENABLE_ALLOC_COMM_INTR)
+    {
+        // Do nothing to disable the IPI interrupt
+    }
+    else
+    {
+        // Disable the poll timer
+        if (gTimerHi)
+            WdfTimerStop(gTimerHi, FALSE);
+
+        if (gTimerLo)
+            WdfTimerStop(gTimerLo, FALSE);
+    }
 }
 
 intr_t win_sos_os_intr_get_vector(void)
 {
-	return sos_os_intr;
+    return sos_os_intr;
 }
 
-#define TIMER_INTERRUPT_VECTOR_WINDOWS      (0xD1)
+#define TIMER_INTERRUPT_VECTOR_WINDOWS (0xD1)
 intr_t win_intr_timer(void)
 {
-	return TIMER_INTERRUPT_VECTOR_WINDOWS;
+    return TIMER_INTERRUPT_VECTOR_WINDOWS;
 }
 
 lapic_id_t win_sos_os_intr_get_os_lapic_id(void)
 {
-	return sos_os_intr_os_lapic_id;
+    return sos_os_intr_os_lapic_id;
 }
 
 void win_debug_intr_get_current_irq_priority(void)
 {
-	KIRQL irql;
-	uint32_t tpr, ppr;
+    KIRQL irql;
+    uint32_t tpr, ppr;
 
-	// Windows IRQL
-	irql = KeGetCurrentIrql();
-	DRV_INFO("<win_get_current_irq_priority> Current IRQL:%u\n", irql);
-	
-	// Task Priority Register
-	tpr = lapic_read_tpr();
+    // Windows IRQL
+    irql = KeGetCurrentIrql();
+    DRV_INFO("<win_get_current_irq_priority> Current IRQL:%u\n", irql);
 
-	// Processor-Priority Register
-	ppr = lapic_read_ppr();
+    // Task Priority Register
+    tpr = lapic_read_tpr();
 
-	// Report
-	DRV_INFO("<win_get_current_irq_priority> Current IRQL:%u, TPR:%u, PPR:%u\n", irql, tpr, ppr);
+    // Processor-Priority Register
+    ppr = lapic_read_ppr();
+
+    // Report
+    DRV_INFO("<win_get_current_irq_priority> Current IRQL:%u, TPR:%u, PPR:%u\n", irql, tpr, ppr);
 }

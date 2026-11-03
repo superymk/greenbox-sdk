@@ -25,6 +25,7 @@
 #include <jansson.h>
 
 #include "ssl_ca.h"
+#include "utils.h"
 
 typedef struct
 {
@@ -46,7 +47,7 @@ typedef struct gdrive_poll_state
 
 } gdrive_tokens_poll_state_t;
 
-#define GDRIVE_UPLOAD_DOWNLOAD_FILE_SIZE_MAX (MB(4))
+#define GDRIVE_UPLOAD_DOWNLOAD_FILE_SIZE_MAX (MB(64))
 
 const char *g_client_id = "544657840600-nmq99f57bvs4c9ojacj9il8tuj29sf5d.apps.googleusercontent.com";
 const char *g_client_secret = "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";
@@ -56,7 +57,7 @@ const char *g_scope =
     "email";
 
 // ---- Config
-static const int min_poll_interval = 7; // Poll interval is >= 7 seconds.
+static const int min_poll_interval = 3; // Poll interval is >= 3 seconds.
 static const char *DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code";
 static const char *TOKEN_URL = "https://oauth2.googleapis.com/token";
 static const char *DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -213,7 +214,7 @@ static void set_common_curl_opts(CURL *C)
     // Fail quickly on dead/stalled connections
     curl_easy_setopt(C, CURLOPT_CONNECTTIMEOUT_MS, 30000L);
     curl_easy_setopt(C, CURLOPT_TIMEOUT_MS, 45000L);
-    
+
     // curl_easy_setopt(C, CURLOPT_LOW_SPEED_LIMIT, 1L);
     // curl_easy_setopt(C, CURLOPT_LOW_SPEED_TIME, 15L);
     curl_easy_setopt(C, CURLOPT_LOW_SPEED_LIMIT, 0L);
@@ -472,7 +473,6 @@ static char *curl_post_multipart_auth(const char *url, const char *bearer,
     /* Give bigger transfers more time */
     curl_easy_setopt(C, CURLOPT_CONNECTTIMEOUT_MS, 45000L);
     curl_easy_setopt(C, CURLOPT_TIMEOUT_MS, 120000L);
-
 
     struct mem m = {0};
     struct curl_slist *hdr = NULL;
@@ -1208,8 +1208,6 @@ static char *_drive_upload_file(const char *bearer, const char *local_path, cons
     (void)parent_id_opt;
     const char *base = name_opt ? name_opt : basename_x(local_path);
 
-    // SAP_ERR("[Superymk] <_drive_upload_file> 1\n");
-
     // Check: file size must be within the limit.
     file_size = _fs_local_get_file_size(local_path);
     if (file_size < 0)
@@ -1235,9 +1233,6 @@ static char *_drive_upload_file(const char *bearer, const char *local_path, cons
     json_decref(meta);
 
     char *resp = curl_post_multipart_auth(DRIVE_UPLOAD, bearer, meta_str, local_path, mime_opt);
-    // SAP_ERR("[Superymk] <_drive_upload_file> 2 local_path:%s\n", local_path);
-    // SAP_ERR("[Superymk] <_drive_upload_file> 2 meta_str:%s\n", meta_str);
-    // SAP_ERR("[Superymk] <_drive_upload_file> 2 resp:%s\n", resp ? resp : "(null)");
     free(meta_str);
 
     if (!resp)
@@ -1271,13 +1266,23 @@ static char *_drive_upload_file(const char *bearer, const char *local_path, cons
 
 static char *drive_create_folder(const char *bearer, const char *name, const char *parent_id_opt)
 {
-    char url[256];
-    snprintf(url, sizeof(url), "%s/files", DRIVE_API);
+    char *ret = NULL;
+    char *url = NULL;
+    json_t *J = NULL;
+
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        goto out;
+    }
+
+    snprintf(url, URL_MAX_SIZE, "%s/files", DRIVE_API);
     CURL *C = curl_easy_init();
     if (!C)
     {
         die("curl init");
-        return NULL;
+        goto out;
     }
     set_common_curl_opts(C);
 
@@ -1320,32 +1325,54 @@ static char *drive_create_folder(const char *bearer, const char *name, const cha
     {
         free(m.ptr);
         die("HTTP %ld creating folder", code);
-        return NULL;
+        goto out;
     }
 
     json_error_t je;
-    json_t *J = json_loads(m.ptr, 0, &je);
+    J = json_loads(m.ptr, 0, &je);
     free(m.ptr);
     if (!J)
+    {
         die("create folder parse: %s", je.text);
+        goto out;
+    }
     const char *id = json_string_value(json_object_get(J, "id"));
     if (!id)
     {
         json_decref(J);
         die("create folder: no id");
+        goto out;
     }
-    char *ret = sdup(id);
-    json_decref(J);
+
+    ret = sdup(id);
+
+out:
+    if (J)
+        json_decref(J);
+
+    if (url)
+        url_free(url);
+
     return ret;
 }
 
 char *drive_find_or_create_path(const char *bearer, const char *parent_id, const char *comp)
 {
+    char *ret = NULL;
+    char *url = NULL;
+
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        goto err;
+    }
+
     CURL *C = curl_easy_init();
     if (!C)
     {
         die("curl init");
-        return NULL;
+        goto err;
     }
     set_common_curl_opts(C);
 
@@ -1355,28 +1382,46 @@ char *drive_find_or_create_path(const char *bearer, const char *parent_id, const
              comp, parent_id);
     char *q_esc = escape_str(C, q_raw);
 
-    char url[2048];
-    snprintf(url, sizeof(url), "%s/files?pageSize=10&fields=files(id,name)&q=%s", DRIVE_API, q_esc);
+    snprintf(url, URL_MAX_SIZE, "%s/files?pageSize=10&fields=files(id,name)&q=%s", DRIVE_API, q_esc);
 
     curl_easy_cleanup(C);
     free(q_esc);
 
     char *resp = curl_get_auth(url, bearer);
+    if (!resp)
+    {
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
+        goto err;
+    }
+
     json_error_t je;
     json_t *J = json_loads(resp, 0, &je);
     free(resp);
     if (!J)
+    {
         die("find folder parse: %s", je.text);
+        goto err;
+    }
     json_t *files = json_object_get(J, "files");
     json_t *first = (files && json_array_size(files) > 0) ? json_array_get(files, 0) : NULL;
     const char *id = first ? json_string_value(json_object_get(first, "id")) : NULL;
-    char *ret = NULL;
     if (id)
         ret = sdup(id);
+
     json_decref(J);
+    if (url)
+        url_free(url);
+
     if (ret)
         return ret;
-    return drive_create_folder(bearer, comp, parent_id);
+    else
+        return drive_create_folder(bearer, comp, parent_id);
+
+err:
+    if (url)
+        url_free(url);
+
+    return NULL;
 }
 
 static int drive_list(const char *bearer, const char *parent_opt)
@@ -1395,9 +1440,17 @@ static int drive_list(const char *bearer, const char *parent_opt)
     else
         snprintf(q_raw, sizeof(q_raw), "trashed=false");
 
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        curl_easy_cleanup(C);
+        return 1;
+    }
+
     char *q_esc = escape_str(C, q_raw);
-    char url[2048];
-    snprintf(url, sizeof(url),
+    snprintf(url, URL_MAX_SIZE,
              "%s/files?pageSize=1000"
              "&fields=nextPageToken,files(id,name,mimeType,parents)"
              "&q=%s"
@@ -1408,8 +1461,12 @@ static int drive_list(const char *bearer, const char *parent_opt)
     free(q_esc);
 
     char *resp = curl_get_auth(url, bearer);
+    url_free(url);
     if (!resp)
+    {
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
         return 1;
+    }
 
     json_error_t je;
     json_t *J = json_loads(resp, 0, &je);
@@ -1442,11 +1499,21 @@ static int drive_list(const char *bearer, const char *parent_opt)
 
 static void drive_download_file(const char *bearer, const char *id, const char *name, const char *dest)
 {
-    char path[1024];
+    char path[1024] = {0};
     path_join(path, sizeof(path), dest, name);
-    char url[1024];
-    snprintf(url, sizeof(url), "%s/files/%s?alt=media", DRIVE_API, id);
+
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        return;
+    }
+
+    snprintf(url, URL_MAX_SIZE, "%s/files/%s?alt=media", DRIVE_API, id);
     curl_get_auth_to_file(url, bearer, path);
+    url_free(url);
+
     SAP_INFO("saved: %s\n", path);
 }
 
@@ -1470,15 +1537,31 @@ static void drive_download_folder(const char *bearer, const char *id, const char
 
     char q_raw[1024];
     snprintf(q_raw, sizeof(q_raw), "'%s' in parents and trashed=false", id);
+
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        curl_easy_cleanup(C);
+        return;
+    }
+
     char *q_esc = escape_str(C, q_raw);
 
-    char url[2048];
-    snprintf(url, sizeof(url), "%s/files?pageSize=1000&fields=files(id,name,mimeType)&q=%s", DRIVE_API, q_esc);
+    snprintf(url, URL_MAX_SIZE, "%s/files?pageSize=1000&fields=files(id,name,mimeType)&q=%s", DRIVE_API, q_esc);
 
     curl_easy_cleanup(C);
     free(q_esc);
 
     char *resp = curl_get_auth(url, bearer);
+    url_free(url);
+    if (!resp)
+    {
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
+        return;
+    }
+
     json_error_t je;
     json_t *J = json_loads(resp, 0, &je);
     free(resp);
@@ -1503,9 +1586,23 @@ static void drive_download_folder(const char *bearer, const char *id, const char
 
 __attribute__((unused)) static void drive_download_recursive(const char *bearer, const char *id, const char *dest)
 {
-    char url[1024];
-    snprintf(url, sizeof(url), "%s/files/%s?fields=id,name,mimeType", DRIVE_API, id);
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        return;
+    }
+
+    snprintf(url, URL_MAX_SIZE, "%s/files/%s?fields=id,name,mimeType", DRIVE_API, id);
     char *resp = curl_get_auth(url, bearer);
+    url_free(url);
+    if (!resp)
+    {
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
+        return;
+    }
+
     json_error_t je;
     json_t *J = json_loads(resp, 0, &je);
     free(resp);
@@ -1571,9 +1668,21 @@ static char *_gdrive_upload_file(const char *local_path, const char *name_opt,
 }
 
 /********* Public functions *********/
-SAP_STATUS gdrive_init(void)
+SAP_STATUS gdrive_init(SAP_CONFIG *sap_cfg)
 {
-    sslca_init();
+    SAP_STATUS status = SUCCESS;
+
+    // Check: params must be valid
+    if (!sap_cfg)
+        return EINVAL;
+
+    status = sslca_init(sap_cfg->fs_local_info.certs_filepath);
+    if (FAIL(status))
+    {
+        SAP_ERR("GDrive Init Error: SSL CA init error! status:%lu\n", status);
+        return EINTERNAL;
+    }
+
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
     // Create a shared object to share DNS cache across all easy handles
@@ -1583,6 +1692,8 @@ SAP_STATUS gdrive_init(void)
         curl_share_setopt(g_share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
         // single-threaded: no lock callbacks required
     }
+
+    // On success
     return SUCCESS;
 }
 
@@ -1593,6 +1704,8 @@ void gdrive_fini(void)
         curl_share_cleanup(g_share);
         g_share = NULL;
     }
+
+    sslca_fini();
 }
 
 SAP_STATUS gdrive_login_query_device_user_code(device_user_code_t *out_duc)
@@ -1677,8 +1790,6 @@ int gdrive_list_children(const char *parent_id, gdrive_entry_t **out, size_t *ou
     *out = NULL;
     *out_n = 0;
 
-    // SAP_ERR("[Superymk] <gdrive_list_children> 1\n");
-
     tokens_t T = {0};
     ensure_fresh_access_token(&T);
     if (!T.access_token || !*T.access_token)
@@ -1699,10 +1810,20 @@ int gdrive_list_children(const char *parent_id, gdrive_entry_t **out, size_t *ou
 
     char q_raw[1024];
     snprintf(q_raw, sizeof(q_raw), "trashed=false and '%s' in parents", pid);
+
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        curl_easy_cleanup(C);
+        tokens_free(&T);
+        return 1;
+    }
+
     char *q_esc = escape_str(C, q_raw);
 
-    char url[2048];
-    snprintf(url, sizeof(url),
+    snprintf(url, URL_MAX_SIZE,
              "%s/files?pageSize=1000"
              "&fields=files(id,name,mimeType,modifiedTime,size)"
              "&q=%s"
@@ -1713,11 +1834,13 @@ int gdrive_list_children(const char *parent_id, gdrive_entry_t **out, size_t *ou
     free(q_esc);
 
     char *resp = curl_get_auth(url, T.access_token);
-    // SAP_ERR("[Superymk] <gdrive_list_children> 2 url:%s\n", url);
-    // SAP_ERR("[Superymk] <gdrive_list_children> 2 resp:%s\n", resp ? resp : "(null)");
+    url_free(url);
     tokens_free(&T);
     if (!resp)
+    {
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
         return 1;
+    }
 
     json_error_t je;
     json_t *J = json_loads(resp, 0, &je);
@@ -1785,12 +1908,11 @@ void gdrive_entries_free(gdrive_entry_t *arr, size_t n)
 
 int gdrive_download_to(const char *id, const char *local_dir)
 {
+    int ret = 0;
     tokens_t T = {0};
 
     if (!id || !local_dir)
         return 1;
-
-    // SAP_ERR("[Superymk] <gdrive_download_to> 1\n");
 
     ensure_fresh_access_token(&T);
     if (!T.access_token || !*T.access_token)
@@ -1799,14 +1921,22 @@ int gdrive_download_to(const char *id, const char *local_dir)
         return 1;
     }
 
-    char url[1024];
-    snprintf(url, sizeof(url), "%s/files/%s?fields=id,name,mimeType,size", DRIVE_API, id);
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        tokens_free(&T);
+        return 1;
+    }
+
+    snprintf(url, URL_MAX_SIZE, "%s/files/%s?fields=id,name,mimeType,size", DRIVE_API, id);
     char *resp = curl_get_auth(url, T.access_token);
-    // SAP_ERR("[Superymk] <gdrive_download_to> 2 url:%s\n", url);
-    // SAP_ERR("[Superymk] <gdrive_download_to> 2 resp:%s\n", resp ? resp : "(null)");
+    url_free(url);
     if (!resp)
     {
         tokens_free(&T);
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
         return 1;
     }
 
@@ -1819,29 +1949,42 @@ int gdrive_download_to(const char *id, const char *local_dir)
         return 1;
     }
 
-    const char *name = json_string_value(json_object_get(J, "name"));
+    const char *name_s = json_string_value(json_object_get(J, "name"));
     const char *mt = json_string_value(json_object_get(J, "mimeType"));
     const char *szs = json_string_value(json_object_get(J, "size"));
     int is_folder = (mt && strstr(mt, "folder")) ? 1 : 0;
+
+    /* Make safe copies / values BEFORE decref */
+    char *name = name_s ? sdup(name_s) : sdup("(unnamed)");
+    unsigned long long rfile_size = szs ? parse_ull(szs) : 0ULL;
+
     json_decref(J);
+
+    if (!name)
+    {
+        tokens_free(&T);
+        return 1;
+    }
 
     if (is_folder)
         drive_download_folder(T.access_token, id, name, local_dir);
     else
     {
-        unsigned long long rfile_size = parse_ull(szs);
         if (rfile_size > GDRIVE_UPLOAD_DOWNLOAD_FILE_SIZE_MAX)
         {
             SAP_ERR("GDrive Download: File (%s) is too big! (size: %llu) \n", name, rfile_size);
-            tokens_free(&T);
-            return 1; /* FIX: do not return NULL from int function */
+            ret = 1;
         }
-
-        drive_download_file(T.access_token, id, name, local_dir);
+        else
+        {
+            drive_download_file(T.access_token, id, name, local_dir);
+            ret = 0;
+        }
     }
 
+    free(name);
     tokens_free(&T);
-    return 0;
+    return ret;
 }
 
 int gdrive_upload_one(const char *local_path, const char *parent_id)
@@ -1874,12 +2017,24 @@ int gdrive_id_to_name(const char *id, char *buf, size_t bufsz)
         return 1;
     }
 
-    char url[1024];
-    snprintf(url, sizeof(url), "%s/files/%s?fields=name", DRIVE_API, id);
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        tokens_free(&T);
+        return 1;
+    }
+
+    snprintf(url, URL_MAX_SIZE, "%s/files/%s?fields=name", DRIVE_API, id);
     char *resp = curl_get_auth(url, T.access_token);
+    url_free(url);
     tokens_free(&T);
     if (!resp)
+    {
+        SAP_ERR("<%s>: Invalid response!\n", __func__);
         return 1;
+    }
 
     json_error_t je;
     json_t *J = json_loads(resp, 0, &je);
@@ -1916,8 +2071,16 @@ int gdrive_delete_one(const char *id)
     set_common_curl_opts(C);
 
     /* Build URL: DELETE https://www.googleapis.com/drive/v3/files/{id}?supportsAllDrives=true */
-    char url[1024];
-    snprintf(url, sizeof(url), "%s/files/%s?supportsAllDrives=true", DRIVE_API, id);
+    char *url = NULL;
+    url = url_alloc();
+    if (!url)
+    {
+        SAP_ERR("<%s>: No mem for URL!\n", __func__);
+        curl_easy_cleanup(C);
+        return 1;
+    }
+
+    snprintf(url, URL_MAX_SIZE, "%s/files/%s?supportsAllDrives=true", DRIVE_API, id);
 
     /* Headers */
     struct curl_slist *hdr = NULL;
@@ -1939,6 +2102,8 @@ int gdrive_delete_one(const char *id)
     long code = 0;
     if (rc == CURLE_OK)
         curl_easy_getinfo(C, CURLINFO_RESPONSE_CODE, &code);
+
+    url_free(url);
 
     if (sink.ptr)
         free(sink.ptr);
@@ -1963,9 +2128,9 @@ int gdrive_delete_one(const char *id)
 }
 
 /********* Debug Functions *********/
-void gdrive_test(void)
+void gdrive_test(SAP_CONFIG *sap_cfg)
 {
-    gdrive_init();
+    gdrive_init(sap_cfg);
 
     if (gdrive_login(NULL, NULL) == SUCCESS)
     {

@@ -2,19 +2,19 @@
 	"folders": [
 		{
 			"name": "secapp_demos",
-			"path": "code/secapp_demos"
+			"path": "secapp_demos"
 		},
 		{
 			"name": "secapp_libs",
-			"path": "code/secapp_libs"
+			"path": "secapp_libs"
 		},
 		{
 			"name": "loaders",
-			"path": "code/loaders"
+			"path": "loaders"
 		},
 		{
 			"name": "os_module",
-			"path": "code/os_module"
+			"path": "os_module"
 		}
 	],
     "settings": {
@@ -51,7 +51,10 @@
 			"libc_backend.h": "c",
 			"format": "c",
 			"thread": "c",
-			"vector": "c"
+			"vector": "c",
+			"version": "c",
+			"sl_rpc_protocol.h": "c",
+			"tpmtool_header.h": "c"
 		}
     }
 }
