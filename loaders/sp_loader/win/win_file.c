@@ -137,7 +137,7 @@ FILE* fopen_normalized_path(const char *filepath, const char* mode)
     return fopen(filepath, mode);
 }
 
-int fs_read_file(const char *filepath, uint8_t create_if_not_exist, uint8_t **data, size_t *len)
+int fs_read_file(const char *filepath, bool create_if_not_exist, uint8_t **data, size_t *len)
 {
     int fd;
     if (create_if_not_exist)
